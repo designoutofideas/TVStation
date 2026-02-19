@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated": "2026-02-19T11:13:10.124Z",
+  "generated": "2026-02-19T13:59:38.419Z",
   "blocks": [
     {
       "id": "b1",
@@ -37,6 +37,54 @@
           "identifier": "HowKhazarZionistsDivideAndConquer",
           "duration": 894,
           "scheduledStart": "06:00"
+        },
+        {
+          "title": "Supporters of jailed Cambodian American lawyer Theary Seng protest at Phnom Penh courthouse",
+          "identifier": "youtube-Aa-VtpdhB-4",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Environmental activists march in chains through Cambodia’s capital | Radio Free Asia (RFA)",
+          "identifier": "youtube-WG9Nvh6Zo7g",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "It’s ‘Watch Out for the Train!’ at a Mandalay Market",
+          "identifier": "youtube-aGgh8Y_Or7U",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Cambodian Garment Workers Protest for Better Wages, Conditions",
+          "identifier": "youtube-f08x1NyrzV0",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Cambodian Labor Activists Convicted, Then Released",
+          "identifier": "youtube-ngYYx3d3_8w",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Upstream dam leaves Cambodian fishermen high and dry | Radio Free Asia (RFA)",
+          "identifier": "youtube-hFL39xzcfok",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Khmer Rouge Trial Nears End",
+          "identifier": "youtube-I08cob67GMk",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "China Flexes Military Muscle in Tiananmen Square",
+          "identifier": "youtube-N2EkMko5VW0",
+          "duration": 0,
+          "scheduledStart": "06:00"
         }
       ]
     },
@@ -45,7 +93,45 @@
       "name": "Afternoon",
       "genre": "afternoon",
       "startTime": "12:00",
-      "items": []
+      "items": [
+        {
+          "title": "Khmer Rouge survivor: 'I refused to die'",
+          "identifier": "",
+          "duration": 0,
+          "url": "https://archive.org/details/youtube-eM9hspQBAL4",
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "Surviving Khmer Rouge: RFA staff member looks back on life under Pol Pot",
+          "identifier": "youtube-YzAep6brIIs",
+          "duration": 0,
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "Woman Shot in Shandong Taxi Driver Protest",
+          "identifier": "youtube-yakXWijQtls",
+          "duration": 0,
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "Sold to China",
+          "identifier": "youtube-8BfH3ygkpu0",
+          "duration": 0,
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "Cambodia's Khmer Rouge Defendants Maintain Innocence",
+          "identifier": "youtube-14H5gwsi7m0",
+          "duration": 0,
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "VOA [Voice of America] Global English : March 31, 2020 02:00AM-03:00AM EDT",
+          "identifier": "VOA_Global_English_20200331_060000",
+          "duration": 3600,
+          "scheduledStart": "12:00"
+        }
+      ]
     },
     {
       "id": "b3",
