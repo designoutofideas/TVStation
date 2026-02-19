@@ -1,0 +1,637 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>TVStation</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+
+  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+  :root {
+    --amber: #ffb700;
+    --amber-dim: #7a5800;
+    --red: #ff3b1f;
+    --bg: #0a0a0a;
+    --scanline: rgba(0,0,0,0.25);
+    --glow: rgba(255,183,0,0.15);
+  }
+
+  html, body {
+    width: 100%; height: 100%;
+    background: var(--bg);
+    color: var(--amber);
+    font-family: 'Share Tech Mono', monospace;
+    overflow: hidden;
+  }
+
+  /* CRT phosphor screen effect */
+  body::before {
+    content: '';
+    position: fixed; inset: 0; z-index: 100;
+    background: repeating-linear-gradient(
+      0deg,
+      var(--scanline) 0px,
+      var(--scanline) 1px,
+      transparent 1px,
+      transparent 3px
+    );
+    pointer-events: none;
+    animation: scanroll 8s linear infinite;
+  }
+  @keyframes scanroll {
+    0% { background-position: 0 0; }
+    100% { background-position: 0 300px; }
+  }
+
+  /* Vignette */
+  body::after {
+    content: '';
+    position: fixed; inset: 0; z-index: 99;
+    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.85) 100%);
+    pointer-events: none;
+  }
+
+  #video-container {
+    position: fixed; inset: 0;
+    display: flex; align-items: center; justify-content: center;
+    background: #000;
+  }
+
+  #player {
+    width: 100%; height: 100%;
+    object-fit: contain;
+    opacity: 0;
+    transition: opacity 1.2s ease;
+  }
+  #player.loaded { opacity: 1; }
+
+  /* Static noise overlay when loading */
+  #static {
+    position: fixed; inset: 0; z-index: 50;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.3s;
+    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
+    background-size: 200px;
+    mix-blend-mode: overlay;
+  }
+  #static.active { opacity: 1; }
+
+  /* HUD overlay */
+  #hud {
+    position: fixed; inset: 0; z-index: 90;
+    pointer-events: none;
+    display: flex; flex-direction: column; justify-content: space-between;
+    padding: 28px 36px;
+  }
+
+  /* Top bar */
+  .hud-top {
+    display: flex; justify-content: space-between; align-items: flex-start;
+  }
+
+  .station-id {
+    font-family: 'Bebas Neue', cursive;
+    font-size: clamp(28px, 4vw, 52px);
+    letter-spacing: 0.12em;
+    color: var(--amber);
+    text-shadow: 0 0 20px var(--amber), 0 0 40px rgba(255,183,0,0.4);
+    line-height: 1;
+  }
+  .station-id span {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 0.3em;
+    font-weight: 300;
+    display: block;
+    letter-spacing: 0.3em;
+    color: var(--amber-dim);
+    text-shadow: none;
+    margin-top: 4px;
+  }
+
+  .live-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 600;
+    letter-spacing: 0.2em;
+    color: var(--red);
+    text-shadow: 0 0 10px var(--red);
+  }
+  .live-dot {
+    width: 8px; height: 8px;
+    border-radius: 50%;
+    background: var(--red);
+    box-shadow: 0 0 8px var(--red);
+    animation: blink 1.4s ease-in-out infinite;
+  }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+
+  .clock-block {
+    text-align: right;
+  }
+  #clock {
+    font-family: 'Bebas Neue', cursive;
+    font-size: clamp(22px, 3vw, 42px);
+    letter-spacing: 0.08em;
+    color: var(--amber);
+    text-shadow: 0 0 15px var(--amber);
+    display: block;
+  }
+  #date-display {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    letter-spacing: 0.25em;
+    color: var(--amber-dim);
+    text-align: right;
+    margin-top: 2px;
+  }
+
+  /* Bottom info bar */
+  .hud-bottom {
+    display: flex; flex-direction: column; gap: 10px;
+  }
+
+  .progress-bar-wrap {
+    width: 100%;
+    height: 2px;
+    background: rgba(255,183,0,0.12);
+    position: relative;
+  }
+  #progress-bar {
+    height: 100%;
+    background: var(--amber);
+    box-shadow: 0 0 8px var(--amber);
+    width: 0%;
+    transition: width 1s linear;
+  }
+
+  .now-playing-row {
+    display: flex; justify-content: space-between; align-items: flex-end;
+    gap: 20px;
+  }
+
+  .now-playing {
+    flex: 1;
+  }
+
+  .label {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.35em;
+    color: var(--amber-dim);
+    text-transform: uppercase;
+    margin-bottom: 5px;
+  }
+
+  #now-title {
+    font-family: 'Bebas Neue', cursive;
+    font-size: clamp(18px, 2.8vw, 38px);
+    letter-spacing: 0.06em;
+    line-height: 1.1;
+    color: var(--amber);
+    text-shadow: 0 0 20px rgba(255,183,0,0.5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 65vw;
+  }
+
+  #genre-tag {
+    display: inline-block;
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 9px;
+    font-weight: 600;
+    letter-spacing: 0.25em;
+    color: var(--bg);
+    background: var(--amber-dim);
+    padding: 2px 8px;
+    margin-top: 5px;
+  }
+
+  .up-next {
+    text-align: right;
+    min-width: 220px;
+    max-width: 280px;
+  }
+  #next-title {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    font-weight: 300;
+    color: rgba(255,183,0,0.5);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  #time-remaining {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 10px;
+    color: var(--amber-dim);
+    margin-top: 3px;
+  }
+
+  /* Channel change flash */
+  #channel-flash {
+    position: fixed; inset: 0; z-index: 95;
+    background: white;
+    opacity: 0;
+    pointer-events: none;
+    transition: opacity 0.05s;
+  }
+  #channel-flash.flash { opacity: 0.6; }
+
+  /* Error state */
+  #error-state {
+    position: fixed; inset: 0; z-index: 80;
+    display: none;
+    align-items: center; justify-content: center;
+    flex-direction: column; gap: 16px;
+    text-align: center;
+  }
+  #error-state.visible { display: flex; }
+  #error-state h2 {
+    font-family: 'Bebas Neue', cursive;
+    font-size: 48px;
+    letter-spacing: 0.1em;
+    color: var(--amber-dim);
+  }
+  #error-state p {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--amber-dim);
+  }
+
+  /* No schedule */
+  #no-schedule {
+    position: fixed; inset: 0; z-index: 80;
+    display: none; align-items: center; justify-content: center;
+    flex-direction: column; gap: 20px;
+    text-align: center; padding: 40px;
+  }
+  #no-schedule.visible { display: flex; }
+  #no-schedule h1 {
+    font-family: 'Bebas Neue', cursive;
+    font-size: clamp(36px, 6vw, 80px);
+    letter-spacing: 0.08em;
+    color: var(--amber);
+    text-shadow: 0 0 30px var(--amber);
+  }
+  #no-schedule p {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 12px;
+    letter-spacing: 0.2em;
+    color: var(--amber-dim);
+    max-width: 500px;
+    line-height: 1.8;
+  }
+  #no-schedule a {
+    font-family: 'IBM Plex Mono', monospace;
+    font-size: 11px;
+    letter-spacing: 0.2em;
+    color: var(--amber);
+    text-decoration: none;
+    border: 1px solid var(--amber-dim);
+    padding: 10px 24px;
+    transition: all 0.2s;
+  }
+  #no-schedule a:hover {
+    background: var(--amber);
+    color: var(--bg);
+  }
+</style>
+</head>
+<body>
+
+<div id="channel-flash"></div>
+<div id="static"></div>
+
+<div id="video-container">
+  <video id="player" autoplay playsinline></video>
+</div>
+
+<div id="error-state">
+  <h2>SIGNAL LOST</h2>
+  <p>ATTEMPTING TO RESTORE BROADCAST...</p>
+</div>
+
+<div id="no-schedule" class="visible">
+  <h1>TVStation</h1>
+  <p>NO SCHEDULE LOADED<br>
+  CREATE A SCHEDULE USING THE ADMIN PANEL<br>
+  AND SAVE SCHEDULE.JSON TO THIS DIRECTORY</p>
+  <a href="admin.html">OPEN ADMIN PANEL →</a>
+</div>
+
+<div id="hud">
+  <div class="hud-top">
+    <div>
+      <div class="station-id">
+        TVStation
+        <span>BROADCASTING 24/7</span>
+      </div>
+      <div class="live-badge" style="margin-top:12px">
+        <div class="live-dot"></div>
+        LIVE
+      </div>
+    </div>
+    <div class="clock-block">
+      <span id="clock">00:00:00</span>
+      <div id="date-display">---</div>
+    </div>
+  </div>
+
+  <div class="hud-bottom">
+    <div class="progress-bar-wrap">
+      <div id="progress-bar"></div>
+    </div>
+    <div class="now-playing-row">
+      <div class="now-playing">
+        <div class="label">Now Playing</div>
+        <div id="now-title">—</div>
+        <div id="genre-tag">—</div>
+      </div>
+      <div class="up-next">
+        <div class="label" style="text-align:right">Up Next</div>
+        <div id="next-title">—</div>
+        <div id="time-remaining">—</div>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script>
+// ─── CONFIG ───────────────────────────────────────────────────────────────────
+const SCHEDULE_URL = './schedule.json';  // path to your schedule file
+const STATION_NAME = 'TVStation';
+
+// ─── STATE ────────────────────────────────────────────────────────────────────
+let schedule = [];
+let currentIndex = -1;
+let tickInterval = null;
+let scheduleLoaded = false;
+
+// ─── DOM ──────────────────────────────────────────────────────────────────────
+const player = document.getElementById('player');
+const clockEl = document.getElementById('clock');
+const dateEl = document.getElementById('date-display');
+const nowTitle = document.getElementById('now-title');
+const genreTag = document.getElementById('genre-tag');
+const nextTitle = document.getElementById('next-title');
+const timeRemaining = document.getElementById('time-remaining');
+const progressBar = document.getElementById('progress-bar');
+const noSchedule = document.getElementById('no-schedule');
+const errorState = document.getElementById('error-state');
+const staticEl = document.getElementById('static');
+const flashEl = document.getElementById('channel-flash');
+
+// ─── CLOCK ────────────────────────────────────────────────────────────────────
+function updateClock() {
+  const now = new Date();
+  const h = String(now.getHours()).padStart(2,'0');
+  const m = String(now.getMinutes()).padStart(2,'0');
+  const s = String(now.getSeconds()).padStart(2,'0');
+  clockEl.textContent = `${h}:${m}:${s}`;
+  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+  dateEl.textContent = `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+}
+setInterval(updateClock, 1000);
+updateClock();
+
+// ─── SCHEDULE LOADING ─────────────────────────────────────────────────────────
+async function loadSchedule() {
+  try {
+    const resp = await fetch(SCHEDULE_URL + '?t=' + Date.now());
+    if (!resp.ok) throw new Error('not found');
+    const data = await resp.json();
+    schedule = buildTimeline(data);
+    if (schedule.length > 0) {
+      scheduleLoaded = true;
+      noSchedule.classList.remove('visible');
+      startPlayback();
+    }
+  } catch(e) {
+    console.warn('No schedule.json found. Showing placeholder.');
+    // keep no-schedule visible
+  }
+}
+
+// Build a flat timeline of items with absolute start/end seconds-from-midnight
+function buildTimeline(data) {
+  const timeline = [];
+  const blocks = data.blocks || [];
+
+  blocks.forEach(block => {
+    const items = block.items || [];
+    items.forEach(item => {
+      timeline.push({
+        ...item,
+        genre: block.genre,
+        blockName: block.name
+      });
+    });
+  });
+
+  // Sort by scheduledStart (HH:MM string or seconds)
+  timeline.sort((a, b) => parseTime(a.scheduledStart) - parseTime(b.scheduledStart));
+
+  // Assign absolute start/end in seconds from midnight
+  let cursor = 0;
+  const result = [];
+  for (const item of timeline) {
+    const startSec = parseTime(item.scheduledStart);
+    const start = Math.max(cursor, startSec);
+    const end = start + (item.duration || 3600);
+    result.push({ ...item, startSec: start, endSec: end });
+    cursor = end;
+  }
+  return result;
+}
+
+function parseTime(t) {
+  if (!t) return 0;
+  if (typeof t === 'number') return t;
+  const [h, m] = t.split(':').map(Number);
+  return h * 3600 + (m || 0) * 60;
+}
+
+function secondsFromMidnight() {
+  const now = new Date();
+  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+}
+
+// ─── PLAYBACK ENGINE ──────────────────────────────────────────────────────────
+function startPlayback() {
+  if (tickInterval) clearInterval(tickInterval);
+  syncToCurrentTime();
+  tickInterval = setInterval(tick, 2000);
+}
+
+function syncToCurrentTime() {
+  const now = secondsFromMidnight();
+  const idx = findCurrentItem(now);
+  if (idx === -1) {
+    showError('NO CONTENT SCHEDULED FOR THIS TIME');
+    return;
+  }
+  if (idx !== currentIndex) {
+    loadItem(idx, now);
+  }
+}
+
+function tick() {
+  if (!scheduleLoaded) return;
+  const now = secondsFromMidnight();
+  const item = schedule[currentIndex];
+  if (item && now >= item.endSec) {
+    // time to advance
+    const next = findCurrentItem(now);
+    if (next !== currentIndex) {
+      doChannelChange(() => loadItem(next, now));
+    }
+  }
+  updateHUD();
+}
+
+function findCurrentItem(nowSec) {
+  // Find item that should be playing right now
+  for (let i = 0; i < schedule.length; i++) {
+    if (nowSec >= schedule[i].startSec && nowSec < schedule[i].endSec) return i;
+  }
+  // If we're past the last item, loop back (for 24hr looping)
+  if (schedule.length > 0 && nowSec >= schedule[schedule.length-1].endSec) return 0;
+  if (schedule.length > 0 && nowSec < schedule[0].startSec) return schedule.length - 1;
+  return 0;
+}
+
+function loadItem(idx, nowSec) {
+  currentIndex = idx;
+  const item = schedule[idx];
+  if (!item) return;
+
+  // Build archive.org stream URL
+  const streamUrl = buildStreamUrl(item);
+
+  staticEl.classList.add('active');
+  player.classList.remove('loaded');
+
+  setTimeout(() => {
+    player.src = streamUrl;
+
+    // Seek to correct position within the item
+    const offset = (nowSec - item.startSec);
+    if (offset > 5) {
+      player.addEventListener('loadedmetadata', function seekOnce() {
+        player.currentTime = Math.min(offset, player.duration - 2);
+        player.removeEventListener('loadedmetadata', seekOnce);
+      });
+    }
+
+    player.play().catch(e => {
+      // autoplay blocked — show play prompt
+      console.warn('Autoplay blocked:', e);
+      showPlayPrompt();
+    });
+
+    player.oncanplay = () => {
+      staticEl.classList.remove('active');
+      player.classList.add('loaded');
+      errorState.classList.remove('visible');
+    };
+
+    player.onerror = () => {
+      staticEl.classList.remove('active');
+      showError('STREAM ERROR — SKIPPING...');
+      setTimeout(() => {
+        currentIndex = (currentIndex + 1) % schedule.length;
+        loadItem(currentIndex, secondsFromMidnight());
+      }, 4000);
+    };
+
+    updateHUD();
+  }, 400);
+}
+
+function buildStreamUrl(item) {
+  // If item has a direct url, use it
+  if (item.url) return item.url;
+  // Otherwise build archive.org URL from identifier + filename
+  if (item.identifier && item.filename) {
+    return `https://archive.org/download/${item.identifier}/${item.filename}`;
+  }
+  // Fallback to identifier-based URL (archive.org serves main file)
+  if (item.identifier) {
+    return `https://archive.org/download/${item.identifier}`;
+  }
+  return '';
+}
+
+function updateHUD() {
+  const item = schedule[currentIndex];
+  if (!item) return;
+
+  const now = secondsFromMidnight();
+  const elapsed = now - item.startSec;
+  const total = item.endSec - item.startSec;
+  const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
+  progressBar.style.width = pct + '%';
+
+  nowTitle.textContent = item.title || item.identifier || 'UNKNOWN';
+  genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
+
+  // Up next
+  const nextIdx = (currentIndex + 1) % schedule.length;
+  const nextItem = schedule[nextIdx];
+  if (nextItem) {
+    nextTitle.textContent = nextItem.title || nextItem.identifier || '—';
+    const secLeft = item.endSec - now;
+    if (secLeft > 0) {
+      const mm = Math.floor(secLeft / 60);
+      const ss = String(secLeft % 60).padStart(2,'0');
+      timeRemaining.textContent = `in ${mm}:${ss}`;
+    }
+  }
+}
+
+function doChannelChange(cb) {
+  flashEl.classList.add('flash');
+  staticEl.classList.add('active');
+  setTimeout(() => {
+    flashEl.classList.remove('flash');
+    cb();
+  }, 120);
+}
+
+function showError(msg) {
+  errorState.querySelector('p').textContent = msg;
+  errorState.classList.add('visible');
+}
+
+function showPlayPrompt() {
+  // Create a click-to-play overlay
+  const overlay = document.createElement('div');
+  overlay.style.cssText = `
+    position:fixed;inset:0;z-index:200;display:flex;align-items:center;
+    justify-content:center;cursor:pointer;background:rgba(0,0,0,0.6)
+  `;
+  overlay.innerHTML = `<div style="font-family:'Bebas Neue',cursive;font-size:48px;letter-spacing:0.1em;color:#ffb700;text-shadow:0 0 30px #ffb700;">▶ CLICK TO TUNE IN</div>`;
+  overlay.onclick = () => {
+    player.play();
+    overlay.remove();
+  };
+  document.body.appendChild(overlay);
+}
+
+// ─── INIT ─────────────────────────────────────────────────────────────────────
+loadSchedule();
+
+// Reload schedule every 30 minutes to pick up updates
+setInterval(loadSchedule, 30 * 60 * 1000);
+</script>
+</body>
+</html>

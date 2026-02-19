@@ -1,0 +1,100 @@
+{
+  "version": 1,
+  "generated": "2026-02-18T00:00:00.000Z",
+  "blocks": [
+    {
+      "id": "b1",
+      "name": "Morning",
+      "genre": "morning",
+      "startTime": "06:00",
+      "items": [
+        {
+          "title": "Design for Dreaming (1956)",
+          "identifier": "DesignFo1956",
+          "duration": 660,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "A Touch of Magic (1961)",
+          "identifier": "ATouchOf1961",
+          "duration": 900,
+          "scheduledStart": "06:11"
+        },
+        {
+          "title": "Cavalcade of Aviation (1953)",
+          "identifier": "CavalcadeOfAviation",
+          "duration": 1800,
+          "scheduledStart": "06:26"
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "name": "Afternoon",
+      "genre": "afternoon",
+      "startTime": "12:00",
+      "items": [
+        {
+          "title": "Night of the Living Dead (1968)",
+          "identifier": "night_of_the_living_dead",
+          "duration": 5760,
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "Plan 9 from Outer Space (1957)",
+          "identifier": "plan_9",
+          "duration": 5280,
+          "scheduledStart": "13:36"
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "name": "Prime Time",
+      "genre": "primetime",
+      "startTime": "19:00",
+      "items": [
+        {
+          "title": "His Girl Friday (1940)",
+          "identifier": "HisGirlFriday_931",
+          "duration": 5880,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "The General (1926) - Buster Keaton",
+          "identifier": "TheGeneral_Keaton",
+          "duration": 4680,
+          "scheduledStart": "20:38"
+        }
+      ]
+    },
+    {
+      "id": "b4",
+      "name": "Late Night",
+      "genre": "latenight",
+      "startTime": "23:00",
+      "items": [
+        {
+          "title": "Nosferatu (1922)",
+          "identifier": "Nosferatu_1922_restoration",
+          "duration": 5400,
+          "scheduledStart": "23:00"
+        }
+      ]
+    },
+    {
+      "id": "b5",
+      "name": "Overnight",
+      "genre": "overnight",
+      "startTime": "01:00",
+      "items": [
+        {
+          "title": "Relaxing Nature Sounds - Archive.org",
+          "identifier": "CavalcadeOfAviation",
+          "duration": 18000,
+          "scheduledStart": "01:00"
+        }
+      ]
+    }
+  ]
+}
