@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated": "2026-02-18T00:00:00.000Z",
+  "generated": "2026-02-19T02:15:22.483Z",
   "blocks": [
     {
       "id": "b1",
@@ -18,13 +18,13 @@
           "title": "A Touch of Magic (1961)",
           "identifier": "ATouchOf1961",
           "duration": 900,
-          "scheduledStart": "06:11"
+          "scheduledStart": "06:00"
         },
         {
           "title": "Cavalcade of Aviation (1953)",
           "identifier": "CavalcadeOfAviation",
           "duration": 1800,
-          "scheduledStart": "06:26"
+          "scheduledStart": "06:00"
         }
       ]
     },
@@ -44,7 +44,7 @@
           "title": "Plan 9 from Outer Space (1957)",
           "identifier": "plan_9",
           "duration": 5280,
-          "scheduledStart": "13:36"
+          "scheduledStart": "12:00"
         }
       ]
     },
@@ -64,7 +64,7 @@
           "title": "The General (1926) - Buster Keaton",
           "identifier": "TheGeneral_Keaton",
           "duration": 4680,
-          "scheduledStart": "20:38"
+          "scheduledStart": "19:00"
         }
       ]
     },
