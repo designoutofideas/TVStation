@@ -1,5 +1,107 @@
 {
   "version": 1,
+  "generated": "2026-02-19T23:45:00.894Z",
+  "blocks": [
+    {
+      "id": "b1",
+      "name": "Morning",
+      "genre": "morning",
+      "startTime": "06:00",
+      "items": [
+        {
+          "title": "Woman Shot in Shandong Taxi Driver Protest",
+          "identifier": "youtube-yakXWijQtls",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Thousands Rally for Democracy in Hong Kong",
+          "identifier": "youtube-owpS0GZS_ZM",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Sold to China",
+          "identifier": "youtube-8BfH3ygkpu0",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "Tibetans Rescue Illegally-Caught Fish at Qinghai Lake",
+          "identifier": "youtube-pJtj6kPHNSk",
+          "duration": 0,
+          "scheduledStart": "06:00"
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "name": "Afternoon",
+      "genre": "afternoon",
+      "startTime": "12:00",
+      "items": []
+    },
+    {
+      "id": "b3",
+      "name": "Prime Time",
+      "genre": "primetime",
+      "startTime": "19:00",
+      "items": [
+        {
+          "title": "Sold to China",
+          "identifier": "youtube-8BfH3ygkpu0",
+          "duration": 0,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "Tibetans Rescue Illegally-Caught Fish at Qinghai Lake",
+          "identifier": "youtube-pJtj6kPHNSk",
+          "duration": 0,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "Vietnam’s Montagnards Now a Minority in Their Own Homeland",
+          "identifier": "youtube-MeuH0XTwwkM",
+          "duration": 0,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "It’s ‘Watch Out for the Train!’ at a Mandalay Market",
+          "identifier": "youtube-aGgh8Y_Or7U",
+          "duration": 0,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "Scores March Against Voting Rights for Myanmar’s Rohingya",
+          "identifier": "youtube-XjSm1MiOVxA",
+          "duration": 0,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "Pyongyang Style: North Korea Girl Bands Rock China's Border",
+          "identifier": "youtube-gvcZaLnKask",
+          "duration": 0,
+          "scheduledStart": "19:00"
+        }
+      ]
+    },
+    {
+      "id": "b4",
+      "name": "Late Night",
+      "genre": "latenight",
+      "startTime": "23:00",
+      "items": []
+    },
+    {
+      "id": "b5",
+      "name": "Overnight",
+      "genre": "overnight",
+      "startTime": "01:00",
+      "items": []
+    }
+  ]
+}{
+  "version": 1,
   "generated": "2026-02-19T14:01:57.227Z",
   "blocks": [
     {
