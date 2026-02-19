@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TVStation</title>
+<title>ArchiveTV</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 
@@ -509,34 +509,89 @@ function findCurrentItem(nowSec) {
   return 0;
 }
 
-function loadItem(idx, nowSec) {
+// Cache of resolved URLs so we don't re-fetch metadata each time
+const urlCache = {};
+
+async function resolveStreamUrl(item) {
+  // 1. Direct URL always wins
+  if (item.url) return item.url;
+
+  // 2. identifier + explicit filename
+  if (item.identifier && item.filename) {
+    return `https://archive.org/download/${item.identifier}/${encodeURIComponent(item.filename)}`;
+  }
+
+  // 3. Look up best video file from Archive.org metadata API
+  if (item.identifier) {
+    if (urlCache[item.identifier]) return urlCache[item.identifier];
+    try {
+      const metaUrl = `https://archive.org/metadata/${item.identifier}`;
+      const resp = await fetch(metaUrl);
+      const meta = await resp.json();
+      const files = meta.files || [];
+
+      // Prefer: mp4 > ogv > avi — and prefer smaller/_512kb versions
+      const priority = [/_512kb\.mp4$/i, /\.mp4$/i, /_512kb\.ogv$/i, /\.ogv$/i, /\.avi$/i, /\.mov$/i];
+      let picked = null;
+      for (const pattern of priority) {
+        picked = files.find(f => pattern.test(f.name) && f.source !== 'original' || pattern.test(f.name));
+        if (picked) break;
+      }
+      // Fallback: any video file
+      if (!picked) picked = files.find(f => /\.(mp4|ogv|avi|mov|mkv|webm)$/i.test(f.name));
+
+      if (picked) {
+        const resolved = `https://archive.org/download/${item.identifier}/${encodeURIComponent(picked.name)}`;
+        urlCache[item.identifier] = resolved;
+        console.log(`Resolved ${item.identifier} → ${picked.name}`);
+        return resolved;
+      }
+    } catch(e) {
+      console.warn(`Metadata lookup failed for ${item.identifier}:`, e);
+    }
+  }
+  return '';
+}
+
+async function loadItem(idx, nowSec) {
   currentIndex = idx;
   const item = schedule[idx];
   if (!item) return;
 
-  // Build archive.org stream URL
-  const streamUrl = buildStreamUrl(item);
-
   staticEl.classList.add('active');
   player.classList.remove('loaded');
+  updateHUD();
+
+  // Resolve the actual stream URL (may do a metadata API call)
+  const streamUrl = await resolveStreamUrl(item);
+
+  if (!streamUrl) {
+    showError(`NO PLAYABLE FILE FOUND — SKIPPING "${item.title || item.identifier}"`);
+    setTimeout(() => {
+      currentIndex = (currentIndex + 1) % schedule.length;
+      loadItem(currentIndex, secondsFromMidnight());
+    }, 3000);
+    return;
+  }
 
   setTimeout(() => {
     player.src = streamUrl;
 
     // Seek to correct position within the item
-    const offset = (nowSec - item.startSec);
+    const offset = Math.max(0, nowSec - item.startSec);
     if (offset > 5) {
       player.addEventListener('loadedmetadata', function seekOnce() {
-        player.currentTime = Math.min(offset, player.duration - 2);
+        if (player.duration && offset < player.duration - 2) {
+          player.currentTime = offset;
+        }
         player.removeEventListener('loadedmetadata', seekOnce);
       });
     }
 
-    player.play().catch(e => {
-      // autoplay blocked — show play prompt
-      console.warn('Autoplay blocked:', e);
-      showPlayPrompt();
-    });
+    // Only call play() if user has already interacted
+    if (userHasInteracted) {
+      player.play().catch(e => console.warn('Play failed:', e));
+    }
 
     player.oncanplay = () => {
       staticEl.classList.remove('active');
@@ -546,29 +601,16 @@ function loadItem(idx, nowSec) {
 
     player.onerror = () => {
       staticEl.classList.remove('active');
+      console.warn('Player error on:', streamUrl);
       showError('STREAM ERROR — SKIPPING...');
       setTimeout(() => {
         currentIndex = (currentIndex + 1) % schedule.length;
         loadItem(currentIndex, secondsFromMidnight());
-      }, 4000);
+      }, 3000);
     };
 
     updateHUD();
   }, 400);
-}
-
-function buildStreamUrl(item) {
-  // If item has a direct url, use it
-  if (item.url) return item.url;
-  // Otherwise build archive.org URL from identifier + filename
-  if (item.identifier && item.filename) {
-    return `https://archive.org/download/${item.identifier}/${item.filename}`;
-  }
-  // Fallback to identifier-based URL (archive.org serves main file)
-  if (item.identifier) {
-    return `https://archive.org/download/${item.identifier}`;
-  }
-  return '';
 }
 
 function updateHUD() {
@@ -612,22 +654,40 @@ function showError(msg) {
   errorState.classList.add('visible');
 }
 
-function showPlayPrompt() {
-  // Create a click-to-play overlay
+// ─── TUNE-IN PROMPT (shown immediately — Chrome blocks autoplay until interaction) ──
+let userHasInteracted = false;
+
+function showTuneInPrompt() {
+  if (userHasInteracted) return;
   const overlay = document.createElement('div');
+  overlay.id = 'tunein-overlay';
   overlay.style.cssText = `
-    position:fixed;inset:0;z-index:200;display:flex;align-items:center;
-    justify-content:center;cursor:pointer;background:rgba(0,0,0,0.6)
+    position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
+    align-items:center;justify-content:center;cursor:pointer;
+    background:rgba(0,0,0,0.82);gap:24px;
   `;
-  overlay.innerHTML = `<div style="font-family:'Bebas Neue',cursive;font-size:48px;letter-spacing:0.1em;color:#ffb700;text-shadow:0 0 30px #ffb700;">▶ CLICK TO TUNE IN</div>`;
+  overlay.innerHTML = `
+    <div style="font-family:'Bebas Neue',cursive;font-size:clamp(36px,7vw,88px);
+      letter-spacing:0.1em;color:#ffb700;text-shadow:0 0 40px #ffb700,0 0 80px rgba(255,183,0,0.3);
+      text-align:center;line-height:1">
+      ▶ CLICK TO<br>TUNE IN
+    </div>
+    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;
+      letter-spacing:0.3em;color:#7a5800;text-align:center">
+      TVStation · 24/7 Broadcast
+    </div>`;
   overlay.onclick = () => {
-    player.play();
+    userHasInteracted = true;
     overlay.remove();
+    player.play().catch(() => {});
   };
   document.body.appendChild(overlay);
 }
 
 // ─── INIT ─────────────────────────────────────────────────────────────────────
+// Show tune-in prompt immediately — Chrome requires a user gesture before
+// any audio/video can play, so we gate everything behind this click.
+showTuneInPrompt();
 loadSchedule();
 
 // Reload schedule every 30 minutes to pick up updates
