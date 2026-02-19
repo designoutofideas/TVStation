@@ -1,0 +1,103 @@
+{
+  "version": 1,
+  "generated": "2026-02-18T00:00:00.000Z",
+  "_note": "Durations are in seconds. Use admin.html to build your own schedule.",
+  "blocks": [
+    {
+      "id": "b1",
+      "name": "Morning",
+      "genre": "morning",
+      "startTime": "06:00",
+      "items": [
+        {
+          "title": "Design for Dreaming (1956)",
+          "identifier": "DesignForDreaming",
+          "url": "https://archive.org/download/DesignForDreaming/DesignForDreaming_512kb.mp4",
+          "duration": 660,
+          "scheduledStart": "06:00"
+        },
+        {
+          "title": "A Touch of Magic (1961)",
+          "identifier": "ATouchOfMagic1961",
+          "url": "https://archive.org/download/ATouchOfMagic1961/ATouchOfMagic1961_512kb.mp4",
+          "duration": 900,
+          "scheduledStart": "06:11"
+        }
+      ]
+    },
+    {
+      "id": "b2",
+      "name": "Afternoon",
+      "genre": "afternoon",
+      "startTime": "12:00",
+      "items": [
+        {
+          "title": "Night of the Living Dead (1968)",
+          "identifier": "night_of_the_living_dead",
+          "url": "https://archive.org/download/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4",
+          "duration": 5760,
+          "scheduledStart": "12:00"
+        },
+        {
+          "title": "Plan 9 from Outer Space (1957)",
+          "identifier": "plan9",
+          "url": "https://archive.org/download/plan9/plan9_512kb.mp4",
+          "duration": 5280,
+          "scheduledStart": "13:36"
+        }
+      ]
+    },
+    {
+      "id": "b3",
+      "name": "Prime Time",
+      "genre": "primetime",
+      "startTime": "19:00",
+      "items": [
+        {
+          "title": "His Girl Friday (1940)",
+          "identifier": "HisGirlFriday_931",
+          "url": "https://archive.org/download/HisGirlFriday_931/HisGirlFriday_512kb.mp4",
+          "duration": 5880,
+          "scheduledStart": "19:00"
+        },
+        {
+          "title": "Sherlock Jr. (1924) - Buster Keaton",
+          "identifier": "SherlockJr1924",
+          "url": "https://archive.org/download/SherlockJr1924/SherlockJr1924_512kb.mp4",
+          "duration": 2700,
+          "scheduledStart": "20:38"
+        }
+      ]
+    },
+    {
+      "id": "b4",
+      "name": "Late Night",
+      "genre": "latenight",
+      "startTime": "23:00",
+      "items": [
+        {
+          "title": "Nosferatu (1922)",
+          "identifier": "Nosferatu_1922_restoration",
+          "url": "https://archive.org/download/Nosferatu_1922_restoration/Nosferatu_1922_restoration_512kb.mp4",
+          "duration": 5400,
+          "scheduledStart": "23:00"
+        }
+      ]
+    },
+    {
+      "id": "b5",
+      "name": "Overnight",
+      "genre": "overnight",
+      "startTime": "01:00",
+      "items": [
+        {
+          "title": "Cavalcade of Aviation (1953)",
+          "identifier": "CavalcadeOfAviation",
+          "url": "https://archive.org/download/CavalcadeOfAviation/CavalcadeOfAviation_512kb.mp4",
+          "duration": 5400,
+          "scheduledStart": "01:00"
+        }
+      ]
+    }
+  ]
+}

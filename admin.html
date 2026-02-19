@@ -659,9 +659,12 @@ function setupDragDrop(listEl, block) {
 }
 
 // ═══════════════════════════════════════════════════════
-// ARCHIVE.ORG SEARCH
+// ARCHIVE.ORG SEARCH  (CORS-proxy approach)
 // ═══════════════════════════════════════════════════════
-let searchTimeout = null;
+
+// Archive.org doesn't send CORS headers, so we route through
+// corsproxy.io which adds them for us.
+const CORS_PROXY = 'https://corsproxy.io/?url=';
 
 document.getElementById('btn-search').addEventListener('click', doSearch);
 document.getElementById('search-input').addEventListener('keydown', e => {
@@ -676,53 +679,84 @@ async function doSearch() {
 
   resultsList.innerHTML = '<div class="searching">SEARCHING ARCHIVE.ORG...</div>';
 
+  // Build the Archive.org query
+  const mediatypeFilter = mediatype.split(',').map(m => `mediatype:${m}`).join(' OR ');
+  const collFilter = collection ? ` AND collection:${collection}` : '';
+  const fullQuery = `(${q}) AND (${mediatypeFilter})${collFilter}`;
+
+  // Fields we want back
+  const fields = ['identifier','title','mediatype','runtime','date','description'].join(',');
+
+  // Use the scrape API (more reliable than advancedsearch for CORS)
+  const archiveUrl = `https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(fullQuery)}&fields=${fields}&count=20`;
+  const proxiedUrl = CORS_PROXY + encodeURIComponent(archiveUrl);
+
   try {
-    let query = encodeURIComponent(q);
-    let fl = 'identifier,title,mediatype,description,runtime,subject,date';
-    let rows = 20;
-    let mediatypeFilter = mediatype.split(',').map(m => `mediatype:${m}`).join(' OR ');
-    let collFilter = collection ? `+collection:${collection}` : '';
-    let url = `https://archive.org/advancedsearch.php?q=${query}+AND+(${encodeURIComponent(mediatypeFilter)})${collFilter ? '+AND+' + encodeURIComponent(collFilter) : ''}&fl[]=${fl.split(',').join('&fl[]=')}&rows=${rows}&output=json&callback=`;
-
-    const resp = await fetch(url);
+    const resp = await fetch(proxiedUrl);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    const docs = data?.response?.docs || [];
+    const items = data?.items || [];
 
-    if (docs.length === 0) {
-      resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND</div>';
+    if (items.length === 0) {
+      resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND — TRY DIFFERENT KEYWORDS</div>';
       return;
     }
 
-    resultsList.innerHTML = docs.map(d => {
-      const runtime = d.runtime || '?';
-      const date = d.date ? d.date.substring(0,4) : '';
-      return `
-      <div class="result-item" data-id="${esc(d.identifier)}" data-title="${esc(d.title || d.identifier)}" data-runtime="${esc(d.runtime||'')}">
-        <div class="result-title">${esc(d.title || d.identifier)}</div>
-        <div class="result-meta">
-          <span>📅 ${date}</span>
-          <span>⏱ ${runtime}</span>
-          <span>${d.mediatype}</span>
-        </div>
-        <button class="btn btn-sm result-add-btn" data-id="${esc(d.identifier)}" data-title="${esc(d.title||d.identifier)}" data-runtime="${esc(d.runtime||'')}">+ ADD TO BLOCK</button>
-      </div>`;
-    }).join('');
+    renderResults(items);
 
-    resultsList.querySelectorAll('.result-add-btn').forEach(btn => {
-      btn.addEventListener('click', e => {
-        e.stopPropagation();
-        openAddModal({
-          identifier: btn.dataset.id,
-          title: btn.dataset.title,
-          runtime: btn.dataset.runtime
-        });
+  } catch(err) {
+    console.warn('Primary search failed, trying fallback:', err);
+    // Fallback: advancedsearch via proxy
+    try {
+      const fallbackUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(fullQuery)}&fl[]=identifier&fl[]=title&fl[]=mediatype&fl[]=runtime&fl[]=date&rows=20&output=json`;
+      const proxiedFallback = CORS_PROXY + encodeURIComponent(fallbackUrl);
+      const resp2 = await fetch(proxiedFallback);
+      const data2 = await resp2.json();
+      const docs = data2?.response?.docs || [];
+      if (docs.length === 0) {
+        resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND</div>';
+        return;
+      }
+      renderResults(docs);
+    } catch(err2) {
+      resultsList.innerHTML = `<div class="no-results">SEARCH FAILED<br><br>
+        <span style="font-size:10px;color:#555">The CORS proxy may be unavailable.<br>
+        Try again in a moment, or add items manually<br>using Archive.org identifiers.</span></div>`;
+      console.error('Both search attempts failed:', err2);
+    }
+  }
+}
+
+function renderResults(items) {
+  resultsList.innerHTML = items.map(d => {
+    const runtime = Array.isArray(d.runtime) ? d.runtime[0] : (d.runtime || '');
+    const date = d.date ? String(d.date).substring(0,4) : '';
+    const title = d.title || d.identifier || 'Untitled';
+    return `
+    <div class="result-item">
+      <div class="result-title">${esc(title)}</div>
+      <div class="result-meta">
+        ${date ? `<span>📅 ${esc(date)}</span>` : ''}
+        ${runtime ? `<span>⏱ ${esc(runtime)}</span>` : ''}
+        <span style="text-transform:uppercase">${esc(d.mediatype||'')}</span>
+      </div>
+      <button class="btn btn-sm result-add-btn"
+        data-id="${esc(d.identifier)}"
+        data-title="${esc(title)}"
+        data-runtime="${esc(runtime)}">+ ADD TO BLOCK</button>
+    </div>`;
+  }).join('');
+
+  resultsList.querySelectorAll('.result-add-btn').forEach(btn => {
+    btn.addEventListener('click', e => {
+      e.stopPropagation();
+      openAddModal({
+        identifier: btn.dataset.id,
+        title: btn.dataset.title,
+        runtime: btn.dataset.runtime
       });
     });
-
-  } catch(e) {
-    resultsList.innerHTML = '<div class="no-results">SEARCH FAILED — CHECK NETWORK</div>';
-    console.error(e);
-  }
+  });
 }
 
 // ═══════════════════════════════════════════════════════
