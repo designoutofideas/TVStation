@@ -1,6 +1,7 @@
 {
   "version": 1,
-  "generated": "2026-02-19T02:15:22.483Z",
+  "generated": "2026-02-18T00:00:00.000Z",
+  "_note": "Durations are in seconds. Use admin.html to build your own schedule.",
   "blocks": [
     {
       "id": "b1",
@@ -10,21 +11,17 @@
       "items": [
         {
           "title": "Design for Dreaming (1956)",
-          "identifier": "DesignFo1956",
+          "identifier": "DesignForDreaming",
+          "url": "https://archive.org/download/DesignForDreaming/DesignForDreaming_512kb.mp4",
           "duration": 660,
           "scheduledStart": "06:00"
         },
         {
           "title": "A Touch of Magic (1961)",
-          "identifier": "ATouchOf1961",
+          "identifier": "ATouchOfMagic1961",
+          "url": "https://archive.org/download/ATouchOfMagic1961/ATouchOfMagic1961_512kb.mp4",
           "duration": 900,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Cavalcade of Aviation (1953)",
-          "identifier": "CavalcadeOfAviation",
-          "duration": 1800,
-          "scheduledStart": "06:00"
+          "scheduledStart": "06:11"
         }
       ]
     },
@@ -37,14 +34,16 @@
         {
           "title": "Night of the Living Dead (1968)",
           "identifier": "night_of_the_living_dead",
+          "url": "https://archive.org/download/night_of_the_living_dead/night_of_the_living_dead_512kb.mp4",
           "duration": 5760,
           "scheduledStart": "12:00"
         },
         {
           "title": "Plan 9 from Outer Space (1957)",
-          "identifier": "plan_9",
+          "identifier": "plan9",
+          "url": "https://archive.org/download/plan9/plan9_512kb.mp4",
           "duration": 5280,
-          "scheduledStart": "12:00"
+          "scheduledStart": "13:36"
         }
       ]
     },
@@ -57,14 +56,16 @@
         {
           "title": "His Girl Friday (1940)",
           "identifier": "HisGirlFriday_931",
+          "url": "https://archive.org/download/HisGirlFriday_931/HisGirlFriday_512kb.mp4",
           "duration": 5880,
           "scheduledStart": "19:00"
         },
         {
-          "title": "The General (1926) - Buster Keaton",
-          "identifier": "TheGeneral_Keaton",
-          "duration": 4680,
-          "scheduledStart": "19:00"
+          "title": "Sherlock Jr. (1924) - Buster Keaton",
+          "identifier": "SherlockJr1924",
+          "url": "https://archive.org/download/SherlockJr1924/SherlockJr1924_512kb.mp4",
+          "duration": 2700,
+          "scheduledStart": "20:38"
         }
       ]
     },
@@ -77,6 +78,7 @@
         {
           "title": "Nosferatu (1922)",
           "identifier": "Nosferatu_1922_restoration",
+          "url": "https://archive.org/download/Nosferatu_1922_restoration/Nosferatu_1922_restoration_512kb.mp4",
           "duration": 5400,
           "scheduledStart": "23:00"
         }
@@ -89,9 +91,10 @@
       "startTime": "01:00",
       "items": [
         {
-          "title": "Relaxing Nature Sounds - Archive.org",
+          "title": "Cavalcade of Aviation (1953)",
           "identifier": "CavalcadeOfAviation",
-          "duration": 18000,
+          "url": "https://archive.org/download/CavalcadeOfAviation/CavalcadeOfAviation_512kb.mp4",
+          "duration": 5400,
           "scheduledStart": "01:00"
         }
       ]
