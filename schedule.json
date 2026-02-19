@@ -1,6 +1,6 @@
 {
   "version": 1,
-  "generated": "2026-02-19T13:59:38.419Z",
+  "generated": "2026-02-19T14:01:57.227Z",
   "blocks": [
     {
       "id": "b1",
@@ -153,6 +153,50 @@
       "genre": "overnight",
       "startTime": "01:00",
       "items": []
+    },
+    {
+      "id": "b1771509686481",
+      "name": "New Block",
+      "genre": "custom",
+      "startTime": "09:00",
+      "items": [
+        {
+          "title": "Khmer Rouge Trial Nears End",
+          "identifier": "youtube-I08cob67GMk",
+          "duration": 0,
+          "scheduledStart": "09:00"
+        },
+        {
+          "title": "Khmer Rouge Trial Nears End",
+          "identifier": "youtube-I08cob67GMk",
+          "duration": 0,
+          "scheduledStart": "09:00"
+        },
+        {
+          "title": "Pyongyang Style: North Korea Girl Bands Rock China's Border",
+          "identifier": "youtube-gvcZaLnKask",
+          "duration": 0,
+          "scheduledStart": "09:00"
+        },
+        {
+          "title": "China Flexes Military Muscle in Tiananmen Square",
+          "identifier": "youtube-N2EkMko5VW0",
+          "duration": 0,
+          "scheduledStart": "09:00"
+        },
+        {
+          "title": "Sold to China",
+          "identifier": "youtube-8BfH3ygkpu0",
+          "duration": 0,
+          "scheduledStart": "09:00"
+        },
+        {
+          "title": "Tibetans Rescue Illegally-Caught Fish at Qinghai Lake",
+          "identifier": "youtube-pJtj6kPHNSk",
+          "duration": 0,
+          "scheduledStart": "09:00"
+        }
+      ]
     }
   ]
 }
