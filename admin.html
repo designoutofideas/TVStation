@@ -659,12 +659,11 @@ function setupDragDrop(listEl, block) {
 }
 
 // ═══════════════════════════════════════════════════════
-// ARCHIVE.ORG SEARCH  (CORS-proxy approach)
+// ARCHIVE.ORG SEARCH
+// Uses the public Archive.org Metadata/Search APIs directly.
+// archive.org sends Access-Control-Allow-Origin: * on its
+// JSON endpoints, so no proxy is needed.
 // ═══════════════════════════════════════════════════════
-
-// Archive.org doesn't send CORS headers, so we route through
-// corsproxy.io which adds them for us.
-const CORS_PROXY = 'https://corsproxy.io/?url=';
 
 document.getElementById('btn-search').addEventListener('click', doSearch);
 document.getElementById('search-input').addEventListener('keydown', e => {
@@ -679,49 +678,72 @@ async function doSearch() {
 
   resultsList.innerHTML = '<div class="searching">SEARCHING ARCHIVE.ORG...</div>';
 
-  // Build the Archive.org query
-  const mediatypeFilter = mediatype.split(',').map(m => `mediatype:${m}`).join(' OR ');
-  const collFilter = collection ? ` AND collection:${collection}` : '';
-  const fullQuery = `(${q}) AND (${mediatypeFilter})${collFilter}`;
+  // Build query string
+  const mediatypeClause = mediatype.split(',').map(m => `mediatype:${m}`).join(' OR ');
+  const collClause = collection ? ` AND collection:(${collection})` : '';
+  const fullQuery = `(${q}) AND (${mediatypeClause})${collClause}`;
 
-  // Fields we want back
-  const fields = ['identifier','title','mediatype','runtime','date','description'].join(',');
+  // Archive.org's advancedsearch endpoint supports CORS for JSON responses
+  const params = new URLSearchParams({
+    q: fullQuery,
+    'fl[]': 'identifier,title,mediatype,runtime,date',
+    rows: '24',
+    page: '1',
+    output: 'json',
+    'sort[]': 'downloads desc'
+  });
 
-  // Use the scrape API (more reliable than advancedsearch for CORS)
-  const archiveUrl = `https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(fullQuery)}&fields=${fields}&count=20`;
-  const proxiedUrl = CORS_PROXY + encodeURIComponent(archiveUrl);
+  // fl[] needs to be repeated — URLSearchParams deduplicates, so build manually
+  const fields = ['identifier','title','mediatype','runtime','date'];
+  const flParams = fields.map(f => `fl[]=${encodeURIComponent(f)}`).join('&');
+  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(fullQuery)}&${flParams}&rows=24&output=json&sort[]=downloads+desc`;
 
   try {
-    const resp = await fetch(proxiedUrl);
+    const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
     if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
     const data = await resp.json();
-    const items = data?.items || [];
+    const docs = data?.response?.docs || [];
 
-    if (items.length === 0) {
+    if (docs.length === 0) {
       resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND — TRY DIFFERENT KEYWORDS</div>';
       return;
     }
-
-    renderResults(items);
+    renderResults(docs);
 
   } catch(err) {
-    console.warn('Primary search failed, trying fallback:', err);
-    // Fallback: advancedsearch via proxy
+    console.warn('advancedsearch failed, trying scrape API:', err.message);
+
+    // Fallback: scrape API (also CORS-enabled)
     try {
-      const fallbackUrl = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(fullQuery)}&fl[]=identifier&fl[]=title&fl[]=mediatype&fl[]=runtime&fl[]=date&rows=20&output=json`;
-      const proxiedFallback = CORS_PROXY + encodeURIComponent(fallbackUrl);
-      const resp2 = await fetch(proxiedFallback);
+      const scrapeUrl = `https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(fullQuery)}&fields=identifier,title,mediatype,runtime,date&count=24`;
+      const resp2 = await fetch(scrapeUrl, { headers: { 'Accept': 'application/json' } });
+      if (!resp2.ok) throw new Error(`HTTP ${resp2.status}`);
       const data2 = await resp2.json();
-      const docs = data2?.response?.docs || [];
-      if (docs.length === 0) {
+      const items = data2?.items || [];
+
+      if (items.length === 0) {
         resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND</div>';
         return;
       }
-      renderResults(docs);
+      renderResults(items);
+
     } catch(err2) {
-      resultsList.innerHTML = `<div class="no-results">SEARCH FAILED<br><br>
-        <span style="font-size:10px;color:#555">The CORS proxy may be unavailable.<br>
-        Try again in a moment, or add items manually<br>using Archive.org identifiers.</span></div>`;
+      resultsList.innerHTML = `
+        <div class="no-results">
+          SEARCH UNAVAILABLE<br><br>
+          <span style="font-size:10px;color:#555;line-height:1.8">
+            Archive.org may be temporarily down.<br>
+            You can still add items manually:<br><br>
+            1. Find a video on archive.org<br>
+            2. Copy the identifier from the URL<br>
+            &nbsp;&nbsp;&nbsp;<em style="color:#7a5800">archive.org/details/<strong style="color:#ffb700">IDENTIFIER</strong></em><br>
+            3. Click "+ ADD ITEM MANUALLY" below
+          </span><br><br>
+          <button class="btn btn-sm" id="manual-add-btn">+ ADD ITEM MANUALLY</button>
+        </div>`;
+      document.getElementById('manual-add-btn')?.addEventListener('click', () => {
+        openAddModal({ identifier: '', title: '', runtime: '' });
+      });
       console.error('Both search attempts failed:', err2);
     }
   }
@@ -732,6 +754,7 @@ function renderResults(items) {
     const runtime = Array.isArray(d.runtime) ? d.runtime[0] : (d.runtime || '');
     const date = d.date ? String(d.date).substring(0,4) : '';
     const title = d.title || d.identifier || 'Untitled';
+    const archiveLink = `https://archive.org/details/${encodeURIComponent(d.identifier)}`;
     return `
     <div class="result-item">
       <div class="result-title">${esc(title)}</div>
@@ -739,6 +762,7 @@ function renderResults(items) {
         ${date ? `<span>📅 ${esc(date)}</span>` : ''}
         ${runtime ? `<span>⏱ ${esc(runtime)}</span>` : ''}
         <span style="text-transform:uppercase">${esc(d.mediatype||'')}</span>
+        <a href="${archiveLink}" target="_blank" style="color:var(--amber-dim);text-decoration:none;font-size:9px" title="Preview on archive.org">↗</a>
       </div>
       <button class="btn btn-sm result-add-btn"
         data-id="${esc(d.identifier)}"
