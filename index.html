@@ -3,813 +3,382 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Legacy RFA</title>
+<title>TVStation</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
-
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-  :root {
-    --amber: #ffb700;
-    --amber-dim: #7a5800;
-    --red: #ff3b1f;
-    --bg: #0a0a0a;
-    --scanline: rgba(0,0,0,0.25);
-    --glow: rgba(255,183,0,0.15);
-  }
-
-  html, body {
-    width: 100%; height: 100%;
-    background: var(--bg);
-    color: var(--amber);
-    font-family: 'Share Tech Mono', monospace;
-    overflow: hidden;
-  }
-
-  /* CRT phosphor screen effect */
-  body::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 100;
-    background: repeating-linear-gradient(
-      0deg,
-      var(--scanline) 0px,
-      var(--scanline) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    pointer-events: none;
-    animation: scanroll 8s linear infinite;
-  }
-  @keyframes scanroll {
-    0% { background-position: 0 0; }
-    100% { background-position: 0 300px; }
-  }
-
-  /* Vignette */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; z-index: 99;
-    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.85) 100%);
-    pointer-events: none;
-  }
-
-  #video-container {
-    position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: #000;
-  }
-
-  #player {
-    width: 100%; height: 100%;
-    object-fit: contain;
-    opacity: 0;
-    transition: opacity 1.2s ease;
-  }
-  #player.loaded { opacity: 1; }
-
-  /* Static noise overlay when loading */
-  #static {
-    position: fixed; inset: 0; z-index: 50;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
-    background-size: 200px;
-    mix-blend-mode: overlay;
-  }
-  #static.active { opacity: 1; }
-
-  /* HUD overlay */
-  #hud {
-    position: fixed; inset: 0; z-index: 90;
-    pointer-events: none;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 28px 36px;
-  }
-
-  /* Top bar */
-  .hud-top {
-    display: flex; justify-content: space-between; align-items: flex-start;
-  }
-
-  .station-id {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(28px, 4vw, 52px);
-    letter-spacing: 0.12em;
-    color: var(--amber);
-    text-shadow: 0 0 20px var(--amber), 0 0 40px rgba(255,183,0,0.4);
-    line-height: 1;
-  }
-  .station-id span {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.3em;
-    font-weight: 300;
-    display: block;
-    letter-spacing: 0.3em;
-    color: var(--amber-dim);
-    text-shadow: none;
-    margin-top: 4px;
-  }
-
-  .live-badge {
-    display: flex; align-items: center; gap: 8px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    color: var(--red);
-    text-shadow: 0 0 10px var(--red);
-  }
-  .live-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--red);
-    box-shadow: 0 0 8px var(--red);
-    animation: blink 1.4s ease-in-out infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
-
-  .clock-block {
-    text-align: right;
-  }
-  #clock {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(22px, 3vw, 42px);
-    letter-spacing: 0.08em;
-    color: var(--amber);
-    text-shadow: 0 0 15px var(--amber);
-    display: block;
-  }
-  #date-display {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.25em;
-    color: var(--amber-dim);
-    text-align: right;
-    margin-top: 2px;
-  }
-
-  /* Bottom info bar */
-  .hud-bottom {
-    display: flex; flex-direction: column; gap: 10px;
-  }
-
-  .progress-bar-wrap {
-    width: 100%;
-    height: 2px;
-    background: rgba(255,183,0,0.12);
-    position: relative;
-  }
-  #progress-bar {
-    height: 100%;
-    background: var(--amber);
-    box-shadow: 0 0 8px var(--amber);
-    width: 0%;
-    transition: width 1s linear;
-  }
-
-  .now-playing-row {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    gap: 20px;
-  }
-
-  .now-playing {
-    flex: 1;
-  }
-
-  .label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.35em;
-    color: var(--amber-dim);
-    text-transform: uppercase;
-    margin-bottom: 5px;
-  }
-
-  #now-title {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(18px, 2.8vw, 38px);
-    letter-spacing: 0.06em;
-    line-height: 1.1;
-    color: var(--amber);
-    text-shadow: 0 0 20px rgba(255,183,0,0.5);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 65vw;
-  }
-
-  #genre-tag {
-    display: inline-block;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.25em;
-    color: var(--bg);
-    background: var(--amber-dim);
-    padding: 2px 8px;
-    margin-top: 5px;
-  }
-
-  .up-next {
-    text-align: right;
-    min-width: 220px;
-    max-width: 280px;
-  }
-  #next-title {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    font-weight: 300;
-    color: rgba(255,183,0,0.5);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  #time-remaining {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--amber-dim);
-    margin-top: 3px;
-  }
-
-  /* Channel change flash */
-  #channel-flash {
-    position: fixed; inset: 0; z-index: 95;
-    background: white;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.05s;
-  }
-  #channel-flash.flash { opacity: 0.6; }
-
-  /* Error state */
-  #error-state {
-    position: fixed; inset: 0; z-index: 80;
-    display: none;
-    align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px;
-    text-align: center;
-  }
-  #error-state.visible { display: flex; }
-  #error-state h2 {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 48px;
-    letter-spacing: 0.1em;
-    color: var(--amber-dim);
-  }
-  #error-state p {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    color: var(--amber-dim);
-  }
-
-  /* No schedule */
-  #no-schedule {
-    position: fixed; inset: 0; z-index: 80;
-    display: none; align-items: center; justify-content: center;
-    flex-direction: column; gap: 20px;
-    text-align: center; padding: 40px;
-  }
-  #no-schedule.visible { display: flex; }
-  #no-schedule h1 {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(36px, 6vw, 80px);
-    letter-spacing: 0.08em;
-    color: var(--amber);
-    text-shadow: 0 0 30px var(--amber);
-  }
-  #no-schedule p {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    color: var(--amber-dim);
-    max-width: 500px;
-    line-height: 1.8;
-  }
-  #no-schedule a {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    color: var(--amber);
-    text-decoration: none;
-    border: 1px solid var(--amber-dim);
-    padding: 10px 24px;
-    transition: all 0.2s;
-  }
-  #no-schedule a:hover {
-    background: var(--amber);
-    color: var(--bg);
-  }
+  *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+  :root{--amber:#ffb700;--amber-dim:#7a5800;--amber-mid:#c87f00;--red:#ff3b1f;--bg:#000}
+  html,body{width:100%;height:100%;background:#000;color:var(--amber);font-family:'Share Tech Mono',monospace;overflow:hidden}
+  body::before{content:'';position:fixed;inset:0;z-index:100;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.15) 0px,rgba(0,0,0,0.15) 1px,transparent 1px,transparent 3px);pointer-events:none}
+  body::after{content:'';position:fixed;inset:0;z-index:99;background:radial-gradient(ellipse at center,transparent 50%,rgba(0,0,0,0.88) 100%);pointer-events:none}
+  #screen{position:fixed;inset:0;background:#000;display:flex;align-items:center;justify-content:center}
+  #player{width:100%;height:100%;object-fit:contain;display:block}
+  #hud{position:fixed;inset:0;z-index:90;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:24px 32px}
+  .hud-top{display:flex;justify-content:space-between;align-items:flex-start}
+  .station-id{font-family:'Bebas Neue',cursive;font-size:clamp(26px,4vw,50px);letter-spacing:.12em;color:var(--amber);text-shadow:0 0 20px var(--amber),0 0 40px rgba(255,183,0,.3);line-height:1}
+  .station-sub{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:300;letter-spacing:.35em;color:var(--amber-dim);display:block;margin-top:5px}
+  .live-row{display:flex;align-items:center;gap:7px;margin-top:10px;font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;letter-spacing:.22em;color:var(--red);text-shadow:0 0 10px var(--red)}
+  .live-dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 8px var(--red);animation:blink 1.4s ease-in-out infinite}
+  @keyframes blink{0%,100%{opacity:1}50%{opacity:.15}}
+  .clock-col{text-align:right}
+  #clock{font-family:'Bebas Neue',cursive;font-size:clamp(20px,3vw,40px);letter-spacing:.08em;color:var(--amber);text-shadow:0 0 14px var(--amber);display:block}
+  #dateline{font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.22em;color:var(--amber-dim);margin-top:3px}
+  .hud-bottom{display:flex;flex-direction:column;gap:8px}
+  .progress-track{width:100%;height:2px;background:rgba(255,183,0,.1)}
+  #progress-fill{height:100%;background:var(--amber);box-shadow:0 0 6px var(--amber);width:0%;transition:width .9s linear}
+  .info-row{display:flex;justify-content:space-between;align-items:flex-end;gap:16px}
+  .now-col{flex:1;min-width:0}
+  .tag{font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;letter-spacing:.32em;color:var(--amber-dim);text-transform:uppercase;margin-bottom:5px}
+  #now-title{font-family:'Bebas Neue',cursive;font-size:clamp(16px,2.6vw,36px);letter-spacing:.06em;color:var(--amber);text-shadow:0 0 18px rgba(255,183,0,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:62vw}
+  #genre-badge{display:inline-block;font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;letter-spacing:.22em;color:#000;background:var(--amber-dim);padding:2px 7px;margin-top:5px}
+  .next-col{text-align:right;min-width:180px;max-width:260px}
+  #next-title{font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:300;color:rgba(255,183,0,.4);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #time-left{font-family:'IBM Plex Mono',monospace;font-size:9px;color:var(--amber-dim);margin-top:3px}
+  #cut-flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
+  #cut-flash.on{opacity:.45}
+  #tunein{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.92);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;cursor:pointer}
+  #tunein-label{font-family:'Bebas Neue',cursive;font-size:clamp(40px,8vw,96px);letter-spacing:.1em;color:var(--amber);text-shadow:0 0 40px var(--amber),0 0 80px rgba(255,183,0,.25);text-align:center;line-height:1}
+  #tunein-sub{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.28em;color:var(--amber-dim);text-align:center}
+  #no-sched{position:fixed;inset:0;z-index:200;display:none;flex-direction:column;align-items:center;justify-content:center;gap:20px;text-align:center;padding:40px}
+  #no-sched.show{display:flex}
+  #no-sched h1{font-family:'Bebas Neue',cursive;font-size:clamp(32px,6vw,72px);letter-spacing:.1em;color:var(--amber);text-shadow:0 0 30px var(--amber)}
+  #no-sched p{font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.18em;color:var(--amber-dim);line-height:1.9;max-width:480px}
+  #no-sched a{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.2em;color:var(--amber);text-decoration:none;border:1px solid var(--amber-dim);padding:10px 22px}
 </style>
 </head>
 <body>
 
-<div id="channel-flash"></div>
-<div id="static"></div>
-
-<div id="video-container">
-  <video id="player" autoplay playsinline></video>
-</div>
-
-<div id="error-state">
-  <h2>SIGNAL LOST</h2>
-  <p>ATTEMPTING TO RESTORE BROADCAST...</p>
-</div>
-
-<div id="no-schedule" class="visible">
-  <h1>Legacy RFA</h1>
-  <p>NO SCHEDULE LOADED<br>
-  CREATE A SCHEDULE USING THE ADMIN PANEL<br>
-  AND SAVE SCHEDULE.JSON TO THIS DIRECTORY</p>
-  <a href="admin.html">OPEN ADMIN PANEL →</a>
+<div id="screen">
+  <video id="player" playsinline preload="auto"></video>
 </div>
 
 <div id="hud">
   <div class="hud-top">
     <div>
-      <div class="station-id">
-        Legacy RFA
-        <span>BROADCASTING 24/7</span>
-      </div>
-      <div class="live-badge" style="margin-top:12px">
-        <div class="live-dot"></div>
-        LIVE
-      </div>
+      <div class="station-id">TVStation<span class="station-sub">BROADCASTING 24 / 7</span></div>
+      <div class="live-row"><div class="live-dot"></div>LIVE</div>
     </div>
-    <div class="clock-block">
+    <div class="clock-col">
       <span id="clock">00:00:00</span>
-      <div id="date-display">---</div>
+      <div id="dateline"></div>
     </div>
   </div>
-
   <div class="hud-bottom">
-    <div class="progress-bar-wrap">
-      <div id="progress-bar"></div>
-    </div>
-    <div class="now-playing-row">
-      <div class="now-playing">
-        <div class="label">Now Playing</div>
+    <div class="progress-track"><div id="progress-fill"></div></div>
+    <div class="info-row">
+      <div class="now-col">
+        <div class="tag">Now Playing</div>
         <div id="now-title">—</div>
-        <div id="genre-tag">—</div>
+        <div id="genre-badge">—</div>
       </div>
-      <div class="up-next">
-        <div class="label" style="text-align:right">Up Next</div>
+      <div class="next-col">
+        <div class="tag" style="text-align:right">Up Next</div>
         <div id="next-title">—</div>
-        <div id="time-remaining">—</div>
+        <div id="time-left">—</div>
       </div>
     </div>
   </div>
 </div>
 
+<div id="cut-flash"></div>
+
+<div id="tunein" onclick="tuneIn()">
+  <div id="tunein-label">&#9654; CLICK TO<br>TUNE IN</div>
+  <div id="tunein-sub">TVStation &middot; 24/7 Live Broadcast</div>
+</div>
+
+<div id="no-sched">
+  <h1>TVStation</h1>
+  <p>NO SCHEDULE FOUND<br>CREATE ONE USING THE ADMIN PANEL</p>
+  <a href="admin.html">OPEN ADMIN &rarr;</a>
+</div>
+
 <script>
-// ═══════════════════════════════════════════════════════════════════════════════
-// TVSTATION — SYNCHRONIZED MASTER BROADCAST ENGINE
-//
-// Philosophy: one master wall-clock timeline. Every browser that opens this
-// page at the same moment sees the same frame of the same video — like tuning
-// into a live TV channel. No gaps, ever.
-//
-// Architecture:
-//   1. Load schedule.json and build a 86400s (24hr) flat timeline
-//   2. Pre-resolve ALL archive.org metadata URLs in parallel (before play)
-//   3. Use TWO <video> elements (A/B buffer). While A plays, B loads next.
-//   4. Wall-clock tick every 500ms checks if it's time to swap — instant cut.
-//   5. On page load, calculate exact byte-offset into current video and seek.
-// ═══════════════════════════════════════════════════════════════════════════════
-
 const SCHEDULE_URL = './schedule.json';
+const DAY = 86400;
 
-// ── DOM ───────────────────────────────────────────────────────────────────────
-const clockEl       = document.getElementById('clock');
-const dateEl        = document.getElementById('date-display');
-const nowTitle      = document.getElementById('now-title');
-const genreTag      = document.getElementById('genre-tag');
-const nextTitle     = document.getElementById('next-title');
-const timeRemaining = document.getElementById('time-remaining');
-const progressBar   = document.getElementById('progress-bar');
-const noSchedule    = document.getElementById('no-schedule');
-const errorState    = document.getElementById('error-state');
-const staticEl      = document.getElementById('static');
-const flashEl       = document.getElementById('channel-flash');
-const container     = document.getElementById('video-container');
+// DOM
+const player     = document.getElementById('player');
+const clockEl    = document.getElementById('clock');
+const dateEl     = document.getElementById('dateline');
+const nowTitleEl = document.getElementById('now-title');
+const genreEl    = document.getElementById('genre-badge');
+const nextTitleEl= document.getElementById('next-title');
+const timeLeftEl = document.getElementById('time-left');
+const progressEl = document.getElementById('progress-fill');
+const flashEl    = document.getElementById('cut-flash');
+const tuneinEl   = document.getElementById('tunein');
+const noSchedEl  = document.getElementById('no-sched');
 
-// ── DOUBLE BUFFER: two <video> elements, we swap between them ─────────────────
-const videoA = document.getElementById('player'); // already in HTML
-const videoB = document.createElement('video');
-videoB.style.cssText = videoA.style.cssText;
-videoB.style.position = 'absolute';
-videoB.style.opacity = '0';
-videoB.autoplay = true;
-videoB.playsInline = true;
-container.appendChild(videoB);
+// State
+let timeline      = [];
+let urlCache      = {};
+let currentIdx    = -1;
+let tickInterval  = null;
+let userClicked   = false;
+let scheduleReady = false;
 
-let activeVideo  = videoA;  // currently visible
-let standbyVideo = videoB;  // loading next
-
-// ── STATE ─────────────────────────────────────────────────────────────────────
-let schedule        = [];   // flat 24hr timeline [{startSec, endSec, url, title, ...}]
-let urlCache        = {};   // identifier → resolved stream URL
-let currentIdx      = -1;
-let tickTimer       = null;
-let scheduleReady   = false;
-let userInteracted  = false;
-
-// ── CLOCK ─────────────────────────────────────────────────────────────────────
-function nowSec() {
+// ── CLOCK ─────────────────────────────────────────────────────
+const DNAMES  = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MNAMES  = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function wallSec() {
   const d = new Date();
-  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
-       + d.getMilliseconds() / 1000;
+  return d.getHours()*3600 + d.getMinutes()*60 + d.getSeconds() + d.getMilliseconds()/1000;
 }
-
-function updateClock() {
-  const d   = new Date();
-  const pad = n => String(n).padStart(2,'0');
-  clockEl.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
-  const days   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  dateEl.textContent = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
+function tickClock() {
+  const d = new Date(), p = n => String(n).padStart(2,'0');
+  clockEl.textContent = p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  dateEl.textContent  = DNAMES[d.getDay()]+' '+d.getDate()+' '+MNAMES[d.getMonth()]+' '+d.getFullYear();
 }
-setInterval(updateClock, 1000);
-updateClock();
+setInterval(tickClock,1000); tickClock();
 
-// ── SCHEDULE LOADING ──────────────────────────────────────────────────────────
+// ── SCHEDULE ──────────────────────────────────────────────────
 async function loadSchedule() {
   try {
-    const resp = await fetch(SCHEDULE_URL + '?t=' + Date.now());
-    if (!resp.ok) throw new Error('schedule not found');
-    const data = await resp.json();
-
-    const rawTimeline = buildTimeline(data);
-    if (!rawTimeline.length) throw new Error('empty timeline');
-
-    // Show loading indicator
-    showStatus('LOADING BROADCAST SCHEDULE…');
-
-    // Pre-resolve ALL URLs in parallel before we start playing
-    // This is the key to gapless playback — we never resolve at play time
-    await preResolveAll(rawTimeline);
-
-    schedule      = rawTimeline;
+    const r = await fetch(SCHEDULE_URL+'?_='+Date.now());
+    if (!r.ok) throw new Error('not found');
+    const data = await r.json();
+    const tl = buildTimeline(data);
+    if (!tl.length) throw new Error('empty');
+    timeline = tl;
     scheduleReady = true;
-    noSchedule.classList.remove('visible');
-    errorState.classList.remove('visible');
-
-    showStatus('SCHEDULE READY — TUNE IN TO WATCH');
-    startBroadcast();
-
+    noSchedEl.classList.remove('show');
+    if (userClicked) beginBroadcast();
   } catch(e) {
-    console.error('Schedule load failed:', e);
-    // keep no-schedule screen visible
+    console.warn('Schedule:', e.message);
+    noSchedEl.classList.add('show');
   }
 }
 
-// Pre-resolve every unique identifier in parallel
-async function preResolveAll(timeline) {
-  const identifiers = [...new Set(
-    timeline.filter(i => i.identifier && !i.url).map(i => i.identifier)
-  )];
-
-  console.log(`Pre-resolving ${identifiers.length} unique Archive.org identifiers…`);
-
-  await Promise.allSettled(identifiers.map(id => resolveIdentifier(id)));
-
-  // Stamp resolved URLs onto timeline items
-  for (const item of timeline) {
-    if (!item.url && item.identifier && urlCache[item.identifier]) {
-      item.resolvedUrl = urlCache[item.identifier];
-    } else if (item.url) {
-      item.resolvedUrl = item.url;
+function buildTimeline(data) {
+  const blocks = (data.blocks||[]).slice().sort((a,b)=>toSec(a.startTime)-toSec(b.startTime));
+  const result = [];
+  blocks.forEach((block,bi) => {
+    const items = (block.items||[]).filter(i => i.identifier||i.url);
+    if (!items.length) return;
+    const bStart = toSec(block.startTime);
+    const bEnd   = bi+1<blocks.length ? toSec(blocks[bi+1].startTime) : DAY;
+    let cursor=bStart, i=0;
+    while (cursor<bEnd && i<2000) {
+      const item = items[i%items.length];
+      const dur  = Math.max(10, item.duration||300);
+      const end  = Math.min(cursor+dur, bEnd);
+      result.push({
+        title     : item.title||item.identifier||'—',
+        identifier: item.identifier||null,
+        url       : item.url||null,
+        blockName : block.name,
+        genre     : block.genre||block.name,
+        startSec  : cursor,
+        endSec    : end
+      });
+      cursor=end; i++;
     }
-  }
-
-  const resolved = timeline.filter(i => i.resolvedUrl).length;
-  console.log(`Resolved ${resolved}/${timeline.length} timeline slots`);
+  });
+  return result;
 }
 
-async function resolveIdentifier(identifier) {
-  if (urlCache[identifier]) return urlCache[identifier];
+function toSec(t) {
+  if (!t) return 0;
+  if (typeof t==='number') return t;
+  const [h,m]=t.split(':').map(Number);
+  return (h||0)*3600+(m||0)*60;
+}
+
+function idxAt(sec) {
+  const s=((sec%DAY)+DAY)%DAY;
+  for (let i=0;i<timeline.length;i++)
+    if (s>=timeline[i].startSec && s<timeline[i].endSec) return i;
+  return 0;
+}
+
+// ── URL RESOLUTION ────────────────────────────────────────────
+// Instant guess — no network round trip. Archive.org uses this
+// naming pattern for the majority of their video derivatives.
+function guessUrl(id) {
+  return 'https://archive.org/download/'+id+'/'+id+'_512kb.mp4';
+}
+
+async function resolveUrl(id) {
+  if (urlCache[id]) return urlCache[id];
   try {
-    const resp = await fetch(`https://archive.org/metadata/${identifier}`);
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const meta = await resp.json();
-    const files = meta.files || [];
-
-    // Priority order: small mp4 derivatives first, then any mp4, then other formats
-    const patterns = [
-      /_512kb\.mp4$/i,
-      /_256kb\.mp4$/i,
-      /\.mp4$/i,
-      /\.ogv$/i,
-      /\.webm$/i,
+    const r    = await fetch('https://archive.org/metadata/'+id);
+    if (!r.ok) throw new Error('meta '+r.status);
+    const meta = await r.json();
+    const files= (meta.files||[]);
+    const order= [
+      f => /_512kb\.mp4$/i.test(f.name) && f.source==='derivative',
+      f => /\.mp4$/i.test(f.name)       && f.source==='derivative',
+      f => /_512kb\.mp4$/i.test(f.name),
+      f => /\.mp4$/i.test(f.name),
+      f => /\.ogv$/i.test(f.name),
+      f => /\.webm$/i.test(f.name),
     ];
-
-    let picked = null;
-    for (const pat of patterns) {
-      // Prefer derivatives over originals (smaller, more browser-compatible)
-      picked = files.find(f => pat.test(f.name) && f.source === 'derivative')
-            || files.find(f => pat.test(f.name));
-      if (picked) break;
-    }
-
+    let picked=null;
+    for (const fn of order) { picked=files.find(fn); if(picked) break; }
+    if (!picked) picked=files.find(f=>/\.(mp4|ogv|webm|avi|mov)$/i.test(f.name));
     if (picked) {
-      const url = `https://archive.org/download/${identifier}/${encodeURIComponent(picked.name)}`;
-      urlCache[identifier] = url;
-      console.log(`✓ ${identifier} → ${picked.name}`);
+      const url='https://archive.org/download/'+id+'/'+encodeURIComponent(picked.name);
+      urlCache[id]=url;
       return url;
-    } else {
-      console.warn(`✗ ${identifier}: no playable file found`);
     }
-  } catch(e) {
-    console.warn(`✗ ${identifier}: metadata fetch failed`, e.message);
-  }
+  } catch(e) { console.warn('resolve failed:',id,e.message); }
   return null;
 }
 
-// ── TIMELINE BUILDER ──────────────────────────────────────────────────────────
-function buildTimeline(data) {
-  const blocks = (data.blocks || []).slice()
-    .sort((a,b) => parseHHMM(a.startTime) - parseHHMM(b.startTime));
-
-  const DAY = 86400;
-  const timeline = [];
-
-  blocks.forEach((block, bi) => {
-    const items = (block.items || []).filter(i => i.identifier || i.url);
-    if (!items.length) return;
-
-    const blockStart = parseHHMM(block.startTime);
-    const blockEnd   = bi + 1 < blocks.length
-      ? parseHHMM(blocks[bi+1].startTime)
-      : DAY;
-
-    let cursor = blockStart;
-    let i = 0;
-    while (cursor < blockEnd) {
-      const item    = items[i % items.length];
-      const dur     = item.duration || 300;
-      const endSlot = Math.min(cursor + dur, blockEnd);
-      timeline.push({
-        ...item,
-        blockName : block.name,
-        genre     : block.genre || block.name,
-        startSec  : cursor,
-        endSec    : endSlot,
-        resolvedUrl: item.url || null
-      });
-      cursor = endSlot;
-      i++;
-      if (i > 5000) break; // absolute safety
-    }
-  });
-
-  return timeline;
+// ── BROADCAST ─────────────────────────────────────────────────
+function tuneIn() {
+  userClicked=true;
+  tuneinEl.style.display='none';
+  if (scheduleReady) beginBroadcast();
+  // else: loadSchedule() will call beginBroadcast() when ready
 }
 
-function parseHHMM(t) {
-  if (!t) return 0;
-  if (typeof t === 'number') return t;
-  const [h, m] = t.split(':').map(Number);
-  return (h||0) * 3600 + (m||0) * 60;
-}
-
-// ── BROADCAST ENGINE ──────────────────────────────────────────────────────────
-function startBroadcast() {
-  if (tickTimer) clearInterval(tickTimer);
-
-  // Find and start current item immediately
-  const idx = findIdx(nowSec());
-  playIdx(idx, true); // true = seek to live position
-
-  // Pre-load the next item into standby buffer
-  preloadNext(idx);
-
-  // Tick every 500ms to check for item transitions
-  tickTimer = setInterval(broadcastTick, 500);
+function beginBroadcast() {
+  if (tickInterval) clearInterval(tickInterval);
+  const idx=idxAt(wallSec());
+  playSlot(idx, true);
+  warmNext(idx);
+  tickInterval=setInterval(broadcastTick, 800);
 }
 
 function broadcastTick() {
-  if (!scheduleReady) return;
-  const now = nowSec();
-  const item = schedule[currentIdx];
-
-  // Time to cut to next item?
-  if (item && now >= item.endSec) {
-    const nextIdx = findIdx(now);
-    if (nextIdx !== currentIdx) {
-      cutToNext(nextIdx);
-    }
+  if (!scheduleReady||!userClicked) return;
+  const now=wallSec();
+  const slot=timeline[currentIdx];
+  if (!slot) return;
+  // Check wall clock — cut if we've passed slot end
+  if (now >= slot.endSec) {
+    const ni=idxAt(now);
+    if (ni!==currentIdx) doCut(ni);
   }
-
   updateHUD();
 }
 
-// Find which timeline slot corresponds to 'sec' seconds since midnight
-function findIdx(sec) {
-  const DAY = 86400;
-  const s = ((sec % DAY) + DAY) % DAY; // normalise
-  for (let i = 0; i < schedule.length; i++) {
-    if (s >= schedule[i].startSec && s < schedule[i].endSec) return i;
+async function playSlot(idx, seekLive) {
+  if (idx<0||idx>=timeline.length) return;
+  currentIdx=idx;
+  const slot=timeline[idx];
+
+  // Determine URL — use cache or instant guess
+  let url = slot.url
+          || (slot.identifier ? urlCache[slot.identifier]||null : null);
+
+  if (!url && slot.identifier) {
+    // Use instant guess so playback starts immediately
+    url = guessUrl(slot.identifier);
+    // Quietly confirm the real URL in background
+    resolveUrl(slot.identifier).then(confirmed => {
+      if (!confirmed || currentIdx!==idx) return;
+      if (confirmed===player.src) { urlCache[slot.identifier]=confirmed; return; }
+      // Swap to confirmed URL mid-play, preserving position
+      const t = player.currentTime;
+      player.src = confirmed;
+      player.currentTime = t;
+      player.play().catch(()=>{});
+    });
   }
-  return 0; // fallback to start
-}
 
-// Play a specific timeline index, optionally seeking to live wall-clock position
-function playIdx(idx, seekToLive = false) {
-  const item = schedule[idx];
-  if (!item) return;
-
-  currentIdx = idx;
-
-  const url = item.resolvedUrl;
   if (!url) {
-    console.warn('No URL for item, skipping:', item.title);
-    // Skip to next
-    const next = (idx + 1) % schedule.length;
-    setTimeout(() => playIdx(next, false), 500);
+    console.warn('No URL, skipping slot',idx);
+    setTimeout(()=>doCut((idx+1)%timeline.length), 800);
     return;
   }
 
-  const offset = seekToLive ? Math.max(0, nowSec() - item.startSec) : 0;
+  const offset = seekLive ? Math.max(0, wallSec()-slot.startSec) : 0;
 
-  // Load into active video element
-  if (activeVideo.src !== url) {
-    activeVideo.src = url;
+  // Avoid unnecessary src reload
+  if (player.src !== url) {
+    player.src = url;
   }
-
-  activeVideo.onloadedmetadata = () => {
-    if (seekToLive && offset > 2 && offset < activeVideo.duration - 2) {
-      activeVideo.currentTime = offset;
-    }
-    if (userInteracted) {
-      activeVideo.play().catch(e => console.warn('play():', e));
-    }
-    staticEl.classList.remove('active');
-    activeVideo.style.opacity = '1';
-    activeVideo.classList.add('loaded');
-  };
-
-  activeVideo.onerror = () => {
-    console.warn('Video error, skipping to next');
-    const next = (idx + 1) % schedule.length;
-    setTimeout(() => cutToNext(next), 500);
-  };
 
   updateHUD();
-}
 
-// Instant cut to next item using the pre-loaded standby buffer
-function cutToNext(nextIdx) {
-  const item = schedule[nextIdx];
-  if (!item || !item.resolvedUrl) {
-    // standby isn't ready — force load directly
-    currentIdx = nextIdx;
-    playIdx(nextIdx, false);
-    preloadNext(nextIdx);
-    return;
-  }
+  const tryPlay = () => {
+    if (seekLive && offset>2) {
+      const dur=player.duration;
+      const target=isFinite(dur) ? Math.min(offset,dur-1) : offset;
+      if (target>0) player.currentTime=target;
+    }
+    player.play().catch(err => {
+      // If the guessed URL 404'd, fall back to metadata lookup immediately
+      if (slot.identifier && url===guessUrl(slot.identifier)) {
+        resolveUrl(slot.identifier).then(confirmed => {
+          if (confirmed && currentIdx===idx) {
+            player.src=confirmed;
+            if (offset>2) player.currentTime=offset;
+            player.play().catch(()=>{});
+          } else if (!confirmed) {
+            console.warn('Unplayable, skipping:',slot.title);
+            doCut((idx+1)%timeline.length);
+          }
+        });
+      }
+    });
+  };
 
-  // Flash effect
-  flashEl.classList.add('flash');
-  setTimeout(() => flashEl.classList.remove('flash'), 80);
-
-  // If standby has the right URL loaded and ready, swap buffers instantly
-  if (standbyVideo.src === item.resolvedUrl && standbyVideo.readyState >= 3) {
-    // Swap active ↔ standby
-    standbyVideo.style.opacity = '1';
-    standbyVideo.classList.add('loaded');
-    activeVideo.style.opacity  = '0';
-    activeVideo.classList.remove('loaded');
-    activeVideo.pause();
-
-    const tmp  = activeVideo;
-    activeVideo   = standbyVideo;
-    standbyVideo  = tmp;
-
-    currentIdx = nextIdx;
-    if (userInteracted) activeVideo.play().catch(()=>{});
-
+  if (player.readyState>=1) {
+    tryPlay();
   } else {
-    // Standby wasn't ready in time — direct load (brief static flash)
-    staticEl.classList.add('active');
-    currentIdx = nextIdx;
-    const url = item.resolvedUrl;
-    activeVideo.src = url;
-    activeVideo.onloadedmetadata = () => {
-      if (userInteracted) activeVideo.play().catch(()=>{});
-      staticEl.classList.remove('active');
-      activeVideo.style.opacity = '1';
+    player.onloadedmetadata = ()=>{
+      player.onloadedmetadata=null;
+      tryPlay();
     };
   }
-
-  updateHUD();
-  // Pre-load the one after next
-  preloadNext(nextIdx);
 }
 
-// Silently load the next item into the standby buffer so it's ready for an instant cut
-function preloadNext(currentItemIdx) {
-  const nextIdx  = (currentItemIdx + 1) % schedule.length;
-  const nextItem = schedule[nextIdx];
-  if (!nextItem || !nextItem.resolvedUrl) return;
-  if (standbyVideo.src === nextItem.resolvedUrl) return; // already loaded
-
-  standbyVideo.src     = nextItem.resolvedUrl;
-  standbyVideo.preload = 'auto';
-  standbyVideo.style.opacity = '0';
-  // Don't play — just buffer
-  standbyVideo.load();
+function doCut(nextIdx) {
+  // Brief channel-change flash
+  flashEl.classList.add('on');
+  setTimeout(()=>flashEl.classList.remove('on'),60);
+  player.pause();
+  playSlot(nextIdx, false);
+  warmNext(nextIdx);
 }
 
-// ── HUD ───────────────────────────────────────────────────────────────────────
+// Pre-warm the next slot's URL into cache so cut is instant
+function warmNext(idx) {
+  const next=timeline[(idx+1)%timeline.length];
+  if (next&&next.identifier&&!urlCache[next.identifier]) {
+    resolveUrl(next.identifier).catch(()=>{});
+  }
+}
+
+// ── HUD ───────────────────────────────────────────────────────
 function updateHUD() {
-  const item = schedule[currentIdx];
-  if (!item) return;
-
-  const now     = nowSec();
-  const elapsed = now - item.startSec;
-  const total   = item.endSec - item.startSec;
-  const pct     = Math.max(0, Math.min(100, (elapsed / total) * 100));
-  progressBar.style.width = pct + '%';
-
-  nowTitle.textContent = item.title || item.identifier || 'UNKNOWN';
-  genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
-
-  const nextItem = schedule[(currentIdx + 1) % schedule.length];
-  if (nextItem) {
-    nextTitle.textContent = nextItem.title || nextItem.identifier || '—';
-    const secLeft = Math.max(0, Math.round(item.endSec - now));
-    const mm = Math.floor(secLeft / 60);
-    const ss = String(secLeft % 60).padStart(2,'0');
-    timeRemaining.textContent = `in ${mm}:${ss}`;
+  const slot=timeline[currentIdx];
+  if (!slot) return;
+  const now=wallSec();
+  const pct=Math.max(0,Math.min(100,((now-slot.startSec)/(slot.endSec-slot.startSec))*100));
+  progressEl.style.width=pct+'%';
+  nowTitleEl.textContent=slot.title;
+  genreEl.textContent=(slot.blockName||slot.genre||'BROADCAST').toUpperCase();
+  const next=timeline[(currentIdx+1)%timeline.length];
+  if (next) {
+    nextTitleEl.textContent=next.title;
+    const s=Math.max(0,Math.round(slot.endSec-now));
+    timeLeftEl.textContent='in '+Math.floor(s/60)+':'+String(s%60).padStart(2,'0');
   }
 }
 
-function showStatus(msg) {
-  const el = document.getElementById('status-line');
-  if (el) el.textContent = msg;
-}
-
-// ── TUNE-IN PROMPT ────────────────────────────────────────────────────────────
-// Chrome blocks autoplay until user gesture. We show a fullscreen prompt
-// immediately. Schedule loads in background. Click → instant broadcast.
-
-function showTuneInPrompt() {
-  const overlay = document.createElement('div');
-  overlay.id = 'tunein-overlay';
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;cursor:pointer;
-    background:rgba(0,0,0,0.88);gap:24px;
-  `;
-  overlay.innerHTML = `
-    <div id="status-line" style="
-      font-family:'IBM Plex Mono',monospace;font-size:10px;
-      letter-spacing:0.3em;color:#5a4200;text-align:center;margin-bottom:8px;
-    ">LOADING BROADCAST SCHEDULE…</div>
-    <div style="
-      font-family:'Bebas Neue',cursive;
-      font-size:clamp(36px,7vw,88px);
-      letter-spacing:0.1em;color:#ffb700;
-      text-shadow:0 0 40px #ffb700,0 0 80px rgba(255,183,0,0.3);
-      text-align:center;line-height:1;
-    ">▶ CLICK TO<br>TUNE IN</div>
-    <div style="
-      font-family:'IBM Plex Mono',monospace;font-size:11px;
-      letter-spacing:0.3em;color:#7a5800;text-align:center;
-    ">TVStation · 24/7 Live Broadcast</div>`;
-
-  overlay.onclick = () => {
-    if (!scheduleReady) return; // wait for schedule
-    userInteracted = true;
-    overlay.remove();
-    // Kick off playback now that we have a user gesture
-    if (activeVideo.src) {
-      activeVideo.play().catch(() => {});
-    } else {
-      startBroadcast();
-    }
-  };
-  document.body.appendChild(overlay);
-}
-
-// ── INIT ──────────────────────────────────────────────────────────────────────
-showTuneInPrompt();
-loadSchedule().then(() => {
-  // Update the overlay once schedule is ready
-  const statusLine = document.getElementById('status-line');
-  if (statusLine) {
-    statusLine.textContent = 'BROADCAST READY — CLICK TO TUNE IN';
-    statusLine.style.color = '#ffb700';
-  }
+// ── PLAYER EVENTS ─────────────────────────────────────────────
+// Video ended before its scheduled slot — cut immediately, no gap
+player.addEventListener('ended', ()=>{
+  if (!scheduleReady||!userClicked) return;
+  const now=wallSec();
+  const ni=idxAt(now)===currentIdx ? (currentIdx+1)%timeline.length : idxAt(now);
+  doCut(ni);
 });
 
-// Refresh schedule every 30 min (picks up admin changes without reload)
-setInterval(() => {
-  loadSchedule();
-}, 30 * 60 * 1000);
+player.addEventListener('error', ()=>{
+  if (!scheduleReady||!userClicked) return;
+  console.warn('Video error — skipping');
+  setTimeout(()=>doCut((currentIdx+1)%timeline.length), 500);
+});
+
+// ── INIT ──────────────────────────────────────────────────────
+loadSchedule();
+setInterval(loadSchedule, 30*60*1000);
 </script>
 </body>
 </html>
