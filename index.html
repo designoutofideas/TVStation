@@ -365,380 +365,451 @@
 </div>
 
 <script>
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const SCHEDULE_URL = './schedule.json';  // path to your schedule file
-const STATION_NAME = 'Archive RFA';
+// ═══════════════════════════════════════════════════════════════════════════════
+// TVSTATION — SYNCHRONIZED MASTER BROADCAST ENGINE
+//
+// Philosophy: one master wall-clock timeline. Every browser that opens this
+// page at the same moment sees the same frame of the same video — like tuning
+// into a live TV channel. No gaps, ever.
+//
+// Architecture:
+//   1. Load schedule.json and build a 86400s (24hr) flat timeline
+//   2. Pre-resolve ALL archive.org metadata URLs in parallel (before play)
+//   3. Use TWO <video> elements (A/B buffer). While A plays, B loads next.
+//   4. Wall-clock tick every 500ms checks if it's time to swap — instant cut.
+//   5. On page load, calculate exact byte-offset into current video and seek.
+// ═══════════════════════════════════════════════════════════════════════════════
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let schedule = [];
-let currentIndex = -1;
-let tickInterval = null;
-let scheduleLoaded = false;
+const SCHEDULE_URL = './schedule.json';
 
-// ─── DOM ──────────────────────────────────────────────────────────────────────
-const player = document.getElementById('player');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date-display');
-const nowTitle = document.getElementById('now-title');
-const genreTag = document.getElementById('genre-tag');
-const nextTitle = document.getElementById('next-title');
+// ── DOM ───────────────────────────────────────────────────────────────────────
+const clockEl       = document.getElementById('clock');
+const dateEl        = document.getElementById('date-display');
+const nowTitle      = document.getElementById('now-title');
+const genreTag      = document.getElementById('genre-tag');
+const nextTitle     = document.getElementById('next-title');
 const timeRemaining = document.getElementById('time-remaining');
-const progressBar = document.getElementById('progress-bar');
-const noSchedule = document.getElementById('no-schedule');
-const errorState = document.getElementById('error-state');
-const staticEl = document.getElementById('static');
-const flashEl = document.getElementById('channel-flash');
+const progressBar   = document.getElementById('progress-bar');
+const noSchedule    = document.getElementById('no-schedule');
+const errorState    = document.getElementById('error-state');
+const staticEl      = document.getElementById('static');
+const flashEl       = document.getElementById('channel-flash');
+const container     = document.getElementById('video-container');
 
-// ─── CLOCK ────────────────────────────────────────────────────────────────────
+// ── DOUBLE BUFFER: two <video> elements, we swap between them ─────────────────
+const videoA = document.getElementById('player'); // already in HTML
+const videoB = document.createElement('video');
+videoB.style.cssText = videoA.style.cssText;
+videoB.style.position = 'absolute';
+videoB.style.opacity = '0';
+videoB.autoplay = true;
+videoB.playsInline = true;
+container.appendChild(videoB);
+
+let activeVideo  = videoA;  // currently visible
+let standbyVideo = videoB;  // loading next
+
+// ── STATE ─────────────────────────────────────────────────────────────────────
+let schedule        = [];   // flat 24hr timeline [{startSec, endSec, url, title, ...}]
+let urlCache        = {};   // identifier → resolved stream URL
+let currentIdx      = -1;
+let tickTimer       = null;
+let scheduleReady   = false;
+let userInteracted  = false;
+
+// ── CLOCK ─────────────────────────────────────────────────────────────────────
+function nowSec() {
+  const d = new Date();
+  return d.getHours() * 3600 + d.getMinutes() * 60 + d.getSeconds()
+       + d.getMilliseconds() / 1000;
+}
+
 function updateClock() {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2,'0');
-  const m = String(now.getMinutes()).padStart(2,'0');
-  const s = String(now.getSeconds()).padStart(2,'0');
-  clockEl.textContent = `${h}:${m}:${s}`;
-  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
+  const d   = new Date();
+  const pad = n => String(n).padStart(2,'0');
+  clockEl.textContent = `${pad(d.getHours())}:${pad(d.getMinutes())}:${pad(d.getSeconds())}`;
+  const days   = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
   const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  dateEl.textContent = `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
+  dateEl.textContent = `${days[d.getDay()]} ${d.getDate()} ${months[d.getMonth()]} ${d.getFullYear()}`;
 }
 setInterval(updateClock, 1000);
 updateClock();
 
-// ─── SCHEDULE LOADING ─────────────────────────────────────────────────────────
+// ── SCHEDULE LOADING ──────────────────────────────────────────────────────────
 async function loadSchedule() {
   try {
     const resp = await fetch(SCHEDULE_URL + '?t=' + Date.now());
-    if (!resp.ok) throw new Error('not found');
+    if (!resp.ok) throw new Error('schedule not found');
     const data = await resp.json();
-    schedule = buildTimeline(data);
-    if (schedule.length > 0) {
-      scheduleLoaded = true;
-      noSchedule.classList.remove('visible');
-      startPlayback();
-    }
+
+    const rawTimeline = buildTimeline(data);
+    if (!rawTimeline.length) throw new Error('empty timeline');
+
+    // Show loading indicator
+    showStatus('LOADING BROADCAST SCHEDULE…');
+
+    // Pre-resolve ALL URLs in parallel before we start playing
+    // This is the key to gapless playback — we never resolve at play time
+    await preResolveAll(rawTimeline);
+
+    schedule      = rawTimeline;
+    scheduleReady = true;
+    noSchedule.classList.remove('visible');
+    errorState.classList.remove('visible');
+
+    showStatus('SCHEDULE READY — TUNE IN TO WATCH');
+    startBroadcast();
+
   } catch(e) {
-    console.warn('No schedule.json found. Showing placeholder.');
-    // keep no-schedule visible
+    console.error('Schedule load failed:', e);
+    // keep no-schedule screen visible
   }
 }
 
-// ─── TIMELINE BUILDER ─────────────────────────────────────────────────────────
-// Builds a flat 86400s (24hr) timeline from schedule data.
-//
-// Logic:
-//   1. Each block starts at its defined startTime.
-//   2. Block items play back-to-back from that start time.
-//   3. Any gap between end of a block's items and the start of the NEXT block
-//      is filled by looping the block's evergreen video (marked evergreen:true),
-//      or the global evergreen defined at the top level of schedule.json.
-//   4. After the last block ends, evergreen loops until midnight (86400s).
-//   5. The whole 24hr timeline repeats from 00:00 the next day.
+// Pre-resolve every unique identifier in parallel
+async function preResolveAll(timeline) {
+  const identifiers = [...new Set(
+    timeline.filter(i => i.identifier && !i.url).map(i => i.identifier)
+  )];
 
+  console.log(`Pre-resolving ${identifiers.length} unique Archive.org identifiers…`);
+
+  await Promise.allSettled(identifiers.map(id => resolveIdentifier(id)));
+
+  // Stamp resolved URLs onto timeline items
+  for (const item of timeline) {
+    if (!item.url && item.identifier && urlCache[item.identifier]) {
+      item.resolvedUrl = urlCache[item.identifier];
+    } else if (item.url) {
+      item.resolvedUrl = item.url;
+    }
+  }
+
+  const resolved = timeline.filter(i => i.resolvedUrl).length;
+  console.log(`Resolved ${resolved}/${timeline.length} timeline slots`);
+}
+
+async function resolveIdentifier(identifier) {
+  if (urlCache[identifier]) return urlCache[identifier];
+  try {
+    const resp = await fetch(`https://archive.org/metadata/${identifier}`);
+    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
+    const meta = await resp.json();
+    const files = meta.files || [];
+
+    // Priority order: small mp4 derivatives first, then any mp4, then other formats
+    const patterns = [
+      /_512kb\.mp4$/i,
+      /_256kb\.mp4$/i,
+      /\.mp4$/i,
+      /\.ogv$/i,
+      /\.webm$/i,
+    ];
+
+    let picked = null;
+    for (const pat of patterns) {
+      // Prefer derivatives over originals (smaller, more browser-compatible)
+      picked = files.find(f => pat.test(f.name) && f.source === 'derivative')
+            || files.find(f => pat.test(f.name));
+      if (picked) break;
+    }
+
+    if (picked) {
+      const url = `https://archive.org/download/${identifier}/${encodeURIComponent(picked.name)}`;
+      urlCache[identifier] = url;
+      console.log(`✓ ${identifier} → ${picked.name}`);
+      return url;
+    } else {
+      console.warn(`✗ ${identifier}: no playable file found`);
+    }
+  } catch(e) {
+    console.warn(`✗ ${identifier}: metadata fetch failed`, e.message);
+  }
+  return null;
+}
+
+// ── TIMELINE BUILDER ──────────────────────────────────────────────────────────
 function buildTimeline(data) {
-  const blocks = (data.blocks || []).slice();
-  const globalEvergreen = data.evergreen || null;
-
-  // Sort blocks by startTime
-  blocks.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
+  const blocks = (data.blocks || []).slice()
+    .sort((a,b) => parseHHMM(a.startTime) - parseHHMM(b.startTime));
 
   const DAY = 86400;
   const timeline = [];
 
-  for (let bi = 0; bi < blocks.length; bi++) {
-    const block = blocks[bi];
-    const blockStart = parseTime(block.startTime);
-    const nextBlockStart = bi + 1 < blocks.length
-      ? parseTime(blocks[bi + 1].startTime)
-      : DAY; // last block fills until midnight
+  blocks.forEach((block, bi) => {
+    const items = (block.items || []).filter(i => i.identifier || i.url);
+    if (!items.length) return;
 
-    // Find this block's evergreen (block-level overrides global)
-    const evergreen = block.items.find(i => i.evergreen) || globalEvergreen;
-    const regularItems = block.items.filter(i => !i.evergreen);
+    const blockStart = parseHHMM(block.startTime);
+    const blockEnd   = bi + 1 < blocks.length
+      ? parseHHMM(blocks[bi+1].startTime)
+      : DAY;
 
-    // Place regular items back-to-back starting at blockStart
     let cursor = blockStart;
-    for (const item of regularItems) {
-      const dur = item.duration || 300;
+    let i = 0;
+    while (cursor < blockEnd) {
+      const item    = items[i % items.length];
+      const dur     = item.duration || 300;
+      const endSlot = Math.min(cursor + dur, blockEnd);
       timeline.push({
         ...item,
-        genre: block.genre,
-        blockName: block.name,
-        startSec: cursor,
-        endSec: cursor + dur,
-        isEvergreen: false
+        blockName : block.name,
+        genre     : block.genre || block.name,
+        startSec  : cursor,
+        endSec    : endSlot,
+        resolvedUrl: item.url || null
       });
-      cursor += dur;
+      cursor = endSlot;
+      i++;
+      if (i > 5000) break; // absolute safety
     }
+  });
 
-    // Fill remaining gap until next block with looping evergreen
-    if (evergreen && cursor < nextBlockStart) {
-      const egDur = evergreen.duration || 60;
-      while (cursor < nextBlockStart) {
-        const end = Math.min(cursor + egDur, nextBlockStart);
-        timeline.push({
-          ...evergreen,
-          genre: block.genre,
-          blockName: block.name,
-          title: evergreen.title || 'Station ID',
-          startSec: cursor,
-          endSec: end,
-          isEvergreen: true
-        });
-        cursor = end;
-      }
-    }
-  }
-
-  // Sort final timeline (should already be sorted, but safety check)
-  timeline.sort((a, b) => a.startSec - b.startSec);
   return timeline;
 }
 
-function parseTime(t) {
+function parseHHMM(t) {
   if (!t) return 0;
   if (typeof t === 'number') return t;
   const [h, m] = t.split(':').map(Number);
-  return h * 3600 + (m || 0) * 60;
+  return (h||0) * 3600 + (m||0) * 60;
 }
 
-function secondsFromMidnight() {
-  const now = new Date();
-  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
+// ── BROADCAST ENGINE ──────────────────────────────────────────────────────────
+function startBroadcast() {
+  if (tickTimer) clearInterval(tickTimer);
+
+  // Find and start current item immediately
+  const idx = findIdx(nowSec());
+  playIdx(idx, true); // true = seek to live position
+
+  // Pre-load the next item into standby buffer
+  preloadNext(idx);
+
+  // Tick every 500ms to check for item transitions
+  tickTimer = setInterval(broadcastTick, 500);
 }
 
-// ─── PLAYBACK ENGINE ──────────────────────────────────────────────────────────
-function startPlayback() {
-  if (tickInterval) clearInterval(tickInterval);
-  syncToCurrentTime();
-  tickInterval = setInterval(tick, 2000);
-}
+function broadcastTick() {
+  if (!scheduleReady) return;
+  const now = nowSec();
+  const item = schedule[currentIdx];
 
-function syncToCurrentTime() {
-  const now = secondsFromMidnight();
-  const idx = findCurrentItem(now);
-  if (idx === -1) {
-    showError('NO CONTENT SCHEDULED FOR THIS TIME');
-    return;
-  }
-  if (idx !== currentIndex) {
-    loadItem(idx, now);
-  }
-}
-
-function tick() {
-  if (!scheduleLoaded) return;
-  const now = secondsFromMidnight();
-  const item = schedule[currentIndex];
+  // Time to cut to next item?
   if (item && now >= item.endSec) {
-    // time to advance
-    const next = findCurrentItem(now);
-    if (next !== currentIndex) {
-      doChannelChange(() => loadItem(next, now));
+    const nextIdx = findIdx(now);
+    if (nextIdx !== currentIdx) {
+      cutToNext(nextIdx);
     }
   }
+
   updateHUD();
 }
 
-function findCurrentItem(nowSec) {
-  // Find item that should be playing right now
+// Find which timeline slot corresponds to 'sec' seconds since midnight
+function findIdx(sec) {
+  const DAY = 86400;
+  const s = ((sec % DAY) + DAY) % DAY; // normalise
   for (let i = 0; i < schedule.length; i++) {
-    if (nowSec >= schedule[i].startSec && nowSec < schedule[i].endSec) return i;
+    if (s >= schedule[i].startSec && s < schedule[i].endSec) return i;
   }
-  // If we're past the last item, loop back (for 24hr looping)
-  if (schedule.length > 0 && nowSec >= schedule[schedule.length-1].endSec) return 0;
-  if (schedule.length > 0 && nowSec < schedule[0].startSec) return schedule.length - 1;
-  return 0;
+  return 0; // fallback to start
 }
 
-// Cache of resolved URLs so we don't re-fetch metadata each time
-const urlCache = {};
-
-async function resolveStreamUrl(item) {
-  // 1. Direct URL always wins
-  if (item.url) return item.url;
-
-  // 2. identifier + explicit filename
-  if (item.identifier && item.filename) {
-    return `https://archive.org/download/${item.identifier}/${encodeURIComponent(item.filename)}`;
-  }
-
-  // 3. Look up best video file from Archive.org metadata API
-  if (item.identifier) {
-    if (urlCache[item.identifier]) return urlCache[item.identifier];
-    try {
-      const metaUrl = `https://archive.org/metadata/${item.identifier}`;
-      const resp = await fetch(metaUrl);
-      const meta = await resp.json();
-      const files = meta.files || [];
-
-      // Prefer: mp4 > ogv > avi — and prefer smaller/_512kb versions
-      const priority = [/_512kb\.mp4$/i, /\.mp4$/i, /_512kb\.ogv$/i, /\.ogv$/i, /\.avi$/i, /\.mov$/i];
-      let picked = null;
-      for (const pattern of priority) {
-        picked = files.find(f => pattern.test(f.name) && f.source !== 'original' || pattern.test(f.name));
-        if (picked) break;
-      }
-      // Fallback: any video file
-      if (!picked) picked = files.find(f => /\.(mp4|ogv|avi|mov|mkv|webm)$/i.test(f.name));
-
-      if (picked) {
-        const resolved = `https://archive.org/download/${item.identifier}/${encodeURIComponent(picked.name)}`;
-        urlCache[item.identifier] = resolved;
-        console.log(`Resolved ${item.identifier} → ${picked.name}`);
-        return resolved;
-      }
-    } catch(e) {
-      console.warn(`Metadata lookup failed for ${item.identifier}:`, e);
-    }
-  }
-  return '';
-}
-
-async function loadItem(idx, nowSec) {
-  currentIndex = idx;
+// Play a specific timeline index, optionally seeking to live wall-clock position
+function playIdx(idx, seekToLive = false) {
   const item = schedule[idx];
   if (!item) return;
 
-  staticEl.classList.add('active');
-  player.classList.remove('loaded');
-  updateHUD();
+  currentIdx = idx;
 
-  // Resolve the actual stream URL (may do a metadata API call)
-  const streamUrl = await resolveStreamUrl(item);
-
-  if (!streamUrl) {
-    showError(`NO PLAYABLE FILE FOUND — SKIPPING "${item.title || item.identifier}"`);
-    setTimeout(() => {
-      currentIndex = (currentIndex + 1) % schedule.length;
-      loadItem(currentIndex, secondsFromMidnight());
-    }, 3000);
+  const url = item.resolvedUrl;
+  if (!url) {
+    console.warn('No URL for item, skipping:', item.title);
+    // Skip to next
+    const next = (idx + 1) % schedule.length;
+    setTimeout(() => playIdx(next, false), 500);
     return;
   }
 
-  setTimeout(() => {
-    player.src = streamUrl;
+  const offset = seekToLive ? Math.max(0, nowSec() - item.startSec) : 0;
 
-    // Seek to correct position within the item
-    const offset = Math.max(0, nowSec - item.startSec);
-    if (offset > 5) {
-      player.addEventListener('loadedmetadata', function seekOnce() {
-        if (player.duration && offset < player.duration - 2) {
-          player.currentTime = offset;
-        }
-        player.removeEventListener('loadedmetadata', seekOnce);
-      });
+  // Load into active video element
+  if (activeVideo.src !== url) {
+    activeVideo.src = url;
+  }
+
+  activeVideo.onloadedmetadata = () => {
+    if (seekToLive && offset > 2 && offset < activeVideo.duration - 2) {
+      activeVideo.currentTime = offset;
     }
-
-    // Only call play() if user has already interacted
-    if (userHasInteracted) {
-      player.play().catch(e => console.warn('Play failed:', e));
+    if (userInteracted) {
+      activeVideo.play().catch(e => console.warn('play():', e));
     }
+    staticEl.classList.remove('active');
+    activeVideo.style.opacity = '1';
+    activeVideo.classList.add('loaded');
+  };
 
-    player.oncanplay = () => {
-      staticEl.classList.remove('active');
-      player.classList.add('loaded');
-      errorState.classList.remove('visible');
-    };
+  activeVideo.onerror = () => {
+    console.warn('Video error, skipping to next');
+    const next = (idx + 1) % schedule.length;
+    setTimeout(() => cutToNext(next), 500);
+  };
 
-    player.onerror = () => {
-      staticEl.classList.remove('active');
-      console.warn('Player error on:', streamUrl);
-      showError('STREAM ERROR — SKIPPING...');
-      setTimeout(() => {
-        currentIndex = (currentIndex + 1) % schedule.length;
-        loadItem(currentIndex, secondsFromMidnight());
-      }, 3000);
-    };
-
-    updateHUD();
-  }, 400);
+  updateHUD();
 }
 
+// Instant cut to next item using the pre-loaded standby buffer
+function cutToNext(nextIdx) {
+  const item = schedule[nextIdx];
+  if (!item || !item.resolvedUrl) {
+    // standby isn't ready — force load directly
+    currentIdx = nextIdx;
+    playIdx(nextIdx, false);
+    preloadNext(nextIdx);
+    return;
+  }
+
+  // Flash effect
+  flashEl.classList.add('flash');
+  setTimeout(() => flashEl.classList.remove('flash'), 80);
+
+  // If standby has the right URL loaded and ready, swap buffers instantly
+  if (standbyVideo.src === item.resolvedUrl && standbyVideo.readyState >= 3) {
+    // Swap active ↔ standby
+    standbyVideo.style.opacity = '1';
+    standbyVideo.classList.add('loaded');
+    activeVideo.style.opacity  = '0';
+    activeVideo.classList.remove('loaded');
+    activeVideo.pause();
+
+    const tmp  = activeVideo;
+    activeVideo   = standbyVideo;
+    standbyVideo  = tmp;
+
+    currentIdx = nextIdx;
+    if (userInteracted) activeVideo.play().catch(()=>{});
+
+  } else {
+    // Standby wasn't ready in time — direct load (brief static flash)
+    staticEl.classList.add('active');
+    currentIdx = nextIdx;
+    const url = item.resolvedUrl;
+    activeVideo.src = url;
+    activeVideo.onloadedmetadata = () => {
+      if (userInteracted) activeVideo.play().catch(()=>{});
+      staticEl.classList.remove('active');
+      activeVideo.style.opacity = '1';
+    };
+  }
+
+  updateHUD();
+  // Pre-load the one after next
+  preloadNext(nextIdx);
+}
+
+// Silently load the next item into the standby buffer so it's ready for an instant cut
+function preloadNext(currentItemIdx) {
+  const nextIdx  = (currentItemIdx + 1) % schedule.length;
+  const nextItem = schedule[nextIdx];
+  if (!nextItem || !nextItem.resolvedUrl) return;
+  if (standbyVideo.src === nextItem.resolvedUrl) return; // already loaded
+
+  standbyVideo.src     = nextItem.resolvedUrl;
+  standbyVideo.preload = 'auto';
+  standbyVideo.style.opacity = '0';
+  // Don't play — just buffer
+  standbyVideo.load();
+}
+
+// ── HUD ───────────────────────────────────────────────────────────────────────
 function updateHUD() {
-  const item = schedule[currentIndex];
+  const item = schedule[currentIdx];
   if (!item) return;
 
-  const now = secondsFromMidnight();
+  const now     = nowSec();
   const elapsed = now - item.startSec;
-  const total = item.endSec - item.startSec;
-  const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
+  const total   = item.endSec - item.startSec;
+  const pct     = Math.max(0, Math.min(100, (elapsed / total) * 100));
   progressBar.style.width = pct + '%';
 
   nowTitle.textContent = item.title || item.identifier || 'UNKNOWN';
-  // Show STATION ID badge when evergreen is filling a gap
-  if (item.isEvergreen) {
-    genreTag.textContent = 'STATION ID';
-    genreTag.style.background = 'var(--amber-dim)';
-  } else {
-    genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
-    genreTag.style.background = '';
-  }
+  genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
 
-  // Up next
-  const nextIdx = (currentIndex + 1) % schedule.length;
-  const nextItem = schedule[nextIdx];
+  const nextItem = schedule[(currentIdx + 1) % schedule.length];
   if (nextItem) {
     nextTitle.textContent = nextItem.title || nextItem.identifier || '—';
-    const secLeft = item.endSec - now;
-    if (secLeft > 0) {
-      const mm = Math.floor(secLeft / 60);
-      const ss = String(secLeft % 60).padStart(2,'0');
-      timeRemaining.textContent = `in ${mm}:${ss}`;
-    }
+    const secLeft = Math.max(0, Math.round(item.endSec - now));
+    const mm = Math.floor(secLeft / 60);
+    const ss = String(secLeft % 60).padStart(2,'0');
+    timeRemaining.textContent = `in ${mm}:${ss}`;
   }
 }
 
-function doChannelChange(cb) {
-  flashEl.classList.add('flash');
-  staticEl.classList.add('active');
-  setTimeout(() => {
-    flashEl.classList.remove('flash');
-    cb();
-  }, 120);
+function showStatus(msg) {
+  const el = document.getElementById('status-line');
+  if (el) el.textContent = msg;
 }
 
-function showError(msg) {
-  errorState.querySelector('p').textContent = msg;
-  errorState.classList.add('visible');
-}
-
-// ─── TUNE-IN PROMPT (shown immediately — Chrome blocks autoplay until interaction) ──
-let userHasInteracted = false;
+// ── TUNE-IN PROMPT ────────────────────────────────────────────────────────────
+// Chrome blocks autoplay until user gesture. We show a fullscreen prompt
+// immediately. Schedule loads in background. Click → instant broadcast.
 
 function showTuneInPrompt() {
-  if (userHasInteracted) return;
   const overlay = document.createElement('div');
   overlay.id = 'tunein-overlay';
   overlay.style.cssText = `
     position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
     align-items:center;justify-content:center;cursor:pointer;
-    background:rgba(0,0,0,0.82);gap:24px;
+    background:rgba(0,0,0,0.88);gap:24px;
   `;
   overlay.innerHTML = `
-    <div style="font-family:'Bebas Neue',cursive;font-size:clamp(36px,7vw,88px);
-      letter-spacing:0.1em;color:#ffb700;text-shadow:0 0 40px #ffb700,0 0 80px rgba(255,183,0,0.3);
-      text-align:center;line-height:1">
-      ▶ CLICK TO<br>TUNE IN
-    </div>
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;
-      letter-spacing:0.3em;color:#7a5800;text-align:center">
-      TVStation · 24/7 Broadcast
-    </div>`;
+    <div id="status-line" style="
+      font-family:'IBM Plex Mono',monospace;font-size:10px;
+      letter-spacing:0.3em;color:#5a4200;text-align:center;margin-bottom:8px;
+    ">LOADING BROADCAST SCHEDULE…</div>
+    <div style="
+      font-family:'Bebas Neue',cursive;
+      font-size:clamp(36px,7vw,88px);
+      letter-spacing:0.1em;color:#ffb700;
+      text-shadow:0 0 40px #ffb700,0 0 80px rgba(255,183,0,0.3);
+      text-align:center;line-height:1;
+    ">▶ CLICK TO<br>TUNE IN</div>
+    <div style="
+      font-family:'IBM Plex Mono',monospace;font-size:11px;
+      letter-spacing:0.3em;color:#7a5800;text-align:center;
+    ">TVStation · 24/7 Live Broadcast</div>`;
+
   overlay.onclick = () => {
-    userHasInteracted = true;
+    if (!scheduleReady) return; // wait for schedule
+    userInteracted = true;
     overlay.remove();
-    player.play().catch(() => {});
+    // Kick off playback now that we have a user gesture
+    if (activeVideo.src) {
+      activeVideo.play().catch(() => {});
+    } else {
+      startBroadcast();
+    }
   };
   document.body.appendChild(overlay);
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-// Show tune-in prompt immediately — Chrome requires a user gesture before
-// any audio/video can play, so we gate everything behind this click.
+// ── INIT ──────────────────────────────────────────────────────────────────────
 showTuneInPrompt();
-loadSchedule();
+loadSchedule().then(() => {
+  // Update the overlay once schedule is ready
+  const statusLine = document.getElementById('status-line');
+  if (statusLine) {
+    statusLine.textContent = 'BROADCAST READY — CLICK TO TUNE IN';
+    statusLine.style.color = '#ffb700';
+  }
+});
 
-// Reload schedule every 30 minutes to pick up updates
-setInterval(loadSchedule, 30 * 60 * 1000);
+// Refresh schedule every 30 min (picks up admin changes without reload)
+setInterval(() => {
+  loadSchedule();
+}, 30 * 60 * 1000);
 </script>
 </body>
 </html>
