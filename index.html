@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ArchiveTV</title>
+<title>Archive TV</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 
@@ -320,7 +320,7 @@
 </div>
 
 <div id="no-schedule" class="visible">
-  <h1>ArchiveTV</h1>
+  <h1>Archive TV</h1>
   <p>NO SCHEDULE LOADED<br>
   CREATE A SCHEDULE USING THE ADMIN PANEL<br>
   AND SAVE SCHEDULE.JSON TO THIS DIRECTORY</p>
@@ -367,7 +367,7 @@
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const SCHEDULE_URL = './schedule.json';  // path to your schedule file
-const STATION_NAME = 'TVStation';
+const STATION_NAME = 'Archive TV';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let schedule = [];
@@ -421,36 +421,49 @@ async function loadSchedule() {
   }
 }
 
-// Build a flat timeline of items with absolute start/end seconds-from-midnight
-function buildTimeline(data) {
-  const timeline = [];
-  const blocks = data.blocks || [];
+// ─── TIMELINE BUILDER ─────────────────────────────────────────────────────────
+// Each block owns the time from its startTime until the next block's startTime.
+// Items are looped round-robin to fill that window — no fill entries needed.
 
-  blocks.forEach(block => {
+function buildTimeline(data) {
+  const blocks = (data.blocks || []).slice();
+  blocks.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
+
+  const DAY = 86400;
+  const timeline = [];
+
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const block = blocks[bi];
     const items = block.items || [];
-    items.forEach(item => {
+    if (!items.length) continue;
+
+    const blockStart = parseTime(block.startTime);
+    const blockEnd = bi + 1 < blocks.length
+      ? parseTime(blocks[bi + 1].startTime)
+      : DAY;
+
+    let cursor = blockStart;
+    let idx = 0;
+    const MAX_ITEMS = 500;
+
+    while (cursor < blockEnd && idx < MAX_ITEMS) {
+      const item = items[idx % items.length];
+      const dur = item.duration || 300;
+      const end = Math.min(cursor + dur, blockEnd);
       timeline.push({
         ...item,
         genre: block.genre,
-        blockName: block.name
+        blockName: block.name,
+        startSec: cursor,
+        endSec: end
       });
-    });
-  });
-
-  // Sort by scheduledStart (HH:MM string or seconds)
-  timeline.sort((a, b) => parseTime(a.scheduledStart) - parseTime(b.scheduledStart));
-
-  // Assign absolute start/end in seconds from midnight
-  let cursor = 0;
-  const result = [];
-  for (const item of timeline) {
-    const startSec = parseTime(item.scheduledStart);
-    const start = Math.max(cursor, startSec);
-    const end = start + (item.duration || 3600);
-    result.push({ ...item, startSec: start, endSec: end });
-    cursor = end;
+      cursor = end;
+      idx++;
+    }
   }
-  return result;
+
+  timeline.sort((a, b) => a.startSec - b.startSec);
+  return timeline;
 }
 
 function parseTime(t) {
@@ -624,7 +637,14 @@ function updateHUD() {
   progressBar.style.width = pct + '%';
 
   nowTitle.textContent = item.title || item.identifier || 'UNKNOWN';
-  genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
+  // Show STATION ID badge when evergreen is filling a gap
+  if (item.isEvergreen) {
+    genreTag.textContent = 'STATION ID';
+    genreTag.style.background = 'var(--amber-dim)';
+  } else {
+    genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
+    genreTag.style.background = '';
+  }
 
   // Up next
   const nextIdx = (currentIndex + 1) % schedule.length;
