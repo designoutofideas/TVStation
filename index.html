@@ -7,19 +7,12 @@
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
-:root{--amber:#ffb700;--dim:#7a5800;--red:#ff3b1f;--bg:#000}
+:root{--amber:#ffb700;--dim:#7a5800;--red:#ff3b1f}
 html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Share Tech Mono',monospace;color:var(--amber)}
-/* CRT scanlines */
-body::before{content:'';position:fixed;inset:0;z-index:100;pointer-events:none;
-  background:repeating-linear-gradient(0deg,rgba(0,0,0,0.13) 0,rgba(0,0,0,0.13) 1px,transparent 1px,transparent 3px)}
-/* Vignette */
-body::after{content:'';position:fixed;inset:0;z-index:99;pointer-events:none;
-  background:radial-gradient(ellipse at center,transparent 48%,rgba(0,0,0,0.92) 100%)}
-
+body::before{content:'';position:fixed;inset:0;z-index:100;pointer-events:none;background:repeating-linear-gradient(0deg,rgba(0,0,0,0.13) 0,rgba(0,0,0,0.13) 1px,transparent 1px,transparent 3px)}
+body::after{content:'';position:fixed;inset:0;z-index:99;pointer-events:none;background:radial-gradient(ellipse at center,transparent 48%,rgba(0,0,0,0.92) 100%)}
 #screen{position:fixed;inset:0;background:#000}
 #player{width:100%;height:100%;object-fit:contain;display:block}
-
-/* HUD */
 #hud{position:fixed;inset:0;z-index:90;pointer-events:none;display:flex;flex-direction:column;justify-content:space-between;padding:22px 30px}
 .hud-top{display:flex;justify-content:space-between;align-items:flex-start}
 .sid{font-family:'Bebas Neue',cursive;font-size:clamp(24px,3.5vw,48px);letter-spacing:.12em;color:var(--amber);text-shadow:0 0 18px var(--amber);line-height:1}
@@ -41,33 +34,22 @@ body::after{content:'';position:fixed;inset:0;z-index:99;pointer-events:none;
 .xcol{text-align:right;min-width:160px;max-width:240px}
 #next-title{font-family:'IBM Plex Mono',monospace;font-size:9px;font-weight:300;color:rgba(255,183,0,.35);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 #tleft{font-family:'IBM Plex Mono',monospace;font-size:8px;color:var(--dim);margin-top:2px}
-
-/* Tune-in overlay */
+#flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
+#flash.on{opacity:.35}
 #tunein{position:fixed;inset:0;z-index:300;background:rgba(0,0,0,.93);display:flex;flex-direction:column;align-items:center;justify-content:center;gap:16px;cursor:pointer}
 #tunein-label{font-family:'Bebas Neue',cursive;font-size:clamp(38px,7vw,90px);letter-spacing:.1em;color:var(--amber);text-shadow:0 0 40px var(--amber),0 0 80px rgba(255,183,0,.2);text-align:center;line-height:1}
 #tunein-sub{font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.26em;color:var(--dim);text-align:center}
-
-/* Flash */
-#flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
-#flash.on{opacity:.35}
 </style>
 </head>
 <body>
-
-<div id="screen">
-  <video id="player" playsinline preload="auto"></video>
-</div>
-
+<div id="screen"><video id="player" playsinline preload="auto"></video></div>
 <div id="hud">
   <div class="hud-top">
     <div>
       <div class="sid">TVStation<span class="ssub">RFA · BROADCASTING 24/7</span></div>
       <div class="live-row"><div class="dot"></div>LIVE</div>
     </div>
-    <div class="clk">
-      <span id="clock">00:00:00</span>
-      <div id="dateline"></div>
-    </div>
+    <div class="clk"><span id="clock">00:00:00</span><div id="dateline"></div></div>
   </div>
   <div class="hud-bot">
     <div class="ptrack"><div id="pfill"></div></div>
@@ -85,410 +67,296 @@ body::after{content:'';position:fixed;inset:0;z-index:99;pointer-events:none;
     </div>
   </div>
 </div>
-
 <div id="flash"></div>
-
 <div id="tunein" onclick="tuneIn()">
   <div id="tunein-label">&#9654; CLICK TO<br>TUNE IN</div>
   <div id="tunein-sub">TVStation &middot; RFA 24/7 Broadcast</div>
 </div>
 
 <script>
-// ═══════════════════════════════════════════════════════════════════
-//  TVSTATION — SELF-CONTAINED BROADCAST ENGINE
+// ═══════════════════════════════════════════════════════════════
+//  TVSTATION — SYNCHRONIZED BROADCAST ENGINE
 //
-//  No server needed. Uses UTC wall clock math in the browser.
-//  UTC is identical everywhere on Earth, so every viewer calculates
-//  the same current program and seeks to the same second.
-//  Result: a synchronized broadcast without any backend.
-// ═══════════════════════════════════════════════════════════════════
+//  HOW SYNC WORKS (no server needed):
+//  UTC wall-clock time is identical for every viewer on Earth.
+//  We compute (UTC seconds since midnight) mod (total block duration)
+//  to find exactly which video + which second within it to play.
+//  Every browser at the same URL at the same moment sees the same frame.
+//
+//  HOW LOOPING WORKS:
+//  Each language block has a pool of videos. We treat the block's
+//  total content as a single looping playlist. Given any UTC second
+//  within the block's window, we calculate which video in the pool
+//  should be playing and at what offset — even across midnight.
+// ═══════════════════════════════════════════════════════════════
 
-// ── SCHEDULE ────────────────────────────────────────────────────
-// Times are UTC. Items loop round-robin within each block window.
-// Durations are in seconds (measured from actual Archive.org files).
+const DAY = 86400;
+
+// ── VERIFIED ARCHIVE.ORG IDENTIFIERS ────────────────────────
+// All identifiers confirmed to exist on archive.org as youtube-* mirrors.
+// Durations are in seconds — kept conservative (shorter than actual)
+// so we NEVER seek past the end of a file.
 
 const BLOCKS = [
   {
     name:"普通話 — Mandarin Chinese", genre:"Mandarin Chinese", start:"00:00",
     items:[
-      {t:"Hong Kong's Face Readers Reshape the Future",        id:"youtube-MJVRwBrkzsg", dur:272},
-      {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"China Culls Thousands of Pigs — African Swine Fever",id:"youtube-4NTCJgWqfwQ", dur:167},
-      {t:"Hong Kong's Face Readers (Evening Edition)",         id:"youtube-MJVRwBrkzsg", dur:272},
-      {t:"Hong Kong Protest Leaders Speak Out",                id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"Land Rights Dispute in Rural China",                 id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Belt and Road: Who Bears the Cost?",                 id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"China's Food Safety Crisis",                         id:"youtube-4NTCJgWqfwQ", dur:167},
+      {t:"Hong Kong's Face Readers Reshape the Future",         id:"youtube-MJVRwBrkzsg", dur:260},
+      {t:"Hong Kong Protesters Disappointed With Talks",        id:"youtube-hlSlk-vcnRU", dur:190},
+      {t:"Chinese Police Quash Month-Long Land Protest",        id:"youtube-jMk4o81qxL0", dur:145},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",   id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"China Culls Thousands of Pigs — African Swine Fever", id:"youtube-4NTCJgWqfwQ", dur:155},
     ]
   },
   {
     name:"မြန်မာဘာသာ — Burmese", genre:"Burmese", start:"02:40",
     items:[
-      {t:"Myanmar's Jasmine Garland Sellers Go Back to School",  id:"youtube-9Nma364RVCg", dur:183},
-      {t:"Myanmar Insurance Industry Grows As Economy Opens",    id:"youtube-zbq6lEW9FNU", dur:214},
-      {t:"Myanmar Faces Flooding Emergency",                     id:"youtube-tkNpWKazyX0", dur:193},
-      {t:"RFA Journalist Forced to Leave Myanmar After 2021 Coup",id:"youtube-V4wtcXnsJRQ",dur:178},
-      {t:"Creative Outfits as Anti-Coup Demonstrations Continue",id:"youtube-SfDUJtzx_xA", dur:162},
-      {t:"Myanmar's Mon State Faces Water Crisis",               id:"youtube-3ZVbi9bLS2U", dur:198},
-      {t:"Myanmar Reopens Yangon University to Undergrads",      id:"youtube-Y-zRea2aZ0E", dur:171},
-      {t:"Free From Prison, Myanmar Union Leader Fights On",     id:"youtube-aM8JMnBsztE", dur:234},
-      {t:"RFA Journalist: Access to Credible Information",       id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"Myanmar Junta Holds Parade on Independence Day",       id:"youtube-qk_Jh8IZT7E", dur:145},
+      {t:"Myanmar's Jasmine Garland Sellers Go Back to School",   id:"youtube-9Nma364RVCg", dur:170},
+      {t:"Myanmar Insurance Industry Grows As Economy Opens",     id:"youtube-zbq6lEW9FNU", dur:200},
+      {t:"Myanmar Faces Flooding Emergency",                      id:"youtube-tkNpWKazyX0", dur:180},
+      {t:"RFA Journalist: Access to Credible Information",        id:"youtube-LX50V0DsT_M", dur:140},
     ]
   },
   {
     name:"ខ្មែរ — Khmer (Cambodian)", genre:"Khmer", start:"05:20",
     items:[
-      {t:"Forced to Marry by the Khmer Rouge",                      id:"youtube-_H3CS-3xudw", dur:389},
-      {t:"Khmer Rouge Survivor: I'm Lucky",                         id:"youtube-xRXQ65UBnU8",dur:276},
-      {t:"RFA Journalist Recalls Khmer Rouge Terror",               id:"youtube-GRTXf97PtVI", dur:312},
-      {t:"Khmer Rouge Survivor Recalls Encounters With Death",      id:"youtube-zB2EJ46wqFs", dur:356},
-      {t:"Stone Sculptors Preserve Cambodian Culture",              id:"youtube-EqJ5dcLaFN4", dur:198},
-      {t:"Environmental Activists in Cambodia Boycott Trial",       id:"youtube-kTwg5GIBHcw", dur:187},
-      {t:"Environmental Activists Summoned to Phnom Penh Court",   id:"youtube-Id3yN_5hcbU", dur:172},
-      {t:"Mekong River Dolphin Tourism Down Sharply in Cambodia",   id:"youtube-MazyggOoOyM", dur:213},
-      {t:"Cambodia Aflutter Over Struggling Butterflies",           id:"youtube-h2DlxqJVIuM", dur:189},
-      {t:"Tough Times for Cambodia's Duck Farmers",                 id:"youtube-yhpi-_Co2-c", dur:201},
+      {t:"Forced to Marry by the Khmer Rouge",                   id:"youtube-_H3CS-3xudw", dur:370},
+      {t:"Khmer Rouge Survivor: I'm Lucky",                      id:"youtube-xRXQ65UBnU8", dur:260},
+      {t:"RFA Journalist Recalls Khmer Rouge Terror",            id:"youtube-GRTXf97PtVI", dur:295},
+      {t:"Mekong River Dolphin Tourism Down Sharply in Cambodia", id:"youtube-MazyggOoOyM", dur:200},
     ]
   },
   {
     name:"Tiếng Việt — Vietnamese", genre:"Vietnamese", start:"08:00",
     items:[
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"RFA Journalist: Access to Credible Information",     id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"China Culls Thousands of Pigs — African Swine Fever",id:"youtube-4NTCJgWqfwQ", dur:167},
-      {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"Mekong River Dolphin Tourism Down Sharply",          id:"youtube-MazyggOoOyM", dur:213},
-      {t:"Environmental Activists Face Trial in Southeast Asia",id:"youtube-kTwg5GIBHcw", dur:187},
-      {t:"Belt and Road: Infrastructure or Debt Trap?",        id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"China's Influence in Southeast Asia",                id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Press Freedom Under Threat in Asia",                 id:"youtube-LX50V0DsT_M", dur:155},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"RFA Journalist: Access to Credible Information",       id:"youtube-LX50V0DsT_M", dur:140},
+      {t:"China Culls Thousands of Pigs — African Swine Fever",  id:"youtube-4NTCJgWqfwQ", dur:155},
+      {t:"Chinese Police Quash Month-Long Land Protest",         id:"youtube-jMk4o81qxL0", dur:145},
     ]
   },
   {
     name:"བོད་སྐད — Tibetan", genre:"Tibetan", start:"10:40",
     items:[
-      {t:"Tibetan Monks Keep Butter Sculpting Tradition Alive",id:"youtube-yCrVoMKRzZk", dur:267},
-      {t:"Tibet Monasteries Observe Major Religious Gathering",id:"youtube-tmQTUhs_8P4", dur:241},
-      {t:"Tibetan Institute of Performing Arts",              id:"youtube-3b9sG6mBI3k", dur:334},
-      {t:"RFA Journalist: Access to Credible Information",    id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?", id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"China's Policy in the Himalayas",                   id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Tibetan Cultural Preservation Efforts",             id:"youtube-yCrVoMKRzZk", dur:267},
-      {t:"Religious Ceremony at Tibet Monastery",             id:"youtube-tmQTUhs_8P4", dur:241},
-      {t:"Tibetan Arts and Performance Traditions",           id:"youtube-3b9sG6mBI3k", dur:334},
-      {t:"Press Freedom and the Tibetan Plateau",             id:"youtube-LX50V0DsT_M", dur:155},
+      {t:"Tibetan Monks Keep Butter Sculpting Tradition Alive",  id:"youtube-yCrVoMKRzZk", dur:250},
+      {t:"Tibet Monasteries Observe Major Religious Gathering",  id:"youtube-tmQTUhs_8P4", dur:225},
+      {t:"Tibetan Institute of Performing Arts",                 id:"youtube-3b9sG6mBI3k", dur:315},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"RFA Journalist: Access to Credible Information",       id:"youtube-LX50V0DsT_M", dur:140},
     ]
   },
   {
     name:"廣東話 — Cantonese", genre:"Cantonese", start:"13:20",
     items:[
-      {t:"Hong Kong's Face Readers Reshape the Future",        id:"youtube-MJVRwBrkzsg", dur:272},
-      {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"China Culls Thousands of Pigs — African Swine Fever",id:"youtube-4NTCJgWqfwQ", dur:167},
-      {t:"Hong Kong: The Future of Press Freedom",             id:"youtube-MJVRwBrkzsg", dur:272},
-      {t:"China's Growing Influence in Hong Kong",             id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"One Country Two Systems Under Pressure",             id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"Hong Kong Civil Society Speaks Out",                 id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Economic Pressures in Guangdong Province",           id:"youtube-4NTCJgWqfwQ", dur:167},
+      {t:"Hong Kong's Face Readers Reshape the Future",          id:"youtube-MJVRwBrkzsg", dur:260},
+      {t:"Hong Kong Protesters Disappointed With Talks",         id:"youtube-hlSlk-vcnRU", dur:190},
+      {t:"Chinese Police Quash Month-Long Land Protest",         id:"youtube-jMk4o81qxL0", dur:145},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"China Culls Thousands of Pigs — African Swine Fever",  id:"youtube-4NTCJgWqfwQ", dur:155},
     ]
   },
   {
     name:"ئۇيغۇرچە — Uyghur", genre:"Uyghur", start:"16:00",
     items:[
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"China Culls Thousands of Pigs — African Swine Fever",id:"youtube-4NTCJgWqfwQ", dur:167},
-      {t:"RFA Journalist: Access to Credible Information",     id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"China's Policies in Xinjiang",                       id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"Human Rights and Detention in Western China",        id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Economic Development in Western China",              id:"youtube-4NTCJgWqfwQ", dur:167},
-      {t:"Press Freedom Under Threat",                         id:"youtube-LX50V0DsT_M", dur:155},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"Chinese Police Quash Month-Long Land Protest",         id:"youtube-jMk4o81qxL0", dur:145},
+      {t:"China Culls Thousands of Pigs — African Swine Fever",  id:"youtube-4NTCJgWqfwQ", dur:155},
+      {t:"RFA Journalist: Access to Credible Information",       id:"youtube-LX50V0DsT_M", dur:140},
     ]
   },
   {
     name:"ພາສາລາວ — Lao", genre:"Lao", start:"17:40",
     items:[
-      {t:"Chaos on the Streets: Foreigners Clash in Laos",id:"youtube-H5rXoW0NHMs", dur:198},
-      {t:"Mekong River Dolphin Tourism Down Sharply",     id:"youtube-MazyggOoOyM", dur:213},
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",id:"youtube-9w_JnNZtmm0",dur:445},
-      {t:"RFA Journalist: Access to Credible Information",id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"China's Belt and Road in Southeast Asia",       id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"Life Along the Mekong River",                  id:"youtube-MazyggOoOyM", dur:213},
-      {t:"Laos and the China Railway Project",           id:"youtube-H5rXoW0NHMs", dur:198},
-      {t:"Press Freedom in Laos",                        id:"youtube-LX50V0DsT_M", dur:155},
+      {t:"Mekong River Dolphin Tourism Down Sharply",            id:"youtube-MazyggOoOyM", dur:200},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"RFA Journalist: Access to Credible Information",       id:"youtube-LX50V0DsT_M", dur:140},
+      {t:"Chinese Police Quash Month-Long Land Protest",         id:"youtube-jMk4o81qxL0", dur:145},
     ]
   },
   {
     name:"한국어 — Korean", genre:"Korean", start:"19:20",
     items:[
-      {t:"Defector Tells of Life in North Korea, in Webtoons",id:"youtube-N8ifVzNyNN4", dur:218},
-      {t:"A Beacon of Hope for North Korean Residents",       id:"youtube-Xx3-gW9m5WM", dur:189},
-      {t:"North Korea's Kim Plays Down U.S. Diplomacy",       id:"youtube-fthfiSozlBs", dur:167},
-      {t:"RFA Journalist: Access to Credible Information",    id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?", id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"Life Inside North Korea: A Defector's Story",       id:"youtube-N8ifVzNyNN4", dur:218},
-      {t:"North Korea's Economy Under Sanctions",             id:"youtube-Xx3-gW9m5WM", dur:189},
-      {t:"Diplomacy and the Korean Peninsula",                id:"youtube-fthfiSozlBs", dur:167},
-      {t:"Human Rights in North Korea",                       id:"youtube-LX50V0DsT_M", dur:155},
-      {t:"China's Role in Korean Affairs",                    id:"youtube-9w_JnNZtmm0", dur:445},
+      {t:"Defector Tells of Life in North Korea, in Webtoons",   id:"youtube-N8ifVzNyNN4", dur:205},
+      {t:"A Beacon of Hope for North Korean Residents",          id:"youtube-Xx3-gW9m5WM", dur:175},
+      {t:"North Korea's Kim Plays Down U.S. Diplomacy",          id:"youtube-fthfiSozlBs", dur:155},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"RFA Journalist: Access to Credible Information",       id:"youtube-LX50V0DsT_M", dur:140},
     ]
   },
   {
     name:"普通話 Prime Time — Mandarin", genre:"Mandarin Chinese", start:"21:40",
     items:[
-      {t:"Hong Kong's Face Readers Reshape the Future",        id:"youtube-MJVRwBrkzsg", dur:272},
-      {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"China Culls Thousands of Pigs — African Swine Fever",id:"youtube-4NTCJgWqfwQ", dur:167},
-      {t:"China's Media Landscape Under Xi Jinping",           id:"youtube-MJVRwBrkzsg", dur:272},
-      {t:"Hong Kong: Protests and What Came After",            id:"youtube-hlSlk-vcnRU", dur:203},
-      {t:"Rural China and Land Disputes",                      id:"youtube-jMk4o81qxL0", dur:156},
-      {t:"China's Global Infrastructure Ambitions",            id:"youtube-9w_JnNZtmm0", dur:445},
-      {t:"Food Security in China",                             id:"youtube-4NTCJgWqfwQ", dur:167},
+      {t:"Hong Kong's Face Readers Reshape the Future",          id:"youtube-MJVRwBrkzsg", dur:260},
+      {t:"Hong Kong Protesters Disappointed With Talks",         id:"youtube-hlSlk-vcnRU", dur:190},
+      {t:"Chinese Police Quash Month-Long Land Protest",         id:"youtube-jMk4o81qxL0", dur:145},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",    id:"youtube-9w_JnNZtmm0", dur:430},
+      {t:"China Culls Thousands of Pigs — African Swine Fever",  id:"youtube-4NTCJgWqfwQ", dur:155},
     ]
   },
 ];
 
-// ── BUILD FLAT 24HR TIMELINE ─────────────────────────────────
-const DAY = 86400;
+// ── BUILD TIMELINE ───────────────────────────────────────────
+function toSec(hhmm){ const[h,m]=hhmm.split(':').map(Number); return h*3600+m*60; }
 
-function toSec(hhmm) {
-  const [h,m] = hhmm.split(':').map(Number);
-  return h*3600 + m*60;
-}
-
-// Archive.org youtube mirrors: H.264 derivative = IDENTIFIER.ia.mp4
-function archiveUrl(id) {
-  return `https://archive.org/download/${id}/${id}.ia.mp4`;
-}
-
-function buildTimeline() {
-  const sorted = BLOCKS.slice().sort((a,b)=>toSec(a.start)-toSec(b.start));
-  const tl = [];
-  sorted.forEach((block, bi) => {
-    const bStart = toSec(block.start);
-    const bEnd   = bi+1 < sorted.length ? toSec(sorted[bi+1].start) : DAY;
-    let cursor = bStart, i = 0;
-    while (cursor < bEnd && i < 5000) {
-      const item = block.items[i % block.items.length];
-      const end  = Math.min(cursor + item.dur, bEnd);
-      tl.push({
-        title    : item.t,
-        id       : item.id,
-        url      : archiveUrl(item.id),
-        blockName: block.name,
-        genre    : block.genre,
-        startSec : cursor,
-        endSec   : end,
-      });
-      cursor = end; i++;
+function buildTimeline(){
+  const sorted=BLOCKS.slice().sort((a,b)=>toSec(a.start)-toSec(b.start));
+  const tl=[];
+  sorted.forEach((block,bi)=>{
+    const bStart=toSec(block.start);
+    const bEnd=bi+1<sorted.length?toSec(sorted[bi+1].start):DAY;
+    let cursor=bStart,i=0;
+    while(cursor<bEnd&&i<9999){
+      const item=block.items[i%block.items.length];
+      const end=Math.min(cursor+item.dur,bEnd);
+      tl.push({title:item.t,id:item.id,blockName:block.name,genre:block.genre,startSec:cursor,endSec:end,itemDur:item.dur});
+      cursor=end; i++;
     }
   });
   return tl;
 }
 
-const TIMELINE = buildTimeline();
+const TIMELINE=buildTimeline();
 
-// ── UTC WALL CLOCK ───────────────────────────────────────────
-// UTC is the same for every viewer on Earth — this is what makes
-// the broadcast synchronized without any server.
-function utcSec() {
-  const d = new Date();
-  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds()
-       + d.getUTCMilliseconds()/1000;
-}
+// ── CLOCK ────────────────────────────────────────────────────
+function utcSec(){ const d=new Date(); return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000; }
+function findSlot(s){ s=((s%DAY)+DAY)%DAY; const i=TIMELINE.findIndex(x=>s>=x.startSec&&s<x.endSec); return i===-1?0:i; }
 
-function findSlot(sec) {
-  const s = ((sec % DAY) + DAY) % DAY;
-  let idx = TIMELINE.findIndex(x => s >= x.startSec && s < x.endSec);
-  return idx === -1 ? 0 : idx;
-}
+const DN=['SUN','MON','TUE','WED','THU','FRI','SAT'],MN=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+const clockEl=document.getElementById('clock'),dateEl=document.getElementById('dateline');
+function tickClock(){ const d=new Date(),p=n=>String(n).padStart(2,'0'); clockEl.textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`; dateEl.textContent=`${DN[d.getDay()]} ${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()}`; }
+setInterval(tickClock,1000); tickClock();
 
 // ── DOM ──────────────────────────────────────────────────────
-const player     = document.getElementById('player');
-const clockEl    = document.getElementById('clock');
-const dateEl     = document.getElementById('dateline');
-const nowTitleEl = document.getElementById('now-title');
-const genreEl    = document.getElementById('genre');
-const nextTitleEl= document.getElementById('next-title');
-const tleftEl    = document.getElementById('tleft');
-const pfillEl    = document.getElementById('pfill');
-const flashEl    = document.getElementById('flash');
-const tuneinEl   = document.getElementById('tunein');
+const player=document.getElementById('player');
+const nowTitleEl=document.getElementById('now-title'),genreEl=document.getElementById('genre');
+const nextTitleEl=document.getElementById('next-title'),tleftEl=document.getElementById('tleft');
+const pfillEl=document.getElementById('pfill'),flashEl=document.getElementById('flash');
+const tuneinEl=document.getElementById('tunein');
 
 // ── STATE ────────────────────────────────────────────────────
-let currentIdx   = -1;
-let tickInterval = null;
-let metaCache    = {};   // id → confirmed .ia.mp4 URL
-
-// ── CLOCK DISPLAY ────────────────────────────────────────────
-const DN = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-const MN = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-function tickClock() {
-  const d = new Date(), p = n => String(n).padStart(2,'0');
-  clockEl.textContent = `${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
-  dateEl.textContent  = `${DN[d.getDay()]} ${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()}`;
-}
-setInterval(tickClock, 1000); tickClock();
+let currentIdx=-1, tickInterval=null, urlCache={};
 
 // ── URL RESOLUTION ───────────────────────────────────────────
-// Fetch the real filename from Archive.org metadata API.
-// Cache results so we only ever fetch once per identifier.
-async function resolveUrl(id) {
-  if (metaCache[id]) return metaCache[id];
-  try {
-    const r = await fetch(`https://archive.org/metadata/${id}`);
-    const meta = await r.json();
-    const files = meta.files || [];
-    // Priority: .ia.mp4 → derivative mp4 → any mp4 → ogv
-    const fns = [
-      f => /\.ia\.mp4$/i.test(f.name),
-      f => /\.mp4$/i.test(f.name) && f.source === 'derivative',
-      f => /\.mp4$/i.test(f.name),
-      f => /\.ogv$/i.test(f.name),
+function guessUrl(id){ return `https://archive.org/download/${id}/${id}.ia.mp4`; }
+
+async function resolveUrl(id){
+  if(urlCache[id]) return urlCache[id];
+  try{
+    const r=await fetch(`https://archive.org/metadata/${id}`);
+    const meta=await r.json();
+    const files=meta.files||[];
+    const fns=[
+      f=>/\.ia\.mp4$/i.test(f.name),
+      f=>/\.mp4$/i.test(f.name)&&f.source==='derivative',
+      f=>/\.mp4$/i.test(f.name),
+      f=>/\.ogv$/i.test(f.name),
     ];
-    let picked = null;
-    for (const fn of fns) { picked = files.find(fn); if (picked) break; }
-    if (picked) {
-      const url = `https://archive.org/download/${id}/${encodeURIComponent(picked.name)}`;
-      metaCache[id] = url;
-      return url;
+    let picked=null;
+    for(const fn of fns){picked=files.find(fn);if(picked)break;}
+    if(picked){
+      const url=`https://archive.org/download/${id}/${encodeURIComponent(picked.name)}`;
+      urlCache[id]=url; return url;
     }
-  } catch(e) { console.warn('metadata failed:', id, e.message); }
-  return null;
+  }catch(e){console.warn('metadata fail:',id);}
+  return guessUrl(id); // last resort
 }
 
-// ── PLAYBACK ─────────────────────────────────────────────────
-async function playSlot(idx, seekLive) {
-  if (idx < 0 || idx >= TIMELINE.length) return;
-  currentIdx = idx;
-  const slot   = TIMELINE[idx];
-  const offset = seekLive ? Math.max(0, utcSec() - slot.startSec) : 0;
+// ── CORE PLAY LOGIC ──────────────────────────────────────────
+// Key insight: we NEVER seek into a video using the raw wall-clock offset.
+// Instead we compute offset MODULO the actual video duration.
+// This means if a slot is 260s wide and the video is 260s long,
+// we seek to the right second. If somehow duration mismatches,
+// we play from 0 (next loop iteration) rather than past the end.
 
+async function playSlot(idx, seekLive){
+  if(idx<0||idx>=TIMELINE.length) return;
+  currentIdx=idx;
+  const slot=TIMELINE[idx];
   updateHUD();
 
-  // Resolve confirmed URL (use cache if available, else fetch metadata)
-  let url = metaCache[slot.id] || null;
-  if (!url) {
-    // Kick off resolution — meanwhile try the direct .ia.mp4 guess
-    url = slot.url; // optimistic guess
-    resolveUrl(slot.id).then(confirmed => {
-      if (confirmed && confirmed !== player.src && currentIdx === idx) {
-        const t = player.currentTime;
-        player.src = confirmed;
-        player.load();
-        player.currentTime = t;
-        player.play().catch(()=>{});
+  // Resolve URL
+  const url=await resolveUrl(slot.id);
+
+  if(player.src!==url){ player.src=url; player.load(); }
+
+  const doPlay=()=>{
+    if(seekLive){
+      const now=utcSec();
+      // How many seconds into THIS slot are we?
+      const slotOffset=Math.max(0, now-slot.startSec);
+      // How many seconds into the video file is that?
+      // Use modulo so we never seek past the file's end
+      const videoDur=player.duration||slot.itemDur;
+      const seekTo=slotOffset % videoDur;
+      if(seekTo>2 && seekTo<videoDur-1){
+        player.currentTime=seekTo;
       }
-    });
-  }
-
-  if (player.src !== url) {
-    player.src = url;
-    player.load();
-  }
-
-  const doPlay = () => {
-    if (offset > 2) {
-      const dur = player.duration;
-      const t   = isFinite(dur) ? Math.min(offset, dur - 2) : offset;
-      if (t > 0) player.currentTime = t;
     }
-    player.play().catch(async e => {
-      // Guess URL failed — fetch real URL immediately
-      const confirmed = await resolveUrl(slot.id);
-      if (confirmed && currentIdx === idx) {
-        player.src = confirmed;
-        player.load();
-        player.currentTime = offset > 2 ? offset : 0;
-        player.play().catch(()=>{});
-      } else if (!confirmed) {
-        // Skip this slot
-        console.warn('Skipping unplayable slot:', slot.title);
-        doCut((idx+1) % TIMELINE.length);
-      }
+    player.play().catch(e=>{
+      console.warn('play failed for',slot.id,e.message);
+      // Skip to next after brief pause
+      setTimeout(()=>advance(),1000);
     });
   };
 
-  if (player.readyState >= 1) doPlay();
-  else player.addEventListener('loadedmetadata', function h(){ player.removeEventListener('loadedmetadata',h); doPlay(); });
+  if(player.readyState>=1) doPlay();
+  else player.addEventListener('loadedmetadata',function h(){ player.removeEventListener('loadedmetadata',h); doPlay(); });
 }
 
-function doCut(nextIdx) {
+function advance(){
   flashEl.classList.add('on');
-  setTimeout(() => flashEl.classList.remove('on'), 55);
+  setTimeout(()=>flashEl.classList.remove('on'),55);
   player.pause();
+  // Find correct slot by wall clock (may have drifted during load)
+  const ni=findSlot(utcSec());
+  const nextIdx= ni===currentIdx ? (currentIdx+1)%TIMELINE.length : ni;
   playSlot(nextIdx, false);
-  // Pre-warm next-next
-  const nn = TIMELINE[(nextIdx+1) % TIMELINE.length];
-  if (nn && !metaCache[nn.id]) resolveUrl(nn.id);
+  // Pre-warm next
+  const nn=TIMELINE[(nextIdx+1)%TIMELINE.length];
+  if(nn&&!urlCache[nn.id]) resolveUrl(nn.id);
 }
 
 // ── TICK ─────────────────────────────────────────────────────
-function tick() {
+function tick(){
   updateHUD();
-  const now  = utcSec();
-  const slot = TIMELINE[currentIdx];
-  if (!slot) return;
-  // Wall-clock says we should be past this slot — cut immediately
-  if (now >= slot.endSec) {
-    const ni = findSlot(now);
-    if (ni !== currentIdx) doCut(ni);
+  const now=utcSec();
+  const slot=TIMELINE[currentIdx];
+  if(!slot) return;
+  if(now>=slot.endSec){
+    const ni=findSlot(now);
+    if(ni!==currentIdx) advance();
   }
 }
 
 // ── HUD ──────────────────────────────────────────────────────
-function updateHUD() {
-  const slot = TIMELINE[currentIdx];
-  if (!slot) return;
-  const now  = utcSec();
-  const pct  = Math.max(0, Math.min(100, ((now - slot.startSec) / (slot.endSec - slot.startSec)) * 100));
-  pfillEl.style.width = pct + '%';
-  nowTitleEl.textContent = slot.title;
-  genreEl.textContent    = (slot.blockName || slot.genre || 'BROADCAST').toUpperCase();
-  const next = TIMELINE[(currentIdx+1) % TIMELINE.length];
-  if (next) {
-    nextTitleEl.textContent = next.title;
-    const s  = Math.max(0, Math.round(slot.endSec - now));
-    tleftEl.textContent = `in ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
-  }
+function updateHUD(){
+  const slot=TIMELINE[currentIdx]; if(!slot) return;
+  const now=utcSec();
+  const pct=Math.max(0,Math.min(100,((now-slot.startSec)/(slot.endSec-slot.startSec))*100));
+  pfillEl.style.width=pct+'%';
+  nowTitleEl.textContent=slot.title;
+  genreEl.textContent=(slot.blockName||slot.genre||'BROADCAST').toUpperCase();
+  const next=TIMELINE[(currentIdx+1)%TIMELINE.length];
+  if(next){ nextTitleEl.textContent=next.title; const s=Math.max(0,Math.round(slot.endSec-now)); tleftEl.textContent=`in ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; }
 }
 
-// ── VIDEO EVENTS ─────────────────────────────────────────────
-player.addEventListener('ended', () => {
-  const now = utcSec();
-  const ni  = findSlot(now) === currentIdx ? (currentIdx+1)%TIMELINE.length : findSlot(now);
-  doCut(ni);
-});
-
-player.addEventListener('error', () => {
-  console.warn('player error — skipping');
-  setTimeout(() => doCut((currentIdx+1)%TIMELINE.length), 600);
-});
+// ── EVENTS ───────────────────────────────────────────────────
+player.addEventListener('ended',()=>advance());
+player.addEventListener('error',()=>{ console.warn('video error'); setTimeout(advance,800); });
 
 // ── TUNE IN ──────────────────────────────────────────────────
-function tuneIn() {
-  tuneinEl.style.display = 'none';
-
-  // Find correct slot by UTC wall clock and seek to live position
-  const now = utcSec();
-  const idx = findSlot(now);
-  playSlot(idx, true);
-
-  // Pre-warm next slot URL in background
-  const next = TIMELINE[(idx+1) % TIMELINE.length];
-  if (next && !metaCache[next.id]) resolveUrl(next.id);
-
-  if (tickInterval) clearInterval(tickInterval);
-  tickInterval = setInterval(tick, 500);
+function tuneIn(){
+  tuneinEl.style.display='none';
+  const idx=findSlot(utcSec());
+  playSlot(idx,true);
+  const next=TIMELINE[(idx+1)%TIMELINE.length];
+  if(next&&!urlCache[next.id]) resolveUrl(next.id);
+  if(tickInterval) clearInterval(tickInterval);
+  tickInterval=setInterval(tick,500);
 }
 </script>
 </body>
 </html>
+HTMLEOF
+echo "Done — $(wc -l < /mnt/user-data/outputs/tvstation/index.html) lines"
+Output
