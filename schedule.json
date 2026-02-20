@@ -4,7 +4,7 @@
   "_note": "Each block plays its items once, back-to-back. Gaps between blocks are auto-filled by looping the evergreen Station ID video. The 24hr cycle repeats at midnight.",
 
   "evergreen": {
-    "title": "Legacy — Radio Free Asia",
+    "title": "TVStation — Radio Free Asia",
     "identifier": "youtube-LX50V0DsT_M",
     "duration": 180,
     "evergreen": true
