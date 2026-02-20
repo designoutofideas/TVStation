@@ -97,7 +97,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  TVStation — Thin Client  v4
+//  Archive RFA — Thin Client  v4
 //
 //  This page does NOT manage the schedule. It asks the Cloudflare
 //  Worker (master clock) what is playing RIGHT NOW, then:
@@ -110,7 +110,8 @@
 // ═══════════════════════════════════════════════════════════════
 
 // !! REPLACE THIS with your Cloudflare Worker URL after deploying !!
-const WORKER_URL = 'https://square-night-4e81.demo-3b5.workers.dev';
+const WORKER_URL = 'https://Archive RFA.YOUR-SUBDOMAIN.workers.dev';
+
 const player    = document.getElementById('player');
 const clockEl   = document.getElementById('clock');
 const dateEl    = document.getElementById('dateline');
@@ -250,6 +251,7 @@ async function resolveMetaUrl(identifier) {
     const meta = await r.json();
     const files= meta.files || [];
     const order= [
+      f => /\.ia\.mp4$/i.test(f.name),              // youtube-* H.264 derivative
       f => /_512kb\.mp4$/i.test(f.name) && f.source === 'derivative',
       f => /\.mp4$/i.test(f.name)       && f.source === 'derivative',
       f => /_512kb\.mp4$/i.test(f.name),
