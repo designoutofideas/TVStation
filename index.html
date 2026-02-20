@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>ArchiveTV</title>
+<title>Legacy RFA</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 
@@ -320,7 +320,7 @@
 </div>
 
 <div id="no-schedule" class="visible">
-  <h1>ArchiveTV</h1>
+  <h1>Legacy RFA</h1>
   <p>NO SCHEDULE LOADED<br>
   CREATE A SCHEDULE USING THE ADMIN PANEL<br>
   AND SAVE SCHEDULE.JSON TO THIS DIRECTORY</p>
@@ -331,7 +331,7 @@
   <div class="hud-top">
     <div>
       <div class="station-id">
-        Archive TV
+        Legacy RFA
         <span>BROADCASTING 24/7</span>
       </div>
       <div class="live-badge" style="margin-top:12px">
@@ -367,7 +367,7 @@
 <script>
 // ─── CONFIG ───────────────────────────────────────────────────────────────────
 const SCHEDULE_URL = './schedule.json';  // path to your schedule file
-const STATION_NAME = 'TVStation';
+const STATION_NAME = 'Archive RFA';
 
 // ─── STATE ────────────────────────────────────────────────────────────────────
 let schedule = [];
@@ -421,36 +421,76 @@ async function loadSchedule() {
   }
 }
 
-// Build a flat timeline of items with absolute start/end seconds-from-midnight
-function buildTimeline(data) {
-  const timeline = [];
-  const blocks = data.blocks || [];
+// ─── TIMELINE BUILDER ─────────────────────────────────────────────────────────
+// Builds a flat 86400s (24hr) timeline from schedule data.
+//
+// Logic:
+//   1. Each block starts at its defined startTime.
+//   2. Block items play back-to-back from that start time.
+//   3. Any gap between end of a block's items and the start of the NEXT block
+//      is filled by looping the block's evergreen video (marked evergreen:true),
+//      or the global evergreen defined at the top level of schedule.json.
+//   4. After the last block ends, evergreen loops until midnight (86400s).
+//   5. The whole 24hr timeline repeats from 00:00 the next day.
 
-  blocks.forEach(block => {
-    const items = block.items || [];
-    items.forEach(item => {
+function buildTimeline(data) {
+  const blocks = (data.blocks || []).slice();
+  const globalEvergreen = data.evergreen || null;
+
+  // Sort blocks by startTime
+  blocks.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
+
+  const DAY = 86400;
+  const timeline = [];
+
+  for (let bi = 0; bi < blocks.length; bi++) {
+    const block = blocks[bi];
+    const blockStart = parseTime(block.startTime);
+    const nextBlockStart = bi + 1 < blocks.length
+      ? parseTime(blocks[bi + 1].startTime)
+      : DAY; // last block fills until midnight
+
+    // Find this block's evergreen (block-level overrides global)
+    const evergreen = block.items.find(i => i.evergreen) || globalEvergreen;
+    const regularItems = block.items.filter(i => !i.evergreen);
+
+    // Place regular items back-to-back starting at blockStart
+    let cursor = blockStart;
+    for (const item of regularItems) {
+      const dur = item.duration || 300;
       timeline.push({
         ...item,
         genre: block.genre,
-        blockName: block.name
+        blockName: block.name,
+        startSec: cursor,
+        endSec: cursor + dur,
+        isEvergreen: false
       });
-    });
-  });
+      cursor += dur;
+    }
 
-  // Sort by scheduledStart (HH:MM string or seconds)
-  timeline.sort((a, b) => parseTime(a.scheduledStart) - parseTime(b.scheduledStart));
-
-  // Assign absolute start/end in seconds from midnight
-  let cursor = 0;
-  const result = [];
-  for (const item of timeline) {
-    const startSec = parseTime(item.scheduledStart);
-    const start = Math.max(cursor, startSec);
-    const end = start + (item.duration || 3600);
-    result.push({ ...item, startSec: start, endSec: end });
-    cursor = end;
+    // Fill remaining gap until next block with looping evergreen
+    if (evergreen && cursor < nextBlockStart) {
+      const egDur = evergreen.duration || 60;
+      while (cursor < nextBlockStart) {
+        const end = Math.min(cursor + egDur, nextBlockStart);
+        timeline.push({
+          ...evergreen,
+          genre: block.genre,
+          blockName: block.name,
+          title: evergreen.title || 'Station ID',
+          startSec: cursor,
+          endSec: end,
+          isEvergreen: true
+        });
+        cursor = end;
+      }
+    }
   }
-  return result;
+
+  // Sort final timeline (should already be sorted, but safety check)
+  timeline.sort((a, b) => a.startSec - b.startSec);
+  return timeline;
 }
 
 function parseTime(t) {
@@ -624,7 +664,14 @@ function updateHUD() {
   progressBar.style.width = pct + '%';
 
   nowTitle.textContent = item.title || item.identifier || 'UNKNOWN';
-  genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
+  // Show STATION ID badge when evergreen is filling a gap
+  if (item.isEvergreen) {
+    genreTag.textContent = 'STATION ID';
+    genreTag.style.background = 'var(--amber-dim)';
+  } else {
+    genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
+    genreTag.style.background = '';
+  }
 
   // Up next
   const nextIdx = (currentIndex + 1) % schedule.length;
