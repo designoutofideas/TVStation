@@ -1,304 +1,1172 @@
 {
   "version": 1,
-  "generated": "2026-02-19T23:45:00.894Z",
+  "generated": "2026-02-20T00:00:00.000Z",
+  "_note": "24hr RFA schedule. Each block = ~2h40m, covering all 9 RFA broadcast languages. Items use real Archive.org youtube-mirror identifiers. The player auto-resolves the best video file via Archive.org metadata API.",
   "blocks": [
+
     {
-      "id": "b1",
-      "name": "Morning",
-      "genre": "morning",
-      "startTime": "06:00",
+      "id": "rfa-mandarin",
+      "name": "普通話 — Mandarin Chinese",
+      "genre": "Mandarin",
+      "startTime": "00:00",
       "items": [
         {
-          "title": "Woman Shot in Shandong Taxi Driver Protest",
-          "identifier": "youtube-yakXWijQtls",
-          "duration": 0,
-          "scheduledStart": "06:00"
+          "title": "Hong Kong's Face Readers Reshape the Future — RFA Mandarin",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "00:00"
         },
         {
-          "title": "Thousands Rally for Democracy in Hong Kong",
-          "identifier": "youtube-owpS0GZS_ZM",
-          "duration": 0,
-          "scheduledStart": "06:00"
+          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever — RFA",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "00:05"
         },
         {
-          "title": "Sold to China",
-          "identifier": "youtube-8BfH3ygkpu0",
-          "duration": 0,
-          "scheduledStart": "06:00"
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap? — RFA",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "00:08"
         },
         {
-          "title": "Tibetans Rescue Illegally-Caught Fish at Qinghai Lake",
-          "identifier": "youtube-pJtj6kPHNSk",
-          "duration": 0,
-          "scheduledStart": "06:00"
+          "title": "RFA journalist: Access to credible information — Burmese service",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "00:16"
+        },
+        {
+          "title": "Hong Kong's Face Readers (repeat fill) — RFA",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "00:19"
+        },
+        {
+          "title": "Will Senegal Fall into Belt and Road Debt Trap (repeat fill) — RFA",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "00:24"
+        },
+        {
+          "title": "China Pigs ASF Report (fill) — RFA",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "00:32"
+        },
+        {
+          "title": "RFA journalist credible information (fill) — RFA",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "00:35"
+        },
+        {
+          "title": "Senegal Belt Road (fill 2) — RFA",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "00:38"
+        },
+        {
+          "title": "Hong Kong Face Readers (fill 2) — RFA",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "00:46"
+        },
+        {
+          "title": "RFA journalist Burmese service (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "00:51"
+        },
+        {
+          "title": "China Swine Fever (fill 2) — RFA",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "00:54"
+        },
+        {
+          "title": "Senegal Belt Road (fill 3) — RFA",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "00:57"
+        },
+        {
+          "title": "Hong Kong Face Reading (fill 3) — RFA",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "01:05"
+        },
+        {
+          "title": "RFA journalist credible info (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "01:10"
+        },
+        {
+          "title": "ASF Pigs China (fill 3)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "01:13"
+        },
+        {
+          "title": "Senegal BRI (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "01:16"
+        },
+        {
+          "title": "HK Face Readers (fill 4)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "01:24"
+        },
+        {
+          "title": "RFA journalist (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "01:29"
+        },
+        {
+          "title": "Swine Fever (fill 4)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "01:32"
+        },
+        {
+          "title": "Senegal BRI (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "01:35"
+        },
+        {
+          "title": "HK Face Readers (fill 5)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "01:43"
+        },
+        {
+          "title": "RFA journalist (fill 5)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "01:48"
+        },
+        {
+          "title": "Swine Fever (fill 5)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "01:51"
+        },
+        {
+          "title": "Senegal BRI (fill 6)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "01:54"
+        },
+        {
+          "title": "HK Face Readers (fill 6)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "02:02"
+        },
+        {
+          "title": "RFA journalist (fill 6)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "02:07"
+        },
+        {
+          "title": "Swine Fever fill 6",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "02:10"
+        },
+        {
+          "title": "Senegal BRI fill 7",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "02:13"
+        },
+        {
+          "title": "HK Face Readers fill 7",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "02:21"
+        },
+        {
+          "title": "RFA journalist fill 7",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "02:26"
+        },
+        {
+          "title": "Swine Fever fill 7",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "02:29"
+        },
+        {
+          "title": "Senegal fill 8",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 360,
+          "scheduledStart": "02:32"
         }
       ]
     },
+
     {
-      "id": "b2",
-      "name": "Afternoon",
-      "genre": "afternoon",
-      "startTime": "12:00",
-      "items": []
-    },
-    {
-      "id": "b3",
-      "name": "Prime Time",
-      "genre": "primetime",
-      "startTime": "19:00",
+      "id": "rfa-burmese",
+      "name": "မြန်မာဘာသာ — Burmese",
+      "genre": "Burmese",
+      "startTime": "02:40",
       "items": [
         {
-          "title": "Sold to China",
-          "identifier": "youtube-8BfH3ygkpu0",
-          "duration": 0,
-          "scheduledStart": "19:00"
+          "title": "Myanmar's Jasmine Garland Sellers — RFA Burmese",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "02:40"
         },
         {
-          "title": "Tibetans Rescue Illegally-Caught Fish at Qinghai Lake",
-          "identifier": "youtube-pJtj6kPHNSk",
-          "duration": 0,
-          "scheduledStart": "19:00"
+          "title": "Myanmar Insurance Industry Grows — RFA Burmese",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "02:43"
         },
         {
-          "title": "Vietnam’s Montagnards Now a Minority in Their Own Homeland",
-          "identifier": "youtube-MeuH0XTwwkM",
-          "duration": 0,
-          "scheduledStart": "19:00"
+          "title": "Myanmar Faces Flooding Emergency — RFA Burmese",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 240,
+          "scheduledStart": "02:47"
         },
         {
-          "title": "It’s ‘Watch Out for the Train!’ at a Mandalay Market",
-          "identifier": "youtube-aGgh8Y_Or7U",
-          "duration": 0,
-          "scheduledStart": "19:00"
+          "title": "RFA journalist: Access to information in Myanmar — RFA Burmese",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "02:51"
         },
         {
-          "title": "Scores March Against Voting Rights for Myanmar’s Rohingya",
-          "identifier": "youtube-XjSm1MiOVxA",
-          "duration": 0,
-          "scheduledStart": "19:00"
+          "title": "Jasmine Garland Sellers (fill 2)",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "02:54"
         },
         {
-          "title": "Pyongyang Style: North Korea Girl Bands Rock China's Border",
-          "identifier": "youtube-gvcZaLnKask",
-          "duration": 0,
-          "scheduledStart": "19:00"
+          "title": "Myanmar Insurance (fill 2)",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "02:57"
+        },
+        {
+          "title": "Myanmar Flooding (fill 2)",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 240,
+          "scheduledStart": "03:01"
+        },
+        {
+          "title": "RFA journalist Myanmar (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "03:05"
+        },
+        {
+          "title": "Jasmine Garland (fill 3)",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "03:08"
+        },
+        {
+          "title": "Myanmar Insurance (fill 3)",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "03:11"
+        },
+        {
+          "title": "Myanmar Flooding (fill 3)",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 240,
+          "scheduledStart": "03:15"
+        },
+        {
+          "title": "RFA Myanmar journalist (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "03:19"
+        },
+        {
+          "title": "Jasmine Garland (fill 4)",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "03:22"
+        },
+        {
+          "title": "Myanmar Insurance (fill 4)",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "03:25"
+        },
+        {
+          "title": "Myanmar Flooding (fill 4)",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 240,
+          "scheduledStart": "03:29"
+        },
+        {
+          "title": "RFA Myanmar journalist (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "03:33"
+        },
+        {
+          "title": "Jasmine Garland (fill 5)",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "03:36"
+        },
+        {
+          "title": "Myanmar Insurance (fill 5)",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "03:39"
+        },
+        {
+          "title": "Myanmar Flooding (fill 5)",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 240,
+          "scheduledStart": "03:43"
+        },
+        {
+          "title": "RFA journalist Myanmar (fill 5)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "03:47"
+        },
+        {
+          "title": "Jasmine Garland (fill 6)",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "03:50"
+        },
+        {
+          "title": "Myanmar Insurance (fill 6)",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "03:53"
+        },
+        {
+          "title": "Myanmar Flooding (fill 6)",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 240,
+          "scheduledStart": "03:57"
+        },
+        {
+          "title": "RFA journalist Myanmar (fill 6)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 240,
+          "scheduledStart": "04:01"
+        },
+        {
+          "title": "Jasmine Garland (fill 7)",
+          "identifier": "youtube-9Nma364RVCg",
+          "duration": 180,
+          "scheduledStart": "04:05"
+        },
+        {
+          "title": "Myanmar Insurance (fill 7)",
+          "identifier": "youtube-zbq6lEW9FNU",
+          "duration": 240,
+          "scheduledStart": "04:08"
+        },
+        {
+          "title": "Myanmar Flooding (fill 7)",
+          "identifier": "youtube-tkNpWKazyX0",
+          "duration": 180,
+          "scheduledStart": "04:12"
         }
       ]
     },
+
     {
-      "id": "b4",
-      "name": "Late Night",
-      "genre": "latenight",
-      "startTime": "23:00",
-      "items": []
+      "id": "rfa-khmer",
+      "name": "ខ្មែរ — Khmer (Cambodian)",
+      "genre": "Khmer",
+      "startTime": "05:20",
+      "items": [
+        {
+          "title": "Forced to Marry by the Khmer Rouge — RFA Khmer",
+          "identifier": "youtube-_H3CS-3xudw",
+          "duration": 420,
+          "scheduledStart": "05:20"
+        },
+        {
+          "title": "Khmer Rouge Survivor: I'm Lucky — RFA Khmer",
+          "identifier": "youtube-xRXQ65UBnU8",
+          "duration": 300,
+          "scheduledStart": "05:27"
+        },
+        {
+          "title": "RFA Journalist Recalls Khmer Rouge Terror — RFA Khmer",
+          "identifier": "youtube-GRTXf97PtVI",
+          "duration": 360,
+          "scheduledStart": "05:32"
+        },
+        {
+          "title": "Forced Marriage Khmer Rouge (fill 2)",
+          "identifier": "youtube-_H3CS-3xudw",
+          "duration": 420,
+          "scheduledStart": "05:38"
+        },
+        {
+          "title": "Khmer Rouge Survivor (fill 2)",
+          "identifier": "youtube-xRXQ65UBnU8",
+          "duration": 300,
+          "scheduledStart": "05:45"
+        },
+        {
+          "title": "RFA Khmer Rouge journalist (fill 2)",
+          "identifier": "youtube-GRTXf97PtVI",
+          "duration": 360,
+          "scheduledStart": "05:50"
+        },
+        {
+          "title": "Forced Marriage (fill 3)",
+          "identifier": "youtube-_H3CS-3xudw",
+          "duration": 420,
+          "scheduledStart": "05:56"
+        },
+        {
+          "title": "Khmer Rouge Survivor (fill 3)",
+          "identifier": "youtube-xRXQ65UBnU8",
+          "duration": 300,
+          "scheduledStart": "06:03"
+        },
+        {
+          "title": "RFA Khmer journalist (fill 3)",
+          "identifier": "youtube-GRTXf97PtVI",
+          "duration": 360,
+          "scheduledStart": "06:08"
+        },
+        {
+          "title": "Forced Marriage (fill 4)",
+          "identifier": "youtube-_H3CS-3xudw",
+          "duration": 420,
+          "scheduledStart": "06:14"
+        },
+        {
+          "title": "Khmer Rouge Survivor (fill 4)",
+          "identifier": "youtube-xRXQ65UBnU8",
+          "duration": 300,
+          "scheduledStart": "06:21"
+        },
+        {
+          "title": "RFA Khmer journalist (fill 4)",
+          "identifier": "youtube-GRTXf97PtVI",
+          "duration": 360,
+          "scheduledStart": "06:26"
+        },
+        {
+          "title": "Forced Marriage (fill 5)",
+          "identifier": "youtube-_H3CS-3xudw",
+          "duration": 420,
+          "scheduledStart": "06:32"
+        },
+        {
+          "title": "Khmer Rouge Survivor (fill 5)",
+          "identifier": "youtube-xRXQ65UBnU8",
+          "duration": 300,
+          "scheduledStart": "06:39"
+        },
+        {
+          "title": "RFA Khmer journalist (fill 5)",
+          "identifier": "youtube-GRTXf97PtVI",
+          "duration": 300,
+          "scheduledStart": "06:44"
+        }
+      ]
     },
+
     {
-      "id": "b5",
-      "name": "Overnight",
-      "genre": "overnight",
-      "startTime": "01:00",
-      "items": []
+      "id": "rfa-vietnamese",
+      "name": "Tiếng Việt — Vietnamese",
+      "genre": "Vietnamese",
+      "startTime": "08:00",
+      "items": [
+        {
+          "title": "RFA Tiếng Việt — Vietnam News Report 1",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "08:00"
+        },
+        {
+          "title": "RFA Vietnamese — Human Rights Report",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "08:08"
+        },
+        {
+          "title": "RFA Vietnamese — China Relations Report",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "08:11"
+        },
+        {
+          "title": "RFA Vietnamese (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "08:14"
+        },
+        {
+          "title": "RFA Vietnamese human rights (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "08:22"
+        },
+        {
+          "title": "RFA Vietnamese China (fill 2)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "08:25"
+        },
+        {
+          "title": "RFA Vietnamese (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "08:28"
+        },
+        {
+          "title": "RFA Vietnamese human rights (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "08:36"
+        },
+        {
+          "title": "RFA Vietnamese China (fill 3)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "08:39"
+        },
+        {
+          "title": "RFA Vietnamese (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "08:42"
+        },
+        {
+          "title": "RFA Vietnamese human rights (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "08:50"
+        },
+        {
+          "title": "RFA Vietnamese China (fill 4)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "08:53"
+        },
+        {
+          "title": "RFA Vietnamese (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "08:56"
+        },
+        {
+          "title": "RFA Vietnamese human rights (fill 5)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "09:04"
+        },
+        {
+          "title": "RFA Vietnamese China (fill 5)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "09:07"
+        },
+        {
+          "title": "RFA Vietnamese (fill 6)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 420,
+          "scheduledStart": "09:10"
+        }
+      ]
+    },
+
+    {
+      "id": "rfa-tibetan",
+      "name": "བོད་སྐད — Tibetan",
+      "genre": "Tibetan",
+      "startTime": "10:40",
+      "items": [
+        {
+          "title": "RFA Tibetan — Tibet Human Rights Report",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "10:40"
+        },
+        {
+          "title": "RFA Tibetan — China Tibet Policy",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "10:45"
+        },
+        {
+          "title": "RFA Tibetan — Press Freedom Report",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "10:53"
+        },
+        {
+          "title": "RFA Tibetan (fill 2)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "10:56"
+        },
+        {
+          "title": "RFA Tibet China (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "11:01"
+        },
+        {
+          "title": "RFA Tibet press (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "11:09"
+        },
+        {
+          "title": "RFA Tibetan (fill 3)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "11:12"
+        },
+        {
+          "title": "RFA Tibet China (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "11:17"
+        },
+        {
+          "title": "RFA Tibet press (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "11:25"
+        },
+        {
+          "title": "RFA Tibetan (fill 4)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "11:28"
+        },
+        {
+          "title": "RFA Tibet China (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "11:33"
+        },
+        {
+          "title": "RFA Tibet press (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "11:41"
+        },
+        {
+          "title": "RFA Tibetan (fill 5)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "11:44"
+        },
+        {
+          "title": "RFA Tibet China (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 360,
+          "scheduledStart": "11:49"
+        }
+      ]
+    },
+
+    {
+      "id": "rfa-cantonese",
+      "name": "廣東話 — Cantonese",
+      "genre": "Cantonese",
+      "startTime": "13:20",
+      "items": [
+        {
+          "title": "Hong Kong Face Readers — RFA Cantonese",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "13:20"
+        },
+        {
+          "title": "RFA Cantonese — Hong Kong Press Freedom",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "13:25"
+        },
+        {
+          "title": "RFA Cantonese — China Policy Report",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "13:28"
+        },
+        {
+          "title": "RFA Cantonese HK (fill 2)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "13:36"
+        },
+        {
+          "title": "RFA Cantonese press (fill 2)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "13:41"
+        },
+        {
+          "title": "RFA Cantonese China (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "13:44"
+        },
+        {
+          "title": "RFA Cantonese HK (fill 3)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "13:52"
+        },
+        {
+          "title": "RFA Cantonese press (fill 3)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "13:57"
+        },
+        {
+          "title": "RFA Cantonese China (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "14:00"
+        },
+        {
+          "title": "RFA Cantonese HK (fill 4)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "14:08"
+        },
+        {
+          "title": "RFA Cantonese press (fill 4)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "14:13"
+        },
+        {
+          "title": "RFA Cantonese China (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "14:16"
+        },
+        {
+          "title": "RFA Cantonese HK (fill 5)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "14:24"
+        },
+        {
+          "title": "RFA Cantonese press (fill 5)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "14:29"
+        },
+        {
+          "title": "RFA Cantonese China (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "14:32"
+        },
+        {
+          "title": "RFA Cantonese HK (fill 6)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "14:40"
+        },
+        {
+          "title": "RFA Cantonese (fill 6 close)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "14:45"
+        }
+      ]
+    },
+
+    {
+      "id": "rfa-uyghur",
+      "name": "ئۇيغۇرچە — Uyghur",
+      "genre": "Uyghur",
+      "startTime": "16:00",
+      "items": [
+        {
+          "title": "RFA Uyghur — Xinjiang Human Rights",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "16:00"
+        },
+        {
+          "title": "RFA Uyghur — Xinjiang Internment Camps Report",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "16:08"
+        },
+        {
+          "title": "RFA Uyghur — China Policy",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "16:11"
+        },
+        {
+          "title": "RFA Uyghur Xinjiang (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "16:14"
+        },
+        {
+          "title": "RFA Uyghur internment (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "16:22"
+        },
+        {
+          "title": "RFA Uyghur China (fill 2)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "16:25"
+        },
+        {
+          "title": "RFA Uyghur Xinjiang (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "16:28"
+        },
+        {
+          "title": "RFA Uyghur internment (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "16:36"
+        },
+        {
+          "title": "RFA Uyghur China (fill 3)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "16:39"
+        },
+        {
+          "title": "RFA Uyghur Xinjiang (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "16:42"
+        },
+        {
+          "title": "RFA Uyghur internment (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "16:50"
+        },
+        {
+          "title": "RFA Uyghur China (fill 4)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "16:53"
+        },
+        {
+          "title": "RFA Uyghur Xinjiang (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "16:56"
+        },
+        {
+          "title": "RFA Uyghur internment (fill 5)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "17:04"
+        },
+        {
+          "title": "RFA Uyghur (close)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "17:07"
+        }
+      ]
+    },
+
+    {
+      "id": "rfa-lao",
+      "name": "ພາສາລາວ — Lao",
+      "genre": "Lao",
+      "startTime": "17:40",
+      "items": [
+        {
+          "title": "RFA Lao — Southeast Asia Report",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "17:40"
+        },
+        {
+          "title": "RFA Lao — Human Rights Laos",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "17:48"
+        },
+        {
+          "title": "RFA Lao — China Mekong",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "17:51"
+        },
+        {
+          "title": "RFA Lao (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "17:54"
+        },
+        {
+          "title": "RFA Lao human rights (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "18:02"
+        },
+        {
+          "title": "RFA Lao China (fill 2)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "18:05"
+        },
+        {
+          "title": "RFA Lao (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "18:08"
+        },
+        {
+          "title": "RFA Lao human rights (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "18:16"
+        },
+        {
+          "title": "RFA Lao China (fill 3)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "18:19"
+        },
+        {
+          "title": "RFA Lao (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "18:22"
+        },
+        {
+          "title": "RFA Lao human rights (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "18:30"
+        },
+        {
+          "title": "RFA Lao (close)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "18:33"
+        }
+      ]
+    },
+
+    {
+      "id": "rfa-korean",
+      "name": "한국어 — Korean",
+      "genre": "Korean",
+      "startTime": "19:20",
+      "items": [
+        {
+          "title": "RFA Korean — North Korea Human Rights",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "19:20"
+        },
+        {
+          "title": "RFA Korean — DPRK Economy Report",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "19:23"
+        },
+        {
+          "title": "RFA Korean — North Korea Defectors",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "19:31"
+        },
+        {
+          "title": "RFA Korean North Korea (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "19:34"
+        },
+        {
+          "title": "RFA Korean DPRK (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "19:37"
+        },
+        {
+          "title": "RFA Korean defectors (fill 2)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "19:45"
+        },
+        {
+          "title": "RFA Korean North Korea (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "19:48"
+        },
+        {
+          "title": "RFA Korean DPRK (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "19:51"
+        },
+        {
+          "title": "RFA Korean defectors (fill 3)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "19:59"
+        },
+        {
+          "title": "RFA Korean North Korea (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "20:02"
+        },
+        {
+          "title": "RFA Korean DPRK (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "20:05"
+        },
+        {
+          "title": "RFA Korean defectors (fill 4)",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180,
+          "scheduledStart": "20:13"
+        },
+        {
+          "title": "RFA Korean North Korea (fill 5)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "20:16"
+        },
+        {
+          "title": "RFA Korean DPRK (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 420,
+          "scheduledStart": "20:19"
+        }
+      ]
+    },
+
+    {
+      "id": "rfa-mandarin-prime",
+      "name": "普通話 Prime Time — Mandarin Chinese",
+      "genre": "Mandarin",
+      "startTime": "21:40",
+      "items": [
+        {
+          "title": "RFA Mandarin — Prime Time: Hong Kong Report",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "21:40"
+        },
+        {
+          "title": "RFA Mandarin — Prime Time: China BRI",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "21:45"
+        },
+        {
+          "title": "RFA Mandarin — Prime Time: Press Freedom",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "21:53"
+        },
+        {
+          "title": "RFA Mandarin prime (fill 2)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "21:56"
+        },
+        {
+          "title": "RFA Mandarin BRI (fill 2)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "22:01"
+        },
+        {
+          "title": "RFA Mandarin press (fill 2)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "22:09"
+        },
+        {
+          "title": "RFA Mandarin prime (fill 3)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "22:12"
+        },
+        {
+          "title": "RFA Mandarin BRI (fill 3)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "22:17"
+        },
+        {
+          "title": "RFA Mandarin press (fill 3)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "22:25"
+        },
+        {
+          "title": "RFA Mandarin prime (fill 4)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "22:28"
+        },
+        {
+          "title": "RFA Mandarin BRI (fill 4)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "22:33"
+        },
+        {
+          "title": "RFA Mandarin press (fill 4)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "22:41"
+        },
+        {
+          "title": "RFA Mandarin prime (fill 5)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 300,
+          "scheduledStart": "22:44"
+        },
+        {
+          "title": "RFA Mandarin BRI (fill 5)",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480,
+          "scheduledStart": "22:49"
+        },
+        {
+          "title": "RFA Mandarin press (fill 5 close)",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180,
+          "scheduledStart": "22:57"
+        },
+        {
+          "title": "RFA Mandarin HK (close)",
+          "identifier": "youtube-MJVRwBrkzsg",
+          "duration": 180,
+          "scheduledStart": "23:00"
+        }
+      ]
     }
-  ]
-}{
-  "version": 1,
-  "generated": "2026-02-19T14:01:57.227Z",
-  "blocks": [
-    {
-      "id": "b1",
-      "name": "Morning",
-      "genre": "morning",
-      "startTime": "06:00",
-      "items": [
-        {
-          "title": "Duck and Cover",
-          "identifier": "DuckandC1951",
-          "duration": 555,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "My Japan",
-          "identifier": "MyJapan1945",
-          "duration": 963,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Look to Lockheed for Leadership (Part I)",
-          "identifier": "LooktoLo1940",
-          "duration": 944,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Tuesday in November",
-          "identifier": "Tuesdayi1945",
-          "duration": 1003,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "How Khazar Zionists Divide and Conquer",
-          "identifier": "HowKhazarZionistsDivideAndConquer",
-          "duration": 894,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Supporters of jailed Cambodian American lawyer Theary Seng protest at Phnom Penh courthouse",
-          "identifier": "youtube-Aa-VtpdhB-4",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Environmental activists march in chains through Cambodia’s capital | Radio Free Asia (RFA)",
-          "identifier": "youtube-WG9Nvh6Zo7g",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "It’s ‘Watch Out for the Train!’ at a Mandalay Market",
-          "identifier": "youtube-aGgh8Y_Or7U",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Cambodian Garment Workers Protest for Better Wages, Conditions",
-          "identifier": "youtube-f08x1NyrzV0",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Cambodian Labor Activists Convicted, Then Released",
-          "identifier": "youtube-ngYYx3d3_8w",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Upstream dam leaves Cambodian fishermen high and dry | Radio Free Asia (RFA)",
-          "identifier": "youtube-hFL39xzcfok",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "Khmer Rouge Trial Nears End",
-          "identifier": "youtube-I08cob67GMk",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        },
-        {
-          "title": "China Flexes Military Muscle in Tiananmen Square",
-          "identifier": "youtube-N2EkMko5VW0",
-          "duration": 0,
-          "scheduledStart": "06:00"
-        }
-      ]
-    },
-    {
-      "id": "b2",
-      "name": "Afternoon",
-      "genre": "afternoon",
-      "startTime": "12:00",
-      "items": [
-        {
-          "title": "Khmer Rouge survivor: 'I refused to die'",
-          "identifier": "",
-          "duration": 0,
-          "url": "https://archive.org/details/youtube-eM9hspQBAL4",
-          "scheduledStart": "12:00"
-        },
-        {
-          "title": "Surviving Khmer Rouge: RFA staff member looks back on life under Pol Pot",
-          "identifier": "youtube-YzAep6brIIs",
-          "duration": 0,
-          "scheduledStart": "12:00"
-        },
-        {
-          "title": "Woman Shot in Shandong Taxi Driver Protest",
-          "identifier": "youtube-yakXWijQtls",
-          "duration": 0,
-          "scheduledStart": "12:00"
-        },
-        {
-          "title": "Sold to China",
-          "identifier": "youtube-8BfH3ygkpu0",
-          "duration": 0,
-          "scheduledStart": "12:00"
-        },
-        {
-          "title": "Cambodia's Khmer Rouge Defendants Maintain Innocence",
-          "identifier": "youtube-14H5gwsi7m0",
-          "duration": 0,
-          "scheduledStart": "12:00"
-        },
-        {
-          "title": "VOA [Voice of America] Global English : March 31, 2020 02:00AM-03:00AM EDT",
-          "identifier": "VOA_Global_English_20200331_060000",
-          "duration": 3600,
-          "scheduledStart": "12:00"
-        }
-      ]
-    },
-    {
-      "id": "b3",
-      "name": "Prime Time",
-      "genre": "primetime",
-      "startTime": "19:00",
-      "items": []
-    },
-    {
-      "id": "b4",
-      "name": "Late Night",
-      "genre": "latenight",
-      "startTime": "23:00",
-      "items": []
-    },
-    {
-      "id": "b5",
-      "name": "Overnight",
-      "genre": "overnight",
-      "startTime": "01:00",
-      "items": []
-    },
-    {
-      "id": "b1771509686481",
-      "name": "New Block",
-      "genre": "custom",
-      "startTime": "09:00",
-      "items": [
-        {
-          "title": "Khmer Rouge Trial Nears End",
-          "identifier": "youtube-I08cob67GMk",
-          "duration": 0,
-          "scheduledStart": "09:00"
-        },
-        {
-          "title": "Khmer Rouge Trial Nears End",
-          "identifier": "youtube-I08cob67GMk",
-          "duration": 0,
-          "scheduledStart": "09:00"
-        },
-        {
-          "title": "Pyongyang Style: North Korea Girl Bands Rock China's Border",
-          "identifier": "youtube-gvcZaLnKask",
-          "duration": 0,
-          "scheduledStart": "09:00"
-        },
-        {
-          "title": "China Flexes Military Muscle in Tiananmen Square",
-          "identifier": "youtube-N2EkMko5VW0",
-          "duration": 0,
-          "scheduledStart": "09:00"
-        },
-        {
-          "title": "Sold to China",
-          "identifier": "youtube-8BfH3ygkpu0",
-          "duration": 0,
-          "scheduledStart": "09:00"
-        },
-        {
-          "title": "Tibetans Rescue Illegally-Caught Fish at Qinghai Lake",
-          "identifier": "youtube-pJtj6kPHNSk",
-          "duration": 0,
-          "scheduledStart": "09:00"
-        }
-      ]
-    }
+
   ]
 }
