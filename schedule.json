@@ -1,21 +1,13 @@
 {
   "version": 2,
   "generated": "2026-02-20T00:00:00.000Z",
-  "_note": "Each block plays its items once, back-to-back. Gaps between blocks are auto-filled by looping the evergreen Station ID video. The 24hr cycle repeats at midnight.",
-
-  "evergreen": {
-    "title": "Legacy — Radio Free Asia",
-    "identifier": "youtube-LX50V0DsT_M",
-    "duration": 180,
-    "evergreen": true
-  },
-
+  "_note": "Version 2: blocks loop their item playlist automatically until the next block's startTime. No fill needed. All identifiers are real verified Archive.org RFA items.",
   "blocks": [
 
     {
       "id": "rfa-mandarin",
       "name": "普通話 — Mandarin Chinese",
-      "genre": "Mandarin",
+      "genre": "Mandarin Chinese",
       "startTime": "00:00",
       "items": [
         {
@@ -24,14 +16,24 @@
           "duration": 300
         },
         {
-          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever",
-          "identifier": "youtube-4NTCJgWqfwQ",
+          "title": "Chinese Police Quash Month-Long Land Protest",
+          "identifier": "youtube-jMk4o81qxL0",
           "duration": 180
+        },
+        {
+          "title": "Hong Kong Protesters Disappointed With Talks",
+          "identifier": "youtube-hlSlk-vcnRU",
+          "duration": 240
         },
         {
           "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
+        },
+        {
+          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180
         }
       ]
     },
@@ -43,12 +45,12 @@
       "startTime": "02:40",
       "items": [
         {
-          "title": "Myanmar's Jasmine Garland Sellers",
+          "title": "Myanmar's Jasmine Garland Sellers Go Back to School",
           "identifier": "youtube-9Nma364RVCg",
           "duration": 180
         },
         {
-          "title": "Myanmar Insurance Industry Grows",
+          "title": "Myanmar Insurance Industry Grows As Economy Opens",
           "identifier": "youtube-zbq6lEW9FNU",
           "duration": 240
         },
@@ -56,6 +58,31 @@
           "title": "Myanmar Faces Flooding Emergency",
           "identifier": "youtube-tkNpWKazyX0",
           "duration": 240
+        },
+        {
+          "title": "RFA Journalist Forced to Leave Myanmar After 2021 Coup",
+          "identifier": "youtube-V4wtcXnsJRQ",
+          "duration": 180
+        },
+        {
+          "title": "Creative Outfits on Myanmar Streets as Anti-Coup Demonstrations Continue",
+          "identifier": "youtube-SfDUJtzx_xA",
+          "duration": 200
+        },
+        {
+          "title": "Myanmar's Mon State Faces Water Crisis",
+          "identifier": "youtube-3ZVbi9bLS2U",
+          "duration": 210
+        },
+        {
+          "title": "Myanmar Reopens Neglected Yangon University to Undergrads",
+          "identifier": "youtube-Y-zRea2aZ0E",
+          "duration": 180
+        },
+        {
+          "title": "RFA Journalist: Access to Credible Information Allows People to Make Vital Decisions",
+          "identifier": "youtube-LX50V0DsT_M",
+          "duration": 180
         }
       ]
     },
@@ -72,7 +99,7 @@
           "duration": 420
         },
         {
-          "title": "Khmer Rouge Survivor: I'm Lucky",
+          "title": "Khmer Rouge Survivor: 'I'm Lucky'",
           "identifier": "youtube-xRXQ65UBnU8",
           "duration": 300
         },
@@ -80,6 +107,41 @@
           "title": "RFA Journalist Recalls Khmer Rouge Terror",
           "identifier": "youtube-GRTXf97PtVI",
           "duration": 360
+        },
+        {
+          "title": "Khmer Rouge Survivor Recalls Encounters With Death",
+          "identifier": "youtube-zB2EJ46wqFs",
+          "duration": 400
+        },
+        {
+          "title": "Stone Sculptors Preserve Cambodian Culture",
+          "identifier": "youtube-EqJ5dcLaFN4",
+          "duration": 240
+        },
+        {
+          "title": "Environmental Activists in Cambodia Boycott Trial",
+          "identifier": "youtube-kTwg5GIBHcw",
+          "duration": 200
+        },
+        {
+          "title": "Environmental Activists Summoned to Phnom Penh Court",
+          "identifier": "youtube-Id3yN_5hcbU",
+          "duration": 200
+        },
+        {
+          "title": "Mekong River Dolphin Tourism Down Sharply in Cambodia",
+          "identifier": "youtube-MazyggOoOyM",
+          "duration": 240
+        },
+        {
+          "title": "Cambodia Aflutter Over Struggling Butterflies",
+          "identifier": "youtube-h2DlxqJVIuM",
+          "duration": 200
+        },
+        {
+          "title": "Tough Times for Cambodia's Duck Farmers",
+          "identifier": "youtube-yhpi-_Co2-c",
+          "duration": 200
         }
       ]
     },
@@ -91,18 +153,23 @@
       "startTime": "08:00",
       "items": [
         {
-          "title": "Vietnam News Report",
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
         },
         {
-          "title": "Human Rights in Vietnam",
+          "title": "RFA Journalist: Access to Credible Information Allows People to Make Vital Decisions",
           "identifier": "youtube-LX50V0DsT_M",
           "duration": 180
         },
         {
-          "title": "Vietnam–China Relations Report",
+          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever",
           "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180
+        },
+        {
+          "title": "Chinese Police Quash Month-Long Land Protest",
+          "identifier": "youtube-jMk4o81qxL0",
           "duration": 180
         }
       ]
@@ -115,19 +182,29 @@
       "startTime": "10:40",
       "items": [
         {
-          "title": "Tibet Human Rights Report",
-          "identifier": "youtube-MJVRwBrkzsg",
+          "title": "Tibetan Monks Keep Centuries-Old Butter Sculpting Tradition Alive",
+          "identifier": "youtube-yCrVoMKRzZk",
           "duration": 300
         },
         {
-          "title": "China's Tibet Policy",
-          "identifier": "youtube-9w_JnNZtmm0",
-          "duration": 480
+          "title": "Tibet Monasteries Observe Major Religious Gathering",
+          "identifier": "youtube-tmQTUhs_8P4",
+          "duration": 260
         },
         {
-          "title": "Press Freedom in Tibet",
+          "title": "Tibetan Institute of Performing Arts",
+          "identifier": "youtube-3b9sG6mBI3k",
+          "duration": 360
+        },
+        {
+          "title": "RFA Journalist: Access to Credible Information Allows People to Make Vital Decisions",
           "identifier": "youtube-LX50V0DsT_M",
           "duration": 180
+        },
+        {
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
+          "identifier": "youtube-9w_JnNZtmm0",
+          "duration": 480
         }
       ]
     },
@@ -139,19 +216,29 @@
       "startTime": "13:20",
       "items": [
         {
-          "title": "Hong Kong Face Readers",
+          "title": "Hong Kong's Face Readers Reshape the Future",
           "identifier": "youtube-MJVRwBrkzsg",
           "duration": 300
         },
         {
-          "title": "Hong Kong Press Freedom",
-          "identifier": "youtube-4NTCJgWqfwQ",
+          "title": "Hong Kong Protesters Disappointed With Talks",
+          "identifier": "youtube-hlSlk-vcnRU",
+          "duration": 240
+        },
+        {
+          "title": "Chinese Police Quash Month-Long Land Protest",
+          "identifier": "youtube-jMk4o81qxL0",
           "duration": 180
         },
         {
-          "title": "China Policy Report",
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
+        },
+        {
+          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever",
+          "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180
         }
       ]
     },
@@ -163,18 +250,23 @@
       "startTime": "16:00",
       "items": [
         {
-          "title": "Xinjiang Human Rights",
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
         },
         {
-          "title": "Xinjiang Internment Camps Report",
-          "identifier": "youtube-LX50V0DsT_M",
+          "title": "Chinese Police Quash Month-Long Land Protest",
+          "identifier": "youtube-jMk4o81qxL0",
           "duration": 180
         },
         {
-          "title": "China's Xinjiang Policy",
+          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever",
           "identifier": "youtube-4NTCJgWqfwQ",
+          "duration": 180
+        },
+        {
+          "title": "RFA Journalist: Access to Credible Information Allows People to Make Vital Decisions",
+          "identifier": "youtube-LX50V0DsT_M",
           "duration": 180
         }
       ]
@@ -187,18 +279,23 @@
       "startTime": "17:40",
       "items": [
         {
-          "title": "Southeast Asia Report",
+          "title": "Chaos on the Streets: Foreigners Clash in Laos",
+          "identifier": "youtube-H5rXoW0NHMs",
+          "duration": 240
+        },
+        {
+          "title": "Mekong River Dolphin Tourism Down Sharply in Cambodia",
+          "identifier": "youtube-MazyggOoOyM",
+          "duration": 240
+        },
+        {
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
         },
         {
-          "title": "Human Rights in Laos",
+          "title": "RFA Journalist: Access to Credible Information Allows People to Make Vital Decisions",
           "identifier": "youtube-LX50V0DsT_M",
-          "duration": 180
-        },
-        {
-          "title": "China and the Mekong",
-          "identifier": "youtube-4NTCJgWqfwQ",
           "duration": 180
         }
       ]
@@ -211,42 +308,62 @@
       "startTime": "19:20",
       "items": [
         {
-          "title": "North Korea Human Rights",
+          "title": "Defector Tells of Life in North Korea, in Webtoons",
+          "identifier": "youtube-N8ifVzNyNN4",
+          "duration": 240
+        },
+        {
+          "title": "'A Beacon of Hope' for North Korean Residents",
+          "identifier": "youtube-Xx3-gW9m5WM",
+          "duration": 200
+        },
+        {
+          "title": "North Korea's Kim Plays Down U.S. Diplomacy",
+          "identifier": "youtube-fthfiSozlBs",
+          "duration": 180
+        },
+        {
+          "title": "RFA Journalist: Access to Credible Information Allows People to Make Vital Decisions",
           "identifier": "youtube-LX50V0DsT_M",
           "duration": 180
         },
         {
-          "title": "DPRK Economy Report",
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
-        },
-        {
-          "title": "North Korea Defectors",
-          "identifier": "youtube-4NTCJgWqfwQ",
-          "duration": 180
         }
       ]
     },
 
     {
       "id": "rfa-mandarin-prime",
-      "name": "普通話 Prime Time — Mandarin",
-      "genre": "Mandarin",
+      "name": "普通話 Prime Time — Mandarin Chinese",
+      "genre": "Mandarin Chinese",
       "startTime": "21:40",
       "items": [
         {
-          "title": "Prime Time: Hong Kong Report",
+          "title": "Hong Kong's Face Readers Reshape the Future",
           "identifier": "youtube-MJVRwBrkzsg",
           "duration": 300
         },
         {
-          "title": "Prime Time: Belt and Road Initiative",
+          "title": "Chinese Police Quash Month-Long Land Protest",
+          "identifier": "youtube-jMk4o81qxL0",
+          "duration": 180
+        },
+        {
+          "title": "Hong Kong Protesters Disappointed With Talks",
+          "identifier": "youtube-hlSlk-vcnRU",
+          "duration": 240
+        },
+        {
+          "title": "Will Senegal Fall into a Belt and Road Debt Trap?",
           "identifier": "youtube-9w_JnNZtmm0",
           "duration": 480
         },
         {
-          "title": "Prime Time: Press Freedom in China",
-          "identifier": "youtube-LX50V0DsT_M",
+          "title": "China Culls Thousands of Pigs to Stop Spread of African Swine Fever",
+          "identifier": "youtube-4NTCJgWqfwQ",
           "duration": 180
         }
       ]
