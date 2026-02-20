@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Archive RFA</title>
+<title>TVStation</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
   *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -56,7 +56,7 @@
 <div id="hud">
   <div class="hud-top">
     <div>
-      <div class="sid">Archive RFA<span class="ssub">BROADCASTING 24 / 7</span></div>
+      <div class="sid">TVStation<span class="ssub">BROADCASTING 24 / 7</span></div>
       <div class="live"><div class="dot"></div>LIVE</div>
     </div>
     <div class="clk">
@@ -85,7 +85,7 @@
 
 <div id="overlay" onclick="tuneIn()">
   <div id="olab">&#9654; CLICK TO<br>TUNE IN</div>
-  <div id="osub">Archive RFA &middot; 24/7 Live Broadcast</div>
+  <div id="osub">TVStation &middot; 24/7 Live Broadcast</div>
   <div id="ostat">CONTACTING BROADCAST SERVER&hellip;</div>
 </div>
 
@@ -97,7 +97,7 @@
 
 <script>
 // ═══════════════════════════════════════════════════════════════
-//  Archive RFA — Thin Client  v4
+//  TVStation — Thin Client  v4
 //
 //  This page does NOT manage the schedule. It asks the Cloudflare
 //  Worker (master clock) what is playing RIGHT NOW, then:
@@ -110,7 +110,7 @@
 // ═══════════════════════════════════════════════════════════════
 
 // !! REPLACE THIS with your Cloudflare Worker URL after deploying !!
-const WORKER_URL = 'https://square-night-4e81.demo-3b5.workers.dev/';
+const WORKER_URL = 'https://square-night-4e81.demo-3b5.workers.dev';
 
 const player    = document.getElementById('player');
 const clockEl   = document.getElementById('clock');
@@ -146,10 +146,12 @@ function wallSec() {
 }
 
 function tickClock() {
-  const d  = new Date(Date.now() + clockOffset);
-  const p  = n => String(n).padStart(2,'0');
-  clockEl.textContent = p(d.getUTCHours())+':'+p(d.getUTCMinutes())+':'+p(d.getUTCSeconds());
-  dateEl.textContent  = DN[d.getUTCDay()]+' '+d.getUTCDate()+' '+MN[d.getUTCMonth()]+' '+d.getUTCFullYear()+' UTC';
+  // Use viewer's local time for the display clock
+  // (schedule sync stays on UTC — this is display only)
+  const d = new Date();
+  const p = n => String(n).padStart(2,'0');
+  clockEl.textContent = p(d.getHours())+':'+p(d.getMinutes())+':'+p(d.getSeconds());
+  dateEl.textContent  = DN[d.getDay()]+' '+d.getDate()+' '+MN[d.getMonth()]+' '+d.getFullYear();
 }
 setInterval(tickClock, 1000);
 tickClock();
@@ -188,6 +190,14 @@ async function tuneIn() {
   if (!data) { showErr(); return; }
 
   current = data;
+
+  // Pre-warm metadata URLs for current AND next item in parallel
+  // so loadSlot() finds them instantly in metaCache
+  await Promise.all([
+    resolveMetaUrl(data.identifier),
+    data.next && data.next.identifier ? resolveMetaUrl(data.next.identifier) : Promise.resolve()
+  ]);
+
   await loadSlot(data, true);
 
   updateHUD();
@@ -203,12 +213,19 @@ async function tuneIn() {
 
 // ── LOAD A SLOT ────────────────────────────────────────────────
 async function loadSlot(data, seekLive) {
-  const url    = data.streamUrl;
   const offset = seekLive ? Math.max(0, data.seekTo) : 0;
 
-  // Try the worker's URL. If it 404s, fall back to metadata lookup.
+  // Always resolve the real URL via Archive.org metadata API first.
+  // This guarantees the correct filename regardless of what the worker guesses.
+  let url = await resolveMetaUrl(data.identifier);
+
+  // If metadata lookup fails, fall back to worker's URL
+  if (!url) url = data.streamUrl;
+  if (!url) { console.warn('No URL for', data.identifier); return; }
+
   if (player.src !== url) {
     player.src = url;
+    player.load();
   }
 
   return new Promise(resolve => {
@@ -218,25 +235,15 @@ async function loadSlot(data, seekLive) {
         const t   = isFinite(dur) ? Math.min(offset, dur - 1) : offset;
         if (t > 0) player.currentTime = t;
       }
-      player.play()
-        .then(resolve)
-        .catch(async () => {
-          // URL from worker didn't work — try metadata API fallback
-          const fallback = await resolveMetaUrl(data.identifier);
-          if (fallback && fallback !== url) {
-            player.src = fallback;
-            if (seekLive && offset > 2) player.currentTime = offset;
-            player.play().then(resolve).catch(resolve);
-          } else {
-            resolve(); // give up, tick will advance
-          }
-        });
+      player.play().then(resolve).catch(e => {
+        console.warn('play() failed:', e.message);
+        resolve();
+      });
     };
 
     if (player.readyState >= 1) doSeekPlay();
     else {
       player.onloadedmetadata = () => { player.onloadedmetadata = null; doSeekPlay(); };
-      player.load();
     }
   });
 }
@@ -251,12 +258,13 @@ async function resolveMetaUrl(identifier) {
     const meta = await r.json();
     const files= meta.files || [];
     const order= [
-      f => /\.ia\.mp4$/i.test(f.name),              // youtube-* H.264 derivative
+      f => /\.ia\.mp4$/i.test(f.name),
       f => /_512kb\.mp4$/i.test(f.name) && f.source === 'derivative',
       f => /\.mp4$/i.test(f.name)       && f.source === 'derivative',
       f => /_512kb\.mp4$/i.test(f.name),
       f => /\.mp4$/i.test(f.name),
       f => /\.ogv$/i.test(f.name),
+      f => /\.webm$/i.test(f.name),
     ];
     let picked = null;
     for (const fn of order) { picked = files.find(fn); if (picked) break; }
@@ -290,6 +298,8 @@ async function cutToNext() {
   const data = await fetchBroadcast();
   if (!data) { setTimeout(cutToNext, 2000); return; }
   current = data;
+  // Pre-warm next item's URL while current plays
+  if (data.next && data.next.identifier) resolveMetaUrl(data.next.identifier);
   await loadSlot(data, false); // don't seek — start from beginning of slot
   updateHUD();
 
