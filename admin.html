@@ -4,408 +4,162 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RFA Admin — Schedule Editor</title>
-<link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- ① React (global, sync) -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+<!-- ② Firebase COMPAT (global, sync — no ES modules, no race condition) -->
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+
+<!-- ③ Babel (transforms JSX) -->
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
 <style>
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --primary:   #61C230;
+  --primary-d: #4a9624;
+  --primary-g: rgba(97,194,48,0.08);
+  --light:     #CCEDD0;
+  --dim:       #627568;
+  --offwhite:  #F0F6F0;
+  --white:     #FFFFFF;
+  --bg:        #080e09;
+  --surface:   #0e1a10;
+  --surface2:  #141f15;
+  --border:    rgba(97,194,48,0.14);
+  --border-h:  rgba(97,194,48,0.35);
+  --red:       #ff4433;
+  --red-d:     rgba(255,68,51,0.12);
+  --amber:     #f5a623;
+  --mono: 'IBM Plex Mono', monospace;
+  --sans: 'IBM Plex Sans', sans-serif;
+  --display: 'Bebas Neue', cursive;
+}
+html, body, #root { width:100%; min-height:100vh; background:var(--bg); color:var(--offwhite); font-family:var(--sans); font-size:14px; }
+::-webkit-scrollbar { width:4px; }
+::-webkit-scrollbar-track { background:transparent; }
+::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
 
-  :root {
-    --primary:   #61C230;
-    --primary-d: #4a9624;
-    --primary-g: rgba(97,194,48,0.08);
-    --light:     #CCEDD0;
-    --dim:       #627568;
-    --offwhite:  #F0F6F0;
-    --white:     #FFFFFF;
-    --bg:        #080e09;
-    --surface:   #0e1a10;
-    --surface2:  #141f15;
-    --border:    rgba(97,194,48,0.14);
-    --border-h:  rgba(97,194,48,0.35);
-    --red:       #ff4433;
-    --red-d:     rgba(255,68,51,0.12);
-    --amber:     #f5a623;
-    --mono: 'IBM Plex Mono', monospace;
-    --sans: 'IBM Plex Sans', sans-serif;
-    --display: 'Bebas Neue', cursive;
-  }
+.login-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:32px; background:radial-gradient(ellipse at 50% 30%,rgba(97,194,48,0.06) 0%,transparent 70%); }
+.login-logo { font-family:var(--display); font-size:64px; letter-spacing:.12em; color:var(--primary); text-shadow:0 0 40px rgba(97,194,48,0.4); line-height:1; }
+.login-sub { font-family:var(--mono); font-size:9px; letter-spacing:.4em; color:var(--dim); text-transform:uppercase; margin-top:-20px; }
+.login-card { background:var(--surface); border:1px solid var(--border); padding:40px 48px; display:flex; flex-direction:column; align-items:center; gap:20px; min-width:360px; }
+.login-title { font-family:var(--mono); font-size:10px; letter-spacing:.32em; color:var(--dim); text-transform:uppercase; }
+.login-error { font-family:var(--mono); font-size:10px; color:var(--red); letter-spacing:.12em; text-align:center; background:var(--red-d); border:1px solid rgba(255,68,51,0.2); padding:8px 16px; width:100%; }
+.btn-google { display:flex; align-items:center; gap:12px; background:var(--white); color:#333; border:none; cursor:pointer; padding:12px 24px; font-family:var(--sans); font-size:14px; font-weight:500; width:100%; justify-content:center; transition:opacity 0.15s; }
+.btn-google:hover { opacity:0.9; }
+.btn-google:disabled { opacity:0.5; cursor:not-allowed; }
+.btn-google svg { width:18px; height:18px; flex-shrink:0; }
 
-  html, body, #root {
-    width: 100%; min-height: 100vh;
-    background: var(--bg);
-    color: var(--offwhite);
-    font-family: var(--sans);
-    font-size: 14px;
-  }
+.app { display:flex; flex-direction:column; min-height:100vh; }
+.topbar { display:flex; align-items:center; justify-content:space-between; padding:0 28px; height:56px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:50; }
+.topbar-left { display:flex; align-items:center; gap:16px; }
+.topbar-logo { font-family:var(--display); font-size:28px; letter-spacing:.12em; color:var(--primary); text-shadow:0 0 16px rgba(97,194,48,0.4); line-height:1; }
+.topbar-label { font-family:var(--mono); font-size:8px; letter-spacing:.3em; color:var(--dim); text-transform:uppercase; border-left:1px solid var(--border); padding-left:16px; }
+.topbar-right { display:flex; align-items:center; gap:12px; }
+.user-badge { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:.1em; }
+.user-avatar { width:26px; height:26px; border-radius:50%; border:1px solid var(--border); object-fit:cover; }
+.user-avatar-ph { width:26px; height:26px; border-radius:50%; background:var(--primary-d); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; color:var(--white); }
+.status-pill { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:9px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; background:var(--surface2); border:1px solid var(--border); padding:4px 10px; }
+.status-pill.live { color:var(--primary); border-color:rgba(97,194,48,0.3); }
+.status-dot { width:6px; height:6px; border-radius:50%; background:var(--dim); }
+.status-pill.live .status-dot { background:var(--primary); box-shadow:0 0 6px var(--primary); animation:blink 1.4s infinite; }
+@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 
-  /* scrollbars */
-  ::-webkit-scrollbar { width: 4px; }
-  ::-webkit-scrollbar-track { background: transparent; }
-  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+.main { display:flex; flex:1; }
+.sidebar { width:280px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; }
+.sidebar-section { padding:20px 16px 12px; }
+.sidebar-heading { font-family:var(--mono); font-size:8px; letter-spacing:.35em; color:var(--dim); text-transform:uppercase; margin-bottom:12px; }
+.block-list { display:flex; flex-direction:column; gap:2px; }
+.block-item { display:flex; align-items:center; gap:10px; padding:9px 12px; cursor:pointer; border:1px solid transparent; transition:all 0.12s; border-radius:2px; }
+.block-item:hover { background:var(--primary-g); border-color:var(--border); }
+.block-item.active { background:rgba(97,194,48,0.1); border-color:rgba(97,194,48,0.3); }
+.block-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
+.block-info { flex:1; min-width:0; }
+.block-name { font-family:var(--sans); font-size:12px; font-weight:500; color:var(--offwhite); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.block-meta { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:1px; }
+.block-count { font-family:var(--mono); font-size:9px; color:var(--dim); background:var(--surface2); border:1px solid var(--border); padding:2px 6px; border-radius:2px; flex-shrink:0; }
+.sidebar-add-btn { margin:0 16px 16px; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; background:transparent; border:1px dashed rgba(97,194,48,0.25); color:var(--dim); font-family:var(--mono); font-size:10px; letter-spacing:.2em; cursor:pointer; text-transform:uppercase; transition:all 0.12s; }
+.sidebar-add-btn:hover { border-color:var(--primary); color:var(--primary); }
 
-  /* ── LOGIN ── */
-  .login-wrap {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    min-height: 100vh; gap: 32px;
-    background: radial-gradient(ellipse at 50% 30%, rgba(97,194,48,0.06) 0%, transparent 70%);
-  }
-  .login-logo {
-    font-family: var(--display);
-    font-size: 64px; letter-spacing: .12em;
-    color: var(--primary);
-    text-shadow: 0 0 40px rgba(97,194,48,0.4);
-    line-height: 1;
-  }
-  .login-sub {
-    font-family: var(--mono);
-    font-size: 9px; letter-spacing: .4em;
-    color: var(--dim); text-transform: uppercase; margin-top: -20px;
-  }
-  .login-card {
-    background: var(--surface);
-    border: 1px solid var(--border);
-    padding: 40px 48px;
-    display: flex; flex-direction: column; align-items: center; gap: 20px;
-    min-width: 360px;
-  }
-  .login-title {
-    font-family: var(--mono); font-size: 10px;
-    letter-spacing: .32em; color: var(--dim); text-transform: uppercase;
-  }
-  .login-error {
-    font-family: var(--mono); font-size: 10px;
-    color: var(--red); letter-spacing: .12em; text-align: center;
-    background: var(--red-d); border: 1px solid rgba(255,68,51,0.2);
-    padding: 8px 16px; width: 100%;
-  }
-  .btn-google {
-    display: flex; align-items: center; gap: 12px;
-    background: var(--white); color: #333;
-    border: none; cursor: pointer;
-    padding: 12px 24px; font-family: var(--sans); font-size: 14px; font-weight: 500;
-    width: 100%; justify-content: center;
-    transition: opacity 0.15s;
-  }
-  .btn-google:hover { opacity: 0.9; }
-  .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
+.editor { flex:1; padding:28px 32px; overflow-y:auto; }
+.editor-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px; opacity:0.4; }
+.editor-empty-icon { font-size:48px; line-height:1; }
+.editor-empty-text { font-family:var(--mono); font-size:10px; letter-spacing:.3em; color:var(--dim); text-transform:uppercase; }
+.editor-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px; gap:20px; }
+.editor-title-group { display:flex; flex-direction:column; gap:8px; flex:1; }
+.editor-title { font-family:var(--display); font-size:36px; letter-spacing:.08em; color:var(--primary); line-height:1; }
+.editor-actions { display:flex; gap:8px; flex-shrink:0; }
+.field-group { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
+.field { display:flex; flex-direction:column; gap:6px; flex:1; min-width:140px; }
+.field-label { font-family:var(--mono); font-size:8px; letter-spacing:.3em; color:var(--dim); text-transform:uppercase; }
+.field input, .field select { background:var(--surface2); border:1px solid var(--border); color:var(--offwhite); font-family:var(--mono); font-size:13px; padding:8px 12px; outline:none; width:100%; transition:border-color 0.15s; }
+.field input:focus, .field select:focus { border-color:var(--primary); }
+.field select option { background:var(--surface2); }
+.items-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
+.items-label { font-family:var(--mono); font-size:8px; letter-spacing:.32em; color:var(--dim); text-transform:uppercase; }
+.items-count { font-family:var(--mono); font-size:9px; color:var(--dim); background:var(--surface2); border:1px solid var(--border); padding:2px 8px; }
+.item-row { display:grid; grid-template-columns:24px 1fr 220px 72px 36px; gap:6px; align-items:center; padding:8px 12px; border:1px solid var(--border); margin-bottom:4px; background:var(--surface2); transition:border-color 0.12s; }
+.item-row:hover { border-color:var(--border-h); }
+.item-num { font-family:var(--mono); font-size:10px; color:var(--dim); text-align:center; cursor:grab; user-select:none; }
+.item-num:active { cursor:grabbing; }
+.item-row input { background:transparent; border:none; border-bottom:1px solid transparent; color:var(--offwhite); font-family:var(--mono); font-size:12px; padding:2px 4px; outline:none; width:100%; transition:border-color 0.12s; }
+.item-row input:focus { border-bottom-color:var(--primary); }
+.item-row input::placeholder { color:rgba(98,117,104,0.5); }
+.dur-display { font-family:var(--mono); font-size:10px; color:var(--dim); text-align:center; }
+.btn-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; background:transparent; border:1px solid transparent; cursor:pointer; color:var(--dim); font-size:14px; transition:all 0.12s; border-radius:2px; }
+.btn-icon:hover { color:var(--red); border-color:rgba(255,68,51,0.3); background:var(--red-d); }
+.add-item-btn { display:flex; align-items:center; gap:8px; padding:10px 16px; margin-top:8px; background:transparent; border:1px dashed rgba(97,194,48,0.2); color:var(--dim); font-family:var(--mono); font-size:10px; letter-spacing:.2em; cursor:pointer; text-transform:uppercase; width:100%; transition:all 0.12s; }
+.add-item-btn:hover { border-color:var(--primary); color:var(--primary); }
 
-  /* ── LAYOUT ── */
-  .app { display: flex; flex-direction: column; min-height: 100vh; }
+.btn { display:flex; align-items:center; gap:7px; padding:9px 18px; font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; cursor:pointer; border:1px solid; transition:all 0.15s; white-space:nowrap; }
+.btn-primary { background:var(--primary); border-color:var(--primary); color:#050d06; font-weight:600; }
+.btn-primary:hover { background:#74d63d; border-color:#74d63d; }
+.btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-ghost { background:transparent; border-color:var(--border); color:var(--dim); }
+.btn-ghost:hover { border-color:var(--border-h); color:var(--offwhite); }
+.btn-ghost:disabled { opacity:0.4; cursor:not-allowed; }
+.btn-danger { background:transparent; border-color:rgba(255,68,51,0.3); color:var(--red); }
+.btn-danger:hover { background:var(--red-d); }
 
-  /* ── TOPBAR ── */
-  .topbar {
-    display: flex; align-items: center; justify-content: space-between;
-    padding: 0 28px;
-    height: 56px;
-    background: var(--surface);
-    border-bottom: 1px solid var(--border);
-    position: sticky; top: 0; z-index: 50;
-  }
-  .topbar-left { display: flex; align-items: center; gap: 16px; }
-  .topbar-logo {
-    font-family: var(--display); font-size: 28px;
-    letter-spacing: .12em; color: var(--primary);
-    text-shadow: 0 0 16px rgba(97,194,48,0.4);
-    line-height: 1;
-  }
-  .topbar-label {
-    font-family: var(--mono); font-size: 8px;
-    letter-spacing: .3em; color: var(--dim); text-transform: uppercase;
-    border-left: 1px solid var(--border); padding-left: 16px;
-  }
-  .topbar-right { display: flex; align-items: center; gap: 12px; }
-  .user-badge {
-    display: flex; align-items: center; gap: 8px;
-    font-family: var(--mono); font-size: 10px; color: var(--dim);
-    letter-spacing: .1em;
-  }
-  .user-avatar {
-    width: 26px; height: 26px; border-radius: 50%;
-    border: 1px solid var(--border);
-    object-fit: cover;
-  }
-  .user-avatar-placeholder {
-    width: 26px; height: 26px; border-radius: 50%;
-    background: var(--primary-d);
-    display: flex; align-items: center; justify-content: center;
-    font-family: var(--mono); font-size: 10px; color: var(--white);
-  }
+.publish-bar { position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); padding:14px 32px; display:flex; align-items:center; justify-content:space-between; gap:16px; z-index:40; }
+.publish-status { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:.15em; }
+.publish-status.saved { color:var(--primary); }
+.publish-status.unsaved { color:var(--amber); }
+.publish-actions { display:flex; gap:10px; }
 
-  /* status pill */
-  .status-pill {
-    display: flex; align-items: center; gap: 6px;
-    font-family: var(--mono); font-size: 9px; letter-spacing: .2em;
-    color: var(--dim); text-transform: uppercase;
-    background: var(--surface2); border: 1px solid var(--border);
-    padding: 4px 10px;
-  }
-  .status-pill.live { color: var(--primary); border-color: rgba(97,194,48,0.3); }
-  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
-  .status-pill.live .status-dot { background: var(--primary); box-shadow: 0 0 6px var(--primary); animation: blink 1.4s infinite; }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+.toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--primary); color:var(--primary); font-family:var(--mono); font-size:10px; letter-spacing:.25em; padding:10px 24px; z-index:200; pointer-events:none; animation:toast-in 0.3s ease forwards; }
+@keyframes toast-in { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
 
-  /* ── MAIN ── */
-  .main { display: flex; flex: 1; }
+.spinner { width:16px; height:16px; border:2px solid rgba(97,194,48,0.2); border-top-color:var(--primary); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
+@keyframes spin { to { transform:rotate(360deg); } }
 
-  /* ── SIDEBAR ── */
-  .sidebar {
-    width: 280px; flex-shrink: 0;
-    background: var(--surface);
-    border-right: 1px solid var(--border);
-    display: flex; flex-direction: column;
-    position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto;
-  }
-  .sidebar-section { padding: 20px 16px 12px; }
-  .sidebar-heading {
-    font-family: var(--mono); font-size: 8px;
-    letter-spacing: .35em; color: var(--dim); text-transform: uppercase;
-    margin-bottom: 12px;
-  }
-  .block-list { display: flex; flex-direction: column; gap: 2px; }
-  .block-item {
-    display: flex; align-items: center; gap: 10px;
-    padding: 9px 12px; cursor: pointer;
-    border: 1px solid transparent;
-    transition: all 0.12s;
-    border-radius: 2px;
-  }
-  .block-item:hover { background: var(--primary-g); border-color: var(--border); }
-  .block-item.active { background: rgba(97,194,48,0.1); border-color: rgba(97,194,48,0.3); }
-  .block-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
-  .block-info { flex: 1; min-width: 0; }
-  .block-name {
-    font-family: var(--sans); font-size: 12px; font-weight: 500;
-    color: var(--offwhite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
-  }
-  .block-meta {
-    font-family: var(--mono); font-size: 9px; color: var(--dim); margin-top: 1px;
-  }
-  .block-count {
-    font-family: var(--mono); font-size: 9px; color: var(--dim);
-    background: var(--surface2); border: 1px solid var(--border);
-    padding: 2px 6px; border-radius: 2px; flex-shrink: 0;
-  }
+.modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; }
+.modal { background:var(--surface); border:1px solid var(--border); padding:32px; min-width:380px; max-width:480px; width:100%; }
+.modal-title { font-family:var(--display); font-size:28px; letter-spacing:.08em; color:var(--primary); margin-bottom:8px; }
+.modal-sub { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:.2em; text-transform:uppercase; margin-bottom:24px; }
+.modal-actions { display:flex; gap:10px; margin-top:24px; justify-content:flex-end; }
+.swatch-grid { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
+.swatch { width:24px; height:24px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition:border-color 0.12s; }
+.swatch.selected { border-color:var(--white); }
 
-  .sidebar-add-btn {
-    margin: 0 16px 16px;
-    display: flex; align-items: center; justify-content: center; gap: 8px;
-    padding: 10px;
-    background: transparent;
-    border: 1px dashed rgba(97,194,48,0.25);
-    color: var(--dim); font-family: var(--mono); font-size: 10px;
-    letter-spacing: .2em; cursor: pointer; text-transform: uppercase;
-    transition: all 0.12s;
-  }
-  .sidebar-add-btn:hover { border-color: var(--primary); color: var(--primary); }
-
-  /* ── EDITOR ── */
-  .editor { flex: 1; padding: 28px 32px; overflow-y: auto; }
-
-  .editor-empty {
-    display: flex; flex-direction: column; align-items: center; justify-content: center;
-    height: 100%; gap: 16px; opacity: 0.4;
-  }
-  .editor-empty-icon { font-size: 48px; line-height: 1; }
-  .editor-empty-text { font-family: var(--mono); font-size: 10px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
-
-  .editor-header {
-    display: flex; align-items: flex-start; justify-content: space-between;
-    margin-bottom: 28px; gap: 20px;
-  }
-  .editor-title-group { display: flex; flex-direction: column; gap: 8px; flex: 1; }
-  .editor-title {
-    font-family: var(--display); font-size: 36px; letter-spacing: .08em;
-    color: var(--primary); line-height: 1;
-  }
-  .editor-actions { display: flex; gap: 8px; flex-shrink: 0; }
-
-  /* inputs */
-  .field-group { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
-  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
-  .field-label {
-    font-family: var(--mono); font-size: 8px;
-    letter-spacing: .3em; color: var(--dim); text-transform: uppercase;
-  }
-  .field input, .field select {
-    background: var(--surface2); border: 1px solid var(--border);
-    color: var(--offwhite); font-family: var(--mono); font-size: 13px;
-    padding: 8px 12px; outline: none; width: 100%;
-    transition: border-color 0.15s;
-  }
-  .field input:focus, .field select:focus { border-color: var(--primary); }
-  .field select option { background: var(--surface2); }
-
-  /* items table */
-  .items-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 12px;
-  }
-  .items-label {
-    font-family: var(--mono); font-size: 8px;
-    letter-spacing: .32em; color: var(--dim); text-transform: uppercase;
-  }
-  .items-count {
-    font-family: var(--mono); font-size: 9px; color: var(--dim);
-    background: var(--surface2); border: 1px solid var(--border);
-    padding: 2px 8px;
-  }
-
-  .item-row {
-    display: grid;
-    grid-template-columns: 24px 1fr 220px 72px 36px;
-    gap: 6px; align-items: center;
-    padding: 8px 12px;
-    border: 1px solid var(--border);
-    margin-bottom: 4px;
-    background: var(--surface2);
-    transition: border-color 0.12s;
-  }
-  .item-row:hover { border-color: var(--border-h); }
-  .item-row.dragging { opacity: 0.4; }
-
-  .item-num {
-    font-family: var(--mono); font-size: 10px; color: var(--dim);
-    text-align: center; cursor: grab; user-select: none;
-  }
-  .item-num:active { cursor: grabbing; }
-  .item-row input {
-    background: transparent; border: none; border-bottom: 1px solid transparent;
-    color: var(--offwhite); font-family: var(--mono); font-size: 12px;
-    padding: 2px 4px; outline: none; width: 100%;
-    transition: border-color 0.12s;
-  }
-  .item-row input:focus { border-bottom-color: var(--primary); }
-  .item-row input::placeholder { color: rgba(98,117,104,0.5); }
-
-  .dur-display {
-    font-family: var(--mono); font-size: 10px; color: var(--dim);
-    text-align: center;
-  }
-
-  .btn-icon {
-    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
-    background: transparent; border: 1px solid transparent;
-    cursor: pointer; color: var(--dim); font-size: 14px;
-    transition: all 0.12s; border-radius: 2px;
-  }
-  .btn-icon:hover { color: var(--red); border-color: rgba(255,68,51,0.3); background: var(--red-d); }
-
-  .add-item-btn {
-    display: flex; align-items: center; gap: 8px;
-    padding: 10px 16px; margin-top: 8px;
-    background: transparent; border: 1px dashed rgba(97,194,48,0.2);
-    color: var(--dim); font-family: var(--mono); font-size: 10px;
-    letter-spacing: .2em; cursor: pointer; text-transform: uppercase; width: 100%;
-    transition: all 0.12s;
-  }
-  .add-item-btn:hover { border-color: var(--primary); color: var(--primary); }
-
-  /* buttons */
-  .btn {
-    display: flex; align-items: center; gap: 7px;
-    padding: 9px 18px;
-    font-family: var(--mono); font-size: 10px; letter-spacing: .2em;
-    text-transform: uppercase; cursor: pointer; border: 1px solid;
-    transition: all 0.15s; white-space: nowrap;
-  }
-  .btn-primary {
-    background: var(--primary); border-color: var(--primary); color: #050d06;
-    font-weight: 600;
-  }
-  .btn-primary:hover { background: #74d63d; border-color: #74d63d; }
-  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
-  .btn-ghost {
-    background: transparent; border-color: var(--border); color: var(--dim);
-  }
-  .btn-ghost:hover { border-color: var(--border-h); color: var(--offwhite); }
-  .btn-danger {
-    background: transparent; border-color: rgba(255,68,51,0.3); color: var(--red);
-  }
-  .btn-danger:hover { background: var(--red-d); }
-
-  /* publish bar */
-  .publish-bar {
-    position: sticky; bottom: 0;
-    background: var(--surface);
-    border-top: 1px solid var(--border);
-    padding: 14px 32px;
-    display: flex; align-items: center; justify-content: space-between; gap: 16px;
-    z-index: 40;
-  }
-  .publish-status {
-    font-family: var(--mono); font-size: 9px; color: var(--dim); letter-spacing: .15em;
-  }
-  .publish-status.saved { color: var(--primary); }
-  .publish-status.unsaved { color: var(--amber); }
-  .publish-actions { display: flex; gap: 10px; }
-
-  /* toast */
-  .toast {
-    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
-    background: var(--surface); border: 1px solid var(--primary);
-    color: var(--primary); font-family: var(--mono); font-size: 10px;
-    letter-spacing: .25em; padding: 10px 24px; z-index: 200;
-    pointer-events: none;
-    animation: toast-in 0.3s ease forwards;
-  }
-  @keyframes toast-in { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
-
-  /* spinner */
-  .spinner {
-    width: 16px; height: 16px; border: 2px solid rgba(97,194,48,0.2);
-    border-top-color: var(--primary); border-radius: 50%;
-    animation: spin 0.6s linear infinite;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* modal */
-  .modal-overlay {
-    position: fixed; inset: 0; z-index: 100;
-    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
-    display: flex; align-items: center; justify-content: center;
-  }
-  .modal {
-    background: var(--surface); border: 1px solid var(--border);
-    padding: 32px; min-width: 380px; max-width: 480px; width: 100%;
-  }
-  .modal-title {
-    font-family: var(--display); font-size: 28px; letter-spacing: .08em;
-    color: var(--primary); margin-bottom: 8px;
-  }
-  .modal-sub {
-    font-family: var(--mono); font-size: 9px; color: var(--dim);
-    letter-spacing: .2em; text-transform: uppercase; margin-bottom: 24px;
-  }
-  .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
-
-  /* color swatches for block identification */
-  .swatch-grid { display: flex; gap: 8px; flex-wrap: wrap; }
-  .swatch {
-    width: 24px; height: 24px; border-radius: 50%;
-    border: 2px solid transparent; cursor: pointer; transition: border-color 0.12s;
-  }
-  .swatch.selected { border-color: var(--white); }
+.loading-wrap { display:flex; align-items:center; justify-content:center; height:100vh; gap:12px; }
+.loading-text { font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:.3em; text-transform:uppercase; }
 </style>
 </head>
 <body>
 <div id="root"></div>
 
-<!-- React + Babel -->
-<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
-<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
-
-<!-- Firebase -->
-<script type="module">
-  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
-  import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp }
-    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
-
-  // ─────────────────────────────────────────────────────────────
-  //  🔧 PASTE YOUR FIREBASE CONFIG HERE (same as index.html)
-  // ─────────────────────────────────────────────────────────────
+<!-- ④ Single Babel script — Firebase is already on window, no race condition -->
+<script type="text/babel">
+// ─────────────────────────────────────────────────────────────
+//  🔧 PASTE YOUR FIREBASE CONFIG HERE (same as index.html)
+// ─────────────────────────────────────────────────────────────
   const firebaseConfig = {
     apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
   authDomain:        "rfa-legacy.firebaseapp.com",
@@ -420,74 +174,70 @@
   // ─────────────────────────────────────────────────────────────
   const ALLOWED_EMAILS = [
     "hutchinsonj@rfa.org",
-    "teammate@gmail.com",
-    // add more...
-  ];
+  "teammate@gmail.com",
+  // add more...
+];
 
-  const app      = initializeApp(firebaseConfig);
-  const auth     = getAuth(app);
-  const db       = getFirestore(app);
-  const provider = new GoogleAuthProvider();
+// Firebase compat SDK is already on window — init synchronously
+firebase.initializeApp(FIREBASE_CONFIG);
+const auth     = firebase.auth();
+const db       = firebase.firestore();
+const provider = new firebase.auth.GoogleAuthProvider();
 
-  // Expose to React app via window
-  window.__RFA__ = { auth, db, provider, ALLOWED_EMAILS, signInWithPopup, signOut, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, serverTimestamp };
-</script>
+const { useState, useEffect, useRef } = React;
 
-<script type="text/babel">
-const { useState, useEffect, useRef, useCallback } = React;
-
-// ── HELPERS ──────────────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────
 const BLOCK_COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
+const uid = () => Math.random().toString(36).slice(2,9);
+const fmtDur = sec => { const s=parseInt(sec)||0; return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; };
 
-function fmtDur(sec) {
-  const m = Math.floor(sec/60), s = sec % 60;
-  return `${m}:${String(s).padStart(2,'0')}`;
-}
-
-function uid() { return Math.random().toString(36).slice(2,9); }
-
-const SCHEDULE_REF = () => window.__RFA__.doc(window.__RFA__.db, 'broadcast', 'schedule');
-
-// ── DEFAULT BLOCKS ───────────────────────────────────────────
 const DEFAULT_BLOCKS = [
-  { id: uid(), name: '普通話 — Mandarin Chinese', genre: 'Mandarin Chinese', start: '00:00', color: '#61C230',
-    items: [
-      { id: uid(), t: "Hong Kong's Face Readers Reshape the Future", archiveId: 'youtube-MJVRwBrkzsg', dur: 272 },
-      { id: uid(), t: "Hong Kong Protesters Disappointed With Talks", archiveId: 'youtube-hlSlk-vcnRU', dur: 203 },
-      { id: uid(), t: "Chinese Police Quash Month-Long Land Protest", archiveId: 'youtube-jMk4o81qxL0', dur: 156 },
+  { id:uid(), name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230',
+    items:[
+      { id:uid(), t:"Hong Kong's Face Readers Reshape the Future", archiveId:'youtube-MJVRwBrkzsg', dur:272 },
+      { id:uid(), t:"Hong Kong Protesters Disappointed With Talks", archiveId:'youtube-hlSlk-vcnRU', dur:203 },
+      { id:uid(), t:"Chinese Police Quash Month-Long Land Protest", archiveId:'youtube-jMk4o81qxL0', dur:156 },
     ]
   },
-  { id: uid(), name: 'မြန်မာဘာသာ — Burmese', genre: 'Burmese', start: '02:40', color: '#3bb0f5',
-    items: [
-      { id: uid(), t: "Myanmar's Jasmine Garland Sellers Go Back to School", archiveId: 'youtube-9Nma364RVCg', dur: 183 },
-      { id: uid(), t: "Myanmar Insurance Industry Grows As Economy Opens",   archiveId: 'youtube-zbq6lEW9FNU', dur: 214 },
+  { id:uid(), name:'မြန်မာဘာသာ — Burmese', genre:'Burmese', start:'02:40', color:'#3bb0f5',
+    items:[
+      { id:uid(), t:"Myanmar's Jasmine Garland Sellers Go Back to School", archiveId:'youtube-9Nma364RVCg', dur:183 },
+      { id:uid(), t:"Myanmar Insurance Industry Grows As Economy Opens",   archiveId:'youtube-zbq6lEW9FNU', dur:214 },
     ]
   },
 ];
 
-// ── TOAST ─────────────────────────────────────────────────────
-function Toast({ message }) {
-  return <div className="toast">{message}</div>;
+// ── Components ────────────────────────────────────────────────
+const Toast = ({ message }) => <div className="toast">{message}</div>;
+
+function GoogleIcon() {
+  return (
+    <svg viewBox="0 0 48 48">
+      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
+      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
+      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
+      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
+    </svg>
+  );
 }
 
-// ── LOGIN ─────────────────────────────────────────────────────
 function LoginScreen({ onLogin }) {
-  const [error, setError] = useState('');
+  const [error,   setError]   = useState('');
   const [loading, setLoading] = useState(false);
-  const { auth, provider, ALLOWED_EMAILS, signInWithPopup } = window.__RFA__;
 
-  async function handleGoogleSignIn() {
+  async function handleSignIn() {
     setLoading(true); setError('');
     try {
-      const result = await signInWithPopup(auth, provider);
-      const email = result.user.email;
+      const result = await auth.signInWithPopup(provider);
+      const email  = result.user.email;
       if (!ALLOWED_EMAILS.includes(email)) {
-        await window.__RFA__.signOut(auth);
-        setError(`Access denied: ${email} is not on the approved list.`);
-        setLoading(false); return;
+        await auth.signOut();
+        setError(`Access denied — ${email} is not on the approved list.`);
+        setLoading(false);
+        return;
       }
       onLogin(result.user);
-    } catch (e) {
+    } catch(e) {
       setError(e.message);
       setLoading(false);
     }
@@ -502,10 +252,8 @@ function LoginScreen({ onLogin }) {
       <div className="login-card">
         <div className="login-title">Team Sign-In Required</div>
         {error && <div className="login-error">{error}</div>}
-        <button className="btn-google" onClick={handleGoogleSignIn} disabled={loading}>
-          {loading ? <div className="spinner"/> : (
-            <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
-          )}
+        <button className="btn-google" onClick={handleSignIn} disabled={loading}>
+          {loading ? <div className="spinner"/> : <GoogleIcon/>}
           {loading ? 'Signing in…' : 'Continue with Google'}
         </button>
       </div>
@@ -513,16 +261,15 @@ function LoginScreen({ onLogin }) {
   );
 }
 
-// ── ADD BLOCK MODAL ───────────────────────────────────────────
 function AddBlockModal({ onAdd, onClose }) {
-  const [name, setName] = useState('');
+  const [name,  setName]  = useState('');
   const [genre, setGenre] = useState('');
   const [start, setStart] = useState('00:00');
   const [color, setColor] = useState(BLOCK_COLORS[0]);
 
   function submit() {
     if (!name.trim()) return;
-    onAdd({ id: uid(), name: name.trim(), genre: genre.trim() || name.trim(), start, color, items: [] });
+    onAdd({ id:uid(), name:name.trim(), genre:genre.trim()||name.trim(), start, color, items:[] });
     onClose();
   }
 
@@ -547,8 +294,8 @@ function AddBlockModal({ onAdd, onClose }) {
         </div>
         <div className="field" style={{marginTop:4}}>
           <div className="field-label">Block Color</div>
-          <div className="swatch-grid" style={{marginTop:6}}>
-            {BLOCK_COLORS.map(c => (
+          <div className="swatch-grid">
+            {BLOCK_COLORS.map(c=>(
               <div key={c} className={`swatch${color===c?' selected':''}`} style={{background:c}} onClick={()=>setColor(c)}/>
             ))}
           </div>
@@ -562,85 +309,63 @@ function AddBlockModal({ onAdd, onClose }) {
   );
 }
 
-// ── ITEM ROW ─────────────────────────────────────────────────
-function ItemRow({ item, index, onUpdate, onDelete, onDragStart, onDragOver, onDrop }) {
+function ItemRow({ item, index, onUpdate, onDelete, onDragStart, onDrop }) {
   return (
     <div
       className="item-row"
       draggable
       onDragStart={() => onDragStart(index)}
-      onDragOver={e => { e.preventDefault(); onDragOver(index); }}
+      onDragOver={e => e.preventDefault()}
       onDrop={() => onDrop(index)}
     >
       <div className="item-num" title="Drag to reorder">⠿</div>
-      <input
-        value={item.t}
-        onChange={e => onUpdate(index, 't', e.target.value)}
-        placeholder="Video title"
-      />
+      <input value={item.t} onChange={e=>onUpdate(index,'t',e.target.value)} placeholder="Video title"/>
       <input
         value={item.archiveId}
-        onChange={e => onUpdate(index, 'archiveId', e.target.value)}
-        placeholder="Archive.org ID (e.g. youtube-AbCdEf)"
+        onChange={e=>onUpdate(index,'archiveId',e.target.value)}
+        placeholder="Archive.org ID  (e.g. youtube-AbCdEf)"
         style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--dim)'}}
       />
       <div className="dur-display">{fmtDur(item.dur)}</div>
-      <button className="btn-icon" onClick={() => onDelete(index)} title="Remove">✕</button>
+      <button className="btn-icon" onClick={()=>onDelete(index)} title="Remove">✕</button>
     </div>
   );
 }
 
-// ── BLOCK EDITOR ─────────────────────────────────────────────
 function BlockEditor({ block, onChange, onDelete }) {
   const [dragFrom, setDragFrom] = useState(null);
 
-  function updateField(field, val) {
-    onChange({ ...block, [field]: val });
-  }
-
-  function updateItem(idx, field, val) {
-    const items = block.items.map((it, i) => i === idx ? { ...it, [field]: val } : it);
-    onChange({ ...block, items });
-  }
-
-  function addItem() {
-    onChange({ ...block, items: [...block.items, { id: uid(), t: '', archiveId: '', dur: 0 }] });
-  }
-
-  function deleteItem(idx) {
-    onChange({ ...block, items: block.items.filter((_, i) => i !== idx) });
-  }
-
-  function handleDragStart(idx) { setDragFrom(idx); }
-  function handleDragOver(idx) {}
-  function handleDrop(idx) {
-    if (dragFrom === null || dragFrom === idx) return;
-    const items = [...block.items];
-    const [moved] = items.splice(dragFrom, 1);
-    items.splice(idx, 0, moved);
-    onChange({ ...block, items });
+  const updateField = (f,v) => onChange({...block,[f]:v});
+  const updateItem  = (i,f,v) => onChange({...block,items:block.items.map((it,j)=>j===i?{...it,[f]:v}:it)});
+  const addItem     = () => onChange({...block,items:[...block.items,{id:uid(),t:'',archiveId:'',dur:0}]});
+  const deleteItem  = i => onChange({...block,items:block.items.filter((_,j)=>j!==i)});
+  const handleDrop  = i => {
+    if (dragFrom===null||dragFrom===i) return;
+    const items=[...block.items];
+    const [m]=items.splice(dragFrom,1);
+    items.splice(i,0,m);
+    onChange({...block,items});
     setDragFrom(null);
-  }
+  };
 
-  const totalDur = block.items.reduce((s, it) => s + (parseInt(it.dur) || 0), 0);
+  const totalDur = block.items.reduce((s,it)=>s+(parseInt(it.dur)||0),0);
 
   return (
     <div>
       <div className="editor-header">
         <div className="editor-title-group">
-          <div className="editor-title" style={{color: block.color || 'var(--primary)'}}>{block.name || 'Untitled Block'}</div>
-          <div style={{display:'flex', gap:16, alignItems:'center'}}>
-            <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--dim)',letterSpacing:'.2em'}}>
-              UTC {block.start} · {block.items.length} ITEMS · {fmtDur(totalDur)} TOTAL
-            </span>
+          <div className="editor-title" style={{color:block.color||'var(--primary)'}}>
+            {block.name||'Untitled Block'}
           </div>
+          <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--dim)',letterSpacing:'.2em'}}>
+            UTC {block.start} · {block.items.length} ITEMS · {fmtDur(totalDur)} TOTAL
+          </span>
         </div>
         <div className="editor-actions">
           <button className="btn btn-danger" onClick={onDelete}>Delete Block</button>
         </div>
       </div>
 
-      {/* Block metadata */}
       <div className="field-group">
         <div className="field" style={{flex:2}}>
           <div className="field-label">Block Name</div>
@@ -651,200 +376,166 @@ function BlockEditor({ block, onChange, onDelete }) {
           <input value={block.genre} onChange={e=>updateField('genre',e.target.value)} placeholder="Language"/>
         </div>
         <div className="field" style={{maxWidth:110}}>
-          <div className="field-label">UTC Start</div>
-          <input value={block.start} onChange={e=>updateField('start',e.target.value)} placeholder="HH:MM"/>
+          <div className="field-label">UTC Start (HH:MM)</div>
+          <input value={block.start} onChange={e=>updateField('start',e.target.value)} placeholder="00:00"/>
         </div>
         <div className="field" style={{maxWidth:80}}>
           <div className="field-label">Color</div>
           <select value={block.color||BLOCK_COLORS[0]} onChange={e=>updateField('color',e.target.value)}
             style={{background:`${block.color||BLOCK_COLORS[0]}22`,borderColor:block.color||BLOCK_COLORS[0]}}>
-            {BLOCK_COLORS.map(c => <option key={c} value={c} style={{background:'var(--surface2)'}}>{c}</option>)}
+            {BLOCK_COLORS.map(c=><option key={c} value={c} style={{background:'var(--surface2)'}}>{c}</option>)}
           </select>
         </div>
       </div>
 
-      {/* Items */}
       <div className="items-header">
         <div className="items-label">Playlist Items</div>
         <div className="items-count">{block.items.length} items</div>
       </div>
-
-      {/* Column headers */}
       <div style={{display:'grid',gridTemplateColumns:'24px 1fr 220px 72px 36px',gap:6,padding:'4px 12px',marginBottom:4}}>
-        <div/><div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>TITLE</div>
+        <div/>
+        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>TITLE</div>
         <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>ARCHIVE.ORG ID</div>
         <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em',textAlign:'center'}}>DUR</div>
         <div/>
       </div>
-
-      {block.items.map((item, i) => (
-        <ItemRow
-          key={item.id}
-          item={item}
-          index={i}
-          onUpdate={updateItem}
-          onDelete={deleteItem}
-          onDragStart={handleDragStart}
-          onDragOver={handleDragOver}
-          onDrop={handleDrop}
-        />
+      {block.items.map((item,i)=>(
+        <ItemRow key={item.id} item={item} index={i}
+          onUpdate={updateItem} onDelete={deleteItem}
+          onDragStart={setDragFrom} onDrop={handleDrop}/>
       ))}
-
       <button className="add-item-btn" onClick={addItem}>+ Add Item</button>
 
       <div style={{marginTop:20,padding:'12px 16px',background:'var(--surface2)',border:'1px solid var(--border)'}}>
-        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.3em',marginBottom:8}}>
-          DURATION FIELD NOTE
-        </div>
+        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.3em',marginBottom:8}}>DURATION NOTE</div>
         <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',lineHeight:1.7}}>
-          Duration (<code style={{color:'var(--primary)'}}>dur</code>) is in seconds. You can get exact durations from{' '}
-          <span style={{color:'var(--offwhite)'}}>archive.org/metadata/&lt;id&gt;</span> under the file's length field.
-          Items automatically loop within each block's time window.
+          Duration is in seconds. Find it at{' '}
+          <span style={{color:'var(--offwhite)'}}>archive.org/metadata/&lt;id&gt;</span>{' '}
+          under the file's <code style={{color:'var(--primary)'}}>length</code> field.
+          Items loop within each block's time window automatically.
         </div>
       </div>
     </div>
   );
 }
 
-// ── MAIN APP ─────────────────────────────────────────────────
 function App() {
-  const [user, setUser] = useState(null);
-  const [authChecked, setAuthChecked] = useState(false);
-  const [blocks, setBlocks] = useState([]);
-  const [activeId, setActiveId] = useState(null);
-  const [isDirty, setIsDirty] = useState(false);
-  const [isSaving, setIsSaving] = useState(false);
-  const [isLoading, setIsLoading] = useState(true);
-  const [toast, setToast] = useState(null);
+  const [user,         setUser]         = useState(null);
+  const [authChecked,  setAuthChecked]  = useState(false);
+  const [blocks,       setBlocks]       = useState([]);
+  const [activeId,     setActiveId]     = useState(null);
+  const [isDirty,      setIsDirty]      = useState(false);
+  const [isSaving,     setIsSaving]     = useState(false);
+  const [isLoading,    setIsLoading]    = useState(true);
+  const [toast,        setToast]        = useState(null);
   const [showAddBlock, setShowAddBlock] = useState(false);
-  const [liveStatus, setLiveStatus] = useState('connecting');
-  const [lastSaved, setLastSaved] = useState(null);
-  const toastTimer = useRef(null);
+  const [liveStatus,   setLiveStatus]   = useState('connecting');
+  const [lastSaved,    setLastSaved]    = useState(null);
+  const toastTimer     = useRef(null);
+  const firestoreUnsub = useRef(null);
 
-  const { auth, onAuthStateChanged, signOut, ALLOWED_EMAILS, onSnapshot, doc, db, setDoc, serverTimestamp } = window.__RFA__;
-
-  // Auth state
+  // Auth listener
   useEffect(() => {
-    return onAuthStateChanged(auth, u => {
+    return auth.onAuthStateChanged(u => {
       if (u && ALLOWED_EMAILS.includes(u.email)) {
         setUser(u);
       } else {
         setUser(null);
+        setIsLoading(false);
       }
       setAuthChecked(true);
     });
   }, []);
 
-  // Load schedule from Firestore
+  // Firestore listener
   useEffect(() => {
     if (!user) return;
-    const ref = window.__RFA__.doc(window.__RFA__.db, 'broadcast', 'schedule');
-    const unsub = onSnapshot(ref, snap => {
-      setLiveStatus('live');
-      if (snap.exists()) {
-        const data = snap.data();
-        if (data.blocks) {
-          // Ensure all items have local IDs for React keys
-          const hydrated = data.blocks.map(b => ({
-            ...b,
-            id: b.id || uid(),
-            items: (b.items || []).map(it => ({ ...it, id: it.id || uid() }))
-          }));
-          setBlocks(hydrated);
-          if (!activeId && hydrated.length > 0) setActiveId(hydrated[0].id);
+    if (firestoreUnsub.current) firestoreUnsub.current();
+
+    firestoreUnsub.current = db.collection('broadcast').doc('schedule')
+      .onSnapshot(snap => {
+        setLiveStatus('live');
+        if (snap.exists) {
+          const data = snap.data();
+          if (data && Array.isArray(data.blocks)) {
+            const hydrated = data.blocks.map(b=>({
+              ...b, id:b.id||uid(),
+              items:(b.items||[]).map(it=>({...it,id:it.id||uid()}))
+            }));
+            setBlocks(hydrated);
+            setActiveId(id => id || (hydrated[0]&&hydrated[0].id) || null);
+          }
+        } else {
+          setBlocks(DEFAULT_BLOCKS);
+          setActiveId(DEFAULT_BLOCKS[0].id);
         }
-      } else {
-        // No schedule yet — seed with defaults
-        setBlocks(DEFAULT_BLOCKS);
-        setActiveId(DEFAULT_BLOCKS[0].id);
-      }
-      setIsLoading(false);
-      setIsDirty(false);
-    }, err => {
-      setLiveStatus('error');
-      console.error('Firestore error:', err);
-      setIsLoading(false);
-    });
-    return unsub;
+        setIsLoading(false);
+        setIsDirty(false);
+      }, err => {
+        console.error('Firestore error:', err);
+        setLiveStatus('error');
+        setIsLoading(false);
+      });
+
+    return () => { if (firestoreUnsub.current) firestoreUnsub.current(); };
   }, [user]);
 
-  function showToast(msg) {
+  const showToast = msg => {
     setToast(msg);
     if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(() => setToast(null), 3000);
-  }
+    toastTimer.current = setTimeout(()=>setToast(null), 3500);
+  };
 
-  function handleBlockChange(updated) {
-    setBlocks(prev => prev.map(b => b.id === updated.id ? updated : b));
-    setIsDirty(true);
-  }
-
-  function handleAddBlock(block) {
-    setBlocks(prev => [...prev, block]);
-    setActiveId(block.id);
-    setIsDirty(true);
-  }
-
-  function handleDeleteBlock(id) {
-    const next = blocks.filter(b => b.id !== id);
+  const handleBlockChange = updated => { setBlocks(p=>p.map(b=>b.id===updated.id?updated:b)); setIsDirty(true); };
+  const handleAddBlock    = block   => { setBlocks(p=>[...p,block]); setActiveId(block.id); setIsDirty(true); };
+  const handleDeleteBlock = id      => {
+    const next = blocks.filter(b=>b.id!==id);
     setBlocks(next);
-    setActiveId(next.length > 0 ? next[next.length - 1].id : null);
+    setActiveId(next.length ? next[next.length-1].id : null);
     setIsDirty(true);
-  }
+  };
 
   async function publishSchedule() {
     setIsSaving(true);
     try {
-      // Strip local-only 'id' fields from items before saving — keep archiveId/t/dur
-      const toSave = blocks.map(b => ({
-        id: b.id,
-        name: b.name,
-        genre: b.genre,
-        start: b.start,
-        color: b.color || BLOCK_COLORS[0],
-        items: b.items.map(it => ({
-          id: it.id,
-          t: it.t,
-          archiveId: it.archiveId,
-          dur: parseInt(it.dur) || 0,
-        }))
+      const toSave = blocks.map(b=>({
+        id:b.id, name:b.name, genre:b.genre, start:b.start, color:b.color||BLOCK_COLORS[0],
+        items:b.items.map(it=>({ id:it.id, t:it.t, archiveId:it.archiveId, dur:parseInt(it.dur)||0 }))
       }));
-
-      const ref = window.__RFA__.doc(window.__RFA__.db, 'broadcast', 'schedule');
-      await window.__RFA__.setDoc(ref, {
+      await db.collection('broadcast').doc('schedule').set({
         blocks: toSave,
-        publishedAt: serverTimestamp(),
+        publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
         publishedBy: user.email,
       });
-
       setIsDirty(false);
       setLastSaved(new Date());
       showToast('✓ SCHEDULE PUBLISHED — LIVE IN ~1 SECOND');
-    } catch (e) {
+    } catch(e) {
       showToast('✗ PUBLISH FAILED: ' + e.message);
     }
     setIsSaving(false);
   }
 
   async function handleSignOut() {
-    await signOut(auth);
-    setUser(null);
+    if (firestoreUnsub.current) firestoreUnsub.current();
+    await auth.signOut();
+    setUser(null); setBlocks([]); setActiveId(null);
   }
 
-  // ── RENDER ────────────────────────────────────────────────
   if (!authChecked) {
-    return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}>
-      <div className="spinner"/>
-    </div>;
+    return <div className="loading-wrap"><div className="spinner"/><span className="loading-text">Initialising…</span></div>;
   }
-
   if (!user) return <LoginScreen onLogin={setUser}/>;
 
-  const activeBlock = blocks.find(b => b.id === activeId);
+  const activeBlock   = blocks.find(b=>b.id===activeId);
+  const sortedBlocks  = blocks.slice().sort((a,b)=>{
+    const [ah,am]=a.start.split(':').map(Number);
+    const [bh,bm]=b.start.split(':').map(Number);
+    return (ah*60+am)-(bh*60+bm);
+  });
 
   return (
     <div className="app">
-      {/* Top bar */}
       <div className="topbar">
         <div className="topbar-left">
           <div className="topbar-logo">RFA</div>
@@ -853,56 +544,41 @@ function App() {
         <div className="topbar-right">
           <div className={`status-pill${liveStatus==='live'?' live':''}`}>
             <div className="status-dot"/>
-            {liveStatus === 'live' ? 'FIRESTORE LIVE' : liveStatus === 'error' ? 'OFFLINE' : 'CONNECTING'}
+            {liveStatus==='live'?'FIRESTORE LIVE':liveStatus==='error'?'OFFLINE':'CONNECTING'}
           </div>
           <div className="user-badge">
             {user.photoURL
               ? <img className="user-avatar" src={user.photoURL} alt=""/>
-              : <div className="user-avatar-placeholder">{(user.email||'?')[0].toUpperCase()}</div>
+              : <div className="user-avatar-ph">{(user.email||'?')[0].toUpperCase()}</div>
             }
             <span>{user.email}</span>
           </div>
-          <button className="btn btn-ghost" style={{padding:'6px 12px',fontSize:'9px'}} onClick={handleSignOut}>Sign Out</button>
+          <button className="btn btn-ghost" style={{padding:'6px 12px',fontSize:'9px'}} onClick={handleSignOut}>
+            Sign Out
+          </button>
         </div>
       </div>
 
       <div className="main">
-        {/* Sidebar */}
         <div className="sidebar">
           <div className="sidebar-section">
-            <div className="sidebar-heading">Programming Blocks — {blocks.length}</div>
+            <div className="sidebar-heading">Blocks — {blocks.length}</div>
             <div className="block-list">
-              {blocks
-                .slice()
-                .sort((a,b) => {
-                  const [ah,am] = a.start.split(':').map(Number);
-                  const [bh,bm] = b.start.split(':').map(Number);
-                  return (ah*60+am) - (bh*60+bm);
-                })
-                .map(b => (
-                  <div
-                    key={b.id}
-                    className={`block-item${activeId===b.id?' active':''}`}
-                    onClick={() => setActiveId(b.id)}
-                  >
-                    <div className="block-dot" style={{background: b.color || '#61C230'}}/>
-                    <div className="block-info">
-                      <div className="block-name">{b.name}</div>
-                      <div className="block-meta">UTC {b.start}</div>
-                    </div>
-                    <div className="block-count">{b.items.length}</div>
+              {sortedBlocks.map(b=>(
+                <div key={b.id} className={`block-item${activeId===b.id?' active':''}`} onClick={()=>setActiveId(b.id)}>
+                  <div className="block-dot" style={{background:b.color||'#61C230'}}/>
+                  <div className="block-info">
+                    <div className="block-name">{b.name}</div>
+                    <div className="block-meta">UTC {b.start}</div>
                   </div>
-                ))
-              }
+                  <div className="block-count">{b.items.length}</div>
+                </div>
+              ))}
             </div>
           </div>
-
-          <button className="sidebar-add-btn" onClick={() => setShowAddBlock(true)}>
-            + New Block
-          </button>
+          <button className="sidebar-add-btn" onClick={()=>setShowAddBlock(true)}>+ New Block</button>
         </div>
 
-        {/* Editor */}
         <div className="editor">
           {isLoading ? (
             <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:12}}>
@@ -910,12 +586,7 @@ function App() {
               <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',letterSpacing:'.2em'}}>LOADING FROM FIRESTORE…</span>
             </div>
           ) : activeBlock ? (
-            <BlockEditor
-              key={activeBlock.id}
-              block={activeBlock}
-              onChange={handleBlockChange}
-              onDelete={() => handleDeleteBlock(activeBlock.id)}
-            />
+            <BlockEditor key={activeBlock.id} block={activeBlock} onChange={handleBlockChange} onDelete={()=>handleDeleteBlock(activeBlock.id)}/>
           ) : (
             <div className="editor-empty">
               <div className="editor-empty-icon">📡</div>
@@ -925,10 +596,9 @@ function App() {
         </div>
       </div>
 
-      {/* Publish bar */}
       <div className="publish-bar">
         <div>
-          <div className={`publish-status ${isDirty ? 'unsaved' : 'saved'}`}>
+          <div className={`publish-status ${isDirty?'unsaved':'saved'}`}>
             {isDirty ? '● UNSAVED CHANGES' : lastSaved ? `✓ SAVED ${lastSaved.toLocaleTimeString()}` : '✓ IN SYNC WITH FIRESTORE'}
           </div>
           <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',marginTop:4,letterSpacing:'.15em'}}>
@@ -936,21 +606,16 @@ function App() {
           </div>
         </div>
         <div className="publish-actions">
-          <button className="btn btn-ghost" onClick={() => { setIsDirty(false); showToast('Changes discarded'); }}>
+          <button className="btn btn-ghost" onClick={()=>{setIsDirty(false);showToast('Changes discarded');}} disabled={!isDirty}>
             Discard
           </button>
-          <button
-            className="btn btn-primary"
-            onClick={publishSchedule}
-            disabled={isSaving || !isDirty}
-          >
+          <button className="btn btn-primary" onClick={publishSchedule} disabled={isSaving||!isDirty}>
             {isSaving ? <><div className="spinner"/>Publishing…</> : '⬆ Publish to Live'}
           </button>
         </div>
       </div>
 
-      {/* Modals & toasts */}
-      {showAddBlock && <AddBlockModal onAdd={handleAddBlock} onClose={() => setShowAddBlock(false)}/>}
+      {showAddBlock && <AddBlockModal onAdd={handleAddBlock} onClose={()=>setShowAddBlock(false)}/>}
       {toast && <Toast message={toast}/>}
     </div>
   );
