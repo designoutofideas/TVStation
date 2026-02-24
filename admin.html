@@ -6,162 +6,159 @@
 <title>RFA Admin — Schedule Editor</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 
-<!-- ① React (global, sync) -->
+<!-- React — global window.React / window.ReactDOM -->
 <script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
 <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
 
-<!-- ② Firebase COMPAT (global, sync — no ES modules, no race condition) -->
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-auth-compat.js"></script>
-<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
-
-<!-- ③ Babel (transforms JSX) -->
-<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+<!-- Firebase compat (global window.firebase, fully synchronous) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 
 <style>
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-:root {
-  --primary:   #61C230;
-  --primary-d: #4a9624;
-  --primary-g: rgba(97,194,48,0.08);
-  --light:     #CCEDD0;
-  --dim:       #627568;
-  --offwhite:  #F0F6F0;
-  --white:     #FFFFFF;
-  --bg:        #080e09;
-  --surface:   #0e1a10;
-  --surface2:  #141f15;
-  --border:    rgba(97,194,48,0.14);
-  --border-h:  rgba(97,194,48,0.35);
-  --red:       #ff4433;
-  --red-d:     rgba(255,68,51,0.12);
-  --amber:     #f5a623;
-  --mono: 'IBM Plex Mono', monospace;
-  --sans: 'IBM Plex Sans', sans-serif;
-  --display: 'Bebas Neue', cursive;
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --p:#61C230; --pd:#4a9624; --pg:rgba(97,194,48,0.08);
+  --dim:#627568; --off:#F0F6F0; --wh:#FFFFFF;
+  --bg:#080e09; --s1:#0e1a10; --s2:#141f15;
+  --b:rgba(97,194,48,0.14); --bh:rgba(97,194,48,0.35);
+  --red:#ff4433; --redd:rgba(255,68,51,0.12); --amb:#f5a623;
+  --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --disp:'Bebas Neue',cursive;
 }
-html, body, #root { width:100%; min-height:100vh; background:var(--bg); color:var(--offwhite); font-family:var(--sans); font-size:14px; }
-::-webkit-scrollbar { width:4px; }
-::-webkit-scrollbar-track { background:transparent; }
-::-webkit-scrollbar-thumb { background:var(--border); border-radius:2px; }
+html,body,#root{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font-family:var(--sans);font-size:14px}
+::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
 
-.login-wrap { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:100vh; gap:32px; background:radial-gradient(ellipse at 50% 30%,rgba(97,194,48,0.06) 0%,transparent 70%); }
-.login-logo { font-family:var(--display); font-size:64px; letter-spacing:.12em; color:var(--primary); text-shadow:0 0 40px rgba(97,194,48,0.4); line-height:1; }
-.login-sub { font-family:var(--mono); font-size:9px; letter-spacing:.4em; color:var(--dim); text-transform:uppercase; margin-top:-20px; }
-.login-card { background:var(--surface); border:1px solid var(--border); padding:40px 48px; display:flex; flex-direction:column; align-items:center; gap:20px; min-width:360px; }
-.login-title { font-family:var(--mono); font-size:10px; letter-spacing:.32em; color:var(--dim); text-transform:uppercase; }
-.login-error { font-family:var(--mono); font-size:10px; color:var(--red); letter-spacing:.12em; text-align:center; background:var(--red-d); border:1px solid rgba(255,68,51,0.2); padding:8px 16px; width:100%; }
-.btn-google { display:flex; align-items:center; gap:12px; background:var(--white); color:#333; border:none; cursor:pointer; padding:12px 24px; font-family:var(--sans); font-size:14px; font-weight:500; width:100%; justify-content:center; transition:opacity 0.15s; }
-.btn-google:hover { opacity:0.9; }
-.btn-google:disabled { opacity:0.5; cursor:not-allowed; }
-.btn-google svg { width:18px; height:18px; flex-shrink:0; }
+/* LOGIN */
+.lw{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:32px;background:radial-gradient(ellipse at 50% 30%,rgba(97,194,48,.06) 0%,transparent 70%)}
+.ll{font-family:var(--disp);font-size:64px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 40px rgba(97,194,48,.4);line-height:1}
+.ls{font-family:var(--mono);font-size:9px;letter-spacing:.4em;color:var(--dim);text-transform:uppercase;margin-top:-20px}
+.lc{background:var(--s1);border:1px solid var(--b);padding:40px 48px;display:flex;flex-direction:column;align-items:center;gap:20px;min-width:360px}
+.lt{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
+.le{font-family:var(--mono);font-size:10px;color:var(--red);letter-spacing:.12em;text-align:center;background:var(--redd);border:1px solid rgba(255,68,51,.2);padding:8px 16px;width:100%}
+.bg{display:flex;align-items:center;gap:12px;background:var(--wh);color:#333;border:none;cursor:pointer;padding:12px 24px;font-family:var(--sans);font-size:14px;font-weight:500;width:100%;justify-content:center;transition:opacity .15s}
+.bg:hover{opacity:.9}.bg:disabled{opacity:.5;cursor:not-allowed}
+.bg svg{width:18px;height:18px;flex-shrink:0}
 
-.app { display:flex; flex-direction:column; min-height:100vh; }
-.topbar { display:flex; align-items:center; justify-content:space-between; padding:0 28px; height:56px; background:var(--surface); border-bottom:1px solid var(--border); position:sticky; top:0; z-index:50; }
-.topbar-left { display:flex; align-items:center; gap:16px; }
-.topbar-logo { font-family:var(--display); font-size:28px; letter-spacing:.12em; color:var(--primary); text-shadow:0 0 16px rgba(97,194,48,0.4); line-height:1; }
-.topbar-label { font-family:var(--mono); font-size:8px; letter-spacing:.3em; color:var(--dim); text-transform:uppercase; border-left:1px solid var(--border); padding-left:16px; }
-.topbar-right { display:flex; align-items:center; gap:12px; }
-.user-badge { display:flex; align-items:center; gap:8px; font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:.1em; }
-.user-avatar { width:26px; height:26px; border-radius:50%; border:1px solid var(--border); object-fit:cover; }
-.user-avatar-ph { width:26px; height:26px; border-radius:50%; background:var(--primary-d); display:flex; align-items:center; justify-content:center; font-family:var(--mono); font-size:10px; color:var(--white); }
-.status-pill { display:flex; align-items:center; gap:6px; font-family:var(--mono); font-size:9px; letter-spacing:.2em; color:var(--dim); text-transform:uppercase; background:var(--surface2); border:1px solid var(--border); padding:4px 10px; }
-.status-pill.live { color:var(--primary); border-color:rgba(97,194,48,0.3); }
-.status-dot { width:6px; height:6px; border-radius:50%; background:var(--dim); }
-.status-pill.live .status-dot { background:var(--primary); box-shadow:0 0 6px var(--primary); animation:blink 1.4s infinite; }
-@keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
+/* APP */
+.app{display:flex;flex-direction:column;min-height:100vh}
 
-.main { display:flex; flex:1; }
-.sidebar { width:280px; flex-shrink:0; background:var(--surface); border-right:1px solid var(--border); display:flex; flex-direction:column; position:sticky; top:56px; height:calc(100vh - 56px); overflow-y:auto; }
-.sidebar-section { padding:20px 16px 12px; }
-.sidebar-heading { font-family:var(--mono); font-size:8px; letter-spacing:.35em; color:var(--dim); text-transform:uppercase; margin-bottom:12px; }
-.block-list { display:flex; flex-direction:column; gap:2px; }
-.block-item { display:flex; align-items:center; gap:10px; padding:9px 12px; cursor:pointer; border:1px solid transparent; transition:all 0.12s; border-radius:2px; }
-.block-item:hover { background:var(--primary-g); border-color:var(--border); }
-.block-item.active { background:rgba(97,194,48,0.1); border-color:rgba(97,194,48,0.3); }
-.block-dot { width:8px; height:8px; border-radius:50%; flex-shrink:0; }
-.block-info { flex:1; min-width:0; }
-.block-name { font-family:var(--sans); font-size:12px; font-weight:500; color:var(--offwhite); white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
-.block-meta { font-family:var(--mono); font-size:9px; color:var(--dim); margin-top:1px; }
-.block-count { font-family:var(--mono); font-size:9px; color:var(--dim); background:var(--surface2); border:1px solid var(--border); padding:2px 6px; border-radius:2px; flex-shrink:0; }
-.sidebar-add-btn { margin:0 16px 16px; display:flex; align-items:center; justify-content:center; gap:8px; padding:10px; background:transparent; border:1px dashed rgba(97,194,48,0.25); color:var(--dim); font-family:var(--mono); font-size:10px; letter-spacing:.2em; cursor:pointer; text-transform:uppercase; transition:all 0.12s; }
-.sidebar-add-btn:hover { border-color:var(--primary); color:var(--primary); }
+/* TOPBAR */
+.tb{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;background:var(--s1);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:50}
+.tbl{display:flex;align-items:center;gap:16px}
+.tlo{font-family:var(--disp);font-size:28px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 16px rgba(97,194,48,.4);line-height:1}
+.tla{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;border-left:1px solid var(--b);padding-left:16px}
+.tbr{display:flex;align-items:center;gap:12px}
+.ub{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em}
+.ua{width:26px;height:26px;border-radius:50%;border:1px solid var(--b);object-fit:cover}
+.uap{width:26px;height:26px;border-radius:50%;background:var(--pd);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--wh)}
+.sp{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;background:var(--s2);border:1px solid var(--b);padding:4px 10px}
+.sp.live{color:var(--p);border-color:rgba(97,194,48,.3)}
+.sd{width:6px;height:6px;border-radius:50%;background:var(--dim)}
+.sp.live .sd{background:var(--p);box-shadow:0 0 6px var(--p);animation:blk 1.4s infinite}
+@keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}
 
-.editor { flex:1; padding:28px 32px; overflow-y:auto; }
-.editor-empty { display:flex; flex-direction:column; align-items:center; justify-content:center; height:100%; gap:16px; opacity:0.4; }
-.editor-empty-icon { font-size:48px; line-height:1; }
-.editor-empty-text { font-family:var(--mono); font-size:10px; letter-spacing:.3em; color:var(--dim); text-transform:uppercase; }
-.editor-header { display:flex; align-items:flex-start; justify-content:space-between; margin-bottom:28px; gap:20px; }
-.editor-title-group { display:flex; flex-direction:column; gap:8px; flex:1; }
-.editor-title { font-family:var(--display); font-size:36px; letter-spacing:.08em; color:var(--primary); line-height:1; }
-.editor-actions { display:flex; gap:8px; flex-shrink:0; }
-.field-group { display:flex; gap:12px; margin-bottom:20px; flex-wrap:wrap; }
-.field { display:flex; flex-direction:column; gap:6px; flex:1; min-width:140px; }
-.field-label { font-family:var(--mono); font-size:8px; letter-spacing:.3em; color:var(--dim); text-transform:uppercase; }
-.field input, .field select { background:var(--surface2); border:1px solid var(--border); color:var(--offwhite); font-family:var(--mono); font-size:13px; padding:8px 12px; outline:none; width:100%; transition:border-color 0.15s; }
-.field input:focus, .field select:focus { border-color:var(--primary); }
-.field select option { background:var(--surface2); }
-.items-header { display:flex; align-items:center; justify-content:space-between; margin-bottom:12px; }
-.items-label { font-family:var(--mono); font-size:8px; letter-spacing:.32em; color:var(--dim); text-transform:uppercase; }
-.items-count { font-family:var(--mono); font-size:9px; color:var(--dim); background:var(--surface2); border:1px solid var(--border); padding:2px 8px; }
-.item-row { display:grid; grid-template-columns:24px 1fr 220px 72px 36px; gap:6px; align-items:center; padding:8px 12px; border:1px solid var(--border); margin-bottom:4px; background:var(--surface2); transition:border-color 0.12s; }
-.item-row:hover { border-color:var(--border-h); }
-.item-num { font-family:var(--mono); font-size:10px; color:var(--dim); text-align:center; cursor:grab; user-select:none; }
-.item-num:active { cursor:grabbing; }
-.item-row input { background:transparent; border:none; border-bottom:1px solid transparent; color:var(--offwhite); font-family:var(--mono); font-size:12px; padding:2px 4px; outline:none; width:100%; transition:border-color 0.12s; }
-.item-row input:focus { border-bottom-color:var(--primary); }
-.item-row input::placeholder { color:rgba(98,117,104,0.5); }
-.dur-display { font-family:var(--mono); font-size:10px; color:var(--dim); text-align:center; }
-.btn-icon { width:28px; height:28px; display:flex; align-items:center; justify-content:center; background:transparent; border:1px solid transparent; cursor:pointer; color:var(--dim); font-size:14px; transition:all 0.12s; border-radius:2px; }
-.btn-icon:hover { color:var(--red); border-color:rgba(255,68,51,0.3); background:var(--red-d); }
-.add-item-btn { display:flex; align-items:center; gap:8px; padding:10px 16px; margin-top:8px; background:transparent; border:1px dashed rgba(97,194,48,0.2); color:var(--dim); font-family:var(--mono); font-size:10px; letter-spacing:.2em; cursor:pointer; text-transform:uppercase; width:100%; transition:all 0.12s; }
-.add-item-btn:hover { border-color:var(--primary); color:var(--primary); }
+/* MAIN */
+.main{display:flex;flex:1}
 
-.btn { display:flex; align-items:center; gap:7px; padding:9px 18px; font-family:var(--mono); font-size:10px; letter-spacing:.2em; text-transform:uppercase; cursor:pointer; border:1px solid; transition:all 0.15s; white-space:nowrap; }
-.btn-primary { background:var(--primary); border-color:var(--primary); color:#050d06; font-weight:600; }
-.btn-primary:hover { background:#74d63d; border-color:#74d63d; }
-.btn-primary:disabled { opacity:0.4; cursor:not-allowed; }
-.btn-ghost { background:transparent; border-color:var(--border); color:var(--dim); }
-.btn-ghost:hover { border-color:var(--border-h); color:var(--offwhite); }
-.btn-ghost:disabled { opacity:0.4; cursor:not-allowed; }
-.btn-danger { background:transparent; border-color:rgba(255,68,51,0.3); color:var(--red); }
-.btn-danger:hover { background:var(--red-d); }
+/* SIDEBAR */
+.sb{width:280px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+.sbs{padding:20px 16px 12px}
+.sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:12px}
+.bl{display:flex;flex-direction:column;gap:2px}
+.bi{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border:1px solid transparent;transition:all .12s;border-radius:2px}
+.bi:hover{background:var(--pg);border-color:var(--b)}
+.bi.act{background:rgba(97,194,48,.1);border-color:rgba(97,194,48,.3)}
+.bdo{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.bin{flex:1;min-width:0}
+.bn{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:1px}
+.bc{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 6px;border-radius:2px;flex-shrink:0}
+.sadd{margin:0 16px 16px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:transparent;border:1px dashed rgba(97,194,48,.25);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;transition:all .12s}
+.sadd:hover{border-color:var(--p);color:var(--p)}
 
-.publish-bar { position:sticky; bottom:0; background:var(--surface); border-top:1px solid var(--border); padding:14px 32px; display:flex; align-items:center; justify-content:space-between; gap:16px; z-index:40; }
-.publish-status { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:.15em; }
-.publish-status.saved { color:var(--primary); }
-.publish-status.unsaved { color:var(--amber); }
-.publish-actions { display:flex; gap:10px; }
+/* EDITOR */
+.ed{flex:1;padding:28px 32px;overflow-y:auto}
+.ee{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;opacity:.4}
+.eei{font-size:48px;line-height:1}
+.eet{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+.eh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;gap:20px}
+.etg{display:flex;flex-direction:column;gap:8px;flex:1}
+.et{font-family:var(--disp);font-size:36px;letter-spacing:.08em;line-height:1}
+.ea{display:flex;gap:8px;flex-shrink:0}
+.fg{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.fi{display:flex;flex-direction:column;gap:6px;flex:1;min-width:140px}
+.fl{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+.fi input,.fi select{background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:8px 12px;outline:none;width:100%;transition:border-color .15s}
+.fi input:focus,.fi select:focus{border-color:var(--p)}
+.fi select option{background:var(--s2)}
+.ih{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
+.il{font-family:var(--mono);font-size:8px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
+.ic{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 8px}
+.ir{display:grid;grid-template-columns:24px 1fr 200px 64px 32px;gap:6px;align-items:center;padding:8px 12px;border:1px solid var(--b);margin-bottom:4px;background:var(--s2);transition:border-color .12s}
+.ir:hover{border-color:var(--bh)}
+.in{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;cursor:grab;user-select:none}
+.ir input{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--off);font-family:var(--mono);font-size:12px;padding:2px 4px;outline:none;width:100%;transition:border-color .12s}
+.ir input:focus{border-bottom-color:var(--p)}
+.ir input::placeholder{color:rgba(98,117,104,.5)}
+.dd{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
+.bic{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;cursor:pointer;color:var(--dim);font-size:14px;transition:all .12s;border-radius:2px}
+.bic:hover{color:var(--red);border-color:rgba(255,68,51,.3);background:var(--redd)}
+.aib{display:flex;align-items:center;gap:8px;padding:10px 16px;margin-top:8px;background:transparent;border:1px dashed rgba(97,194,48,.2);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;width:100%;transition:all .12s}
+.aib:hover{border-color:var(--p);color:var(--p)}
 
-.toast { position:fixed; bottom:80px; left:50%; transform:translateX(-50%); background:var(--surface); border:1px solid var(--primary); color:var(--primary); font-family:var(--mono); font-size:10px; letter-spacing:.25em; padding:10px 24px; z-index:200; pointer-events:none; animation:toast-in 0.3s ease forwards; }
-@keyframes toast-in { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+/* BUTTONS */
+.btn{display:flex;align-items:center;gap:7px;padding:9px 18px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap}
+.bp{background:var(--p);border-color:var(--p);color:#050d06;font-weight:600}
+.bp:hover{background:#74d63d;border-color:#74d63d}
+.bp:disabled{opacity:.4;cursor:not-allowed}
+.bg2{background:transparent;border-color:var(--b);color:var(--dim)}
+.bg2:hover{border-color:var(--bh);color:var(--off)}
+.bg2:disabled{opacity:.4;cursor:not-allowed}
+.bdr{background:transparent;border-color:rgba(255,68,51,.3);color:var(--red)}
+.bdr:hover{background:var(--redd)}
 
-.spinner { width:16px; height:16px; border:2px solid rgba(97,194,48,0.2); border-top-color:var(--primary); border-radius:50%; animation:spin 0.6s linear infinite; display:inline-block; }
-@keyframes spin { to { transform:rotate(360deg); } }
+/* PUBLISH BAR */
+.pb{position:sticky;bottom:0;background:var(--s1);border-top:1px solid var(--b);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:40}
+.ps{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.15em}
+.ps.saved{color:var(--p)}.ps.unsaved{color:var(--amb)}
+.pa{display:flex;gap:10px}
 
-.modal-overlay { position:fixed; inset:0; z-index:100; background:rgba(0,0,0,0.7); backdrop-filter:blur(4px); display:flex; align-items:center; justify-content:center; }
-.modal { background:var(--surface); border:1px solid var(--border); padding:32px; min-width:380px; max-width:480px; width:100%; }
-.modal-title { font-family:var(--display); font-size:28px; letter-spacing:.08em; color:var(--primary); margin-bottom:8px; }
-.modal-sub { font-family:var(--mono); font-size:9px; color:var(--dim); letter-spacing:.2em; text-transform:uppercase; margin-bottom:24px; }
-.modal-actions { display:flex; gap:10px; margin-top:24px; justify-content:flex-end; }
-.swatch-grid { display:flex; gap:8px; flex-wrap:wrap; margin-top:6px; }
-.swatch { width:24px; height:24px; border-radius:50%; border:2px solid transparent; cursor:pointer; transition:border-color 0.12s; }
-.swatch.selected { border-color:var(--white); }
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.25em;padding:10px 24px;z-index:200;pointer-events:none;animation:tst .3s ease forwards}
+@keyframes tst{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 
-.loading-wrap { display:flex; align-items:center; justify-content:center; height:100vh; gap:12px; }
-.loading-text { font-family:var(--mono); font-size:10px; color:var(--dim); letter-spacing:.3em; text-transform:uppercase; }
+/* SPINNER */
+.spin{width:16px;height:16px;border:2px solid rgba(97,194,48,.2);border-top-color:var(--p);border-radius:50%;animation:spn .6s linear infinite;display:inline-block;flex-shrink:0}
+@keyframes spn{to{transform:rotate(360deg)}}
+
+/* MODAL */
+.mo{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center}
+.md{background:var(--s1);border:1px solid var(--b);padding:32px;min-width:380px;max-width:480px;width:100%}
+.mt{font-family:var(--disp);font-size:28px;letter-spacing:.08em;color:var(--p);margin-bottom:8px}
+.ms{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-bottom:24px}
+.ma{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+.swg{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sw{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .12s}
+.sw.sel{border-color:var(--wh)}
+
+.ldw{display:flex;align-items:center;justify-content:center;height:100vh;gap:12px}
+.ldt{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.3em;text-transform:uppercase}
+
+.note{margin-top:20px;padding:12px 16px;background:var(--s2);border:1px solid var(--b)}
+.noteh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.3em;margin-bottom:8px}
+.noteb{font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.7}
+.noteb code{color:var(--p)}
 </style>
 </head>
 <body>
 <div id="root"></div>
 
-<!-- ④ Single Babel script — Firebase is already on window, no race condition -->
-<script type="text/babel">
+<script>
 // ─────────────────────────────────────────────────────────────
 //  🔧 PASTE YOUR FIREBASE CONFIG HERE (same as index.html)
 // ─────────────────────────────────────────────────────────────
-  const firebaseConfig = {
-    apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
+firebase.initializeApp({
+  apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
   authDomain:        "rfa-legacy.firebaseapp.com",
   projectId:         "rfa-legacy",
   storageBucket:     "rfa-legacy.firebasestorage.app",
@@ -174,24 +171,34 @@ html, body, #root { width:100%; min-height:100vh; background:var(--bg); color:va
   // ─────────────────────────────────────────────────────────────
   const ALLOWED_EMAILS = [
     "hutchinsonj@rfa.org",
-  "teammate@gmail.com",
-  // add more...
+  "teammate@gmail.com"
 ];
 
-// Firebase compat SDK is already on window — init synchronously
-firebase.initializeApp(FIREBASE_CONFIG);
-const auth     = firebase.auth();
-const db       = firebase.firestore();
-const provider = new firebase.auth.GoogleAuthProvider();
+// ── Firebase handles ──────────────────────────────────────────
+var auth     = firebase.auth();
+var db       = firebase.firestore();
+var provider = new firebase.auth.GoogleAuthProvider();
 
-const { useState, useEffect, useRef } = React;
+// ── React shorthand ───────────────────────────────────────────
+var R   = React;
+var h   = R.createElement;
+var RD  = ReactDOM;
 
-// ── Helpers ───────────────────────────────────────────────────
-const BLOCK_COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
-const uid = () => Math.random().toString(36).slice(2,9);
-const fmtDur = sec => { const s=parseInt(sec)||0; return `${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`; };
+var useState    = R.useState;
+var useEffect   = R.useEffect;
+var useRef      = R.useRef;
 
-const DEFAULT_BLOCKS = [
+// ── Constants ─────────────────────────────────────────────────
+var COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
+
+function uid() { return Math.random().toString(36).slice(2,9); }
+
+function fmtDur(sec) {
+  var s = parseInt(sec) || 0;
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
+}
+
+var DEFAULT_BLOCKS = [
   { id:uid(), name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230',
     items:[
       { id:uid(), t:"Hong Kong's Face Readers Reshape the Future", archiveId:'youtube-MJVRwBrkzsg', dur:272 },
@@ -207,237 +214,246 @@ const DEFAULT_BLOCKS = [
   },
 ];
 
-// ── Components ────────────────────────────────────────────────
-const Toast = ({ message }) => <div className="toast">{message}</div>;
+// ── Google logo SVG ───────────────────────────────────────────
+var GoogleSVG = h('svg', {viewBox:'0 0 48 48', style:{width:18,height:18,flexShrink:0}},
+  h('path',{fill:'#FFC107',d:'M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z'}),
+  h('path',{fill:'#FF3D00',d:'M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z'}),
+  h('path',{fill:'#4CAF50',d:'M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z'}),
+  h('path',{fill:'#1976D2',d:'M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z'})
+);
 
-function GoogleIcon() {
-  return (
-    <svg viewBox="0 0 48 48">
-      <path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/>
-      <path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/>
-      <path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/>
-      <path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/>
-    </svg>
-  );
+// ═════════════════════════════════════════════════════════════
+//  COMPONENTS  (React.createElement — no JSX, no Babel)
+// ═════════════════════════════════════════════════════════════
+
+function Toast(props) {
+  return h('div',{className:'toast'}, props.message);
 }
 
-function LoginScreen({ onLogin }) {
-  const [error,   setError]   = useState('');
-  const [loading, setLoading] = useState(false);
+function Spinner() {
+  return h('div',{className:'spin'});
+}
 
-  async function handleSignIn() {
+// ── Login ─────────────────────────────────────────────────────
+function LoginScreen(props) {
+  var _e = useState('');   var error = _e[0]; var setError = _e[1];
+  var _l = useState(false);var loading= _l[0]; var setLoading=_l[1];
+
+  function handleSignIn() {
     setLoading(true); setError('');
-    try {
-      const result = await auth.signInWithPopup(provider);
-      const email  = result.user.email;
-      if (!ALLOWED_EMAILS.includes(email)) {
-        await auth.signOut();
-        setError(`Access denied — ${email} is not on the approved list.`);
+    auth.signInWithPopup(provider).then(function(result) {
+      var email = result.user.email;
+      if (ALLOWED_EMAILS.indexOf(email) === -1) {
+        auth.signOut();
+        setError('Access denied — ' + email + ' is not on the approved list.');
         setLoading(false);
         return;
       }
-      onLogin(result.user);
-    } catch(e) {
+      props.onLogin(result.user);
+    }).catch(function(e) {
       setError(e.message);
       setLoading(false);
-    }
+    });
   }
 
-  return (
-    <div className="login-wrap">
-      <div style={{textAlign:'center'}}>
-        <div className="login-logo">RFA</div>
-        <div className="login-sub">Schedule Admin · Broadcast Control</div>
-      </div>
-      <div className="login-card">
-        <div className="login-title">Team Sign-In Required</div>
-        {error && <div className="login-error">{error}</div>}
-        <button className="btn-google" onClick={handleSignIn} disabled={loading}>
-          {loading ? <div className="spinner"/> : <GoogleIcon/>}
-          {loading ? 'Signing in…' : 'Continue with Google'}
-        </button>
-      </div>
-    </div>
+  return h('div',{className:'lw'},
+    h('div',{style:{textAlign:'center'}},
+      h('div',{className:'ll'},'RFA'),
+      h('div',{className:'ls'},'Schedule Admin · Broadcast Control')
+    ),
+    h('div',{className:'lc'},
+      h('div',{className:'lt'},'Team Sign-In Required'),
+      error ? h('div',{className:'le'},error) : null,
+      h('button',{className:'bg', onClick:handleSignIn, disabled:loading},
+        loading ? h(Spinner) : GoogleSVG,
+        loading ? 'Signing in…' : 'Continue with Google'
+      )
+    )
   );
 }
 
-function AddBlockModal({ onAdd, onClose }) {
-  const [name,  setName]  = useState('');
-  const [genre, setGenre] = useState('');
-  const [start, setStart] = useState('00:00');
-  const [color, setColor] = useState(BLOCK_COLORS[0]);
+// ── Add Block Modal ───────────────────────────────────────────
+function AddBlockModal(props) {
+  var _n=useState('');   var name=_n[0];  var setName=_n[1];
+  var _g=useState('');   var genre=_g[0]; var setGenre=_g[1];
+  var _s=useState('00:00'); var start=_s[0]; var setStart=_s[1];
+  var _c=useState(COLORS[0]); var color=_c[0]; var setColor=_c[1];
 
   function submit() {
     if (!name.trim()) return;
-    onAdd({ id:uid(), name:name.trim(), genre:genre.trim()||name.trim(), start, color, items:[] });
-    onClose();
+    props.onAdd({id:uid(),name:name.trim(),genre:genre.trim()||name.trim(),start:start,color:color,items:[]});
+    props.onClose();
   }
 
-  return (
-    <div className="modal-overlay" onClick={onClose}>
-      <div className="modal" onClick={e => e.stopPropagation()}>
-        <div className="modal-title">New Block</div>
-        <div className="modal-sub">Add a language / programming block</div>
-        <div className="field" style={{marginBottom:14}}>
-          <div className="field-label">Block Name</div>
-          <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. 한국어 — Korean" autoFocus/>
-        </div>
-        <div className="field-group">
-          <div className="field">
-            <div className="field-label">Genre / Language</div>
-            <input value={genre} onChange={e=>setGenre(e.target.value)} placeholder="Korean"/>
-          </div>
-          <div className="field" style={{maxWidth:100}}>
-            <div className="field-label">UTC Start</div>
-            <input value={start} onChange={e=>setStart(e.target.value)} placeholder="HH:MM"/>
-          </div>
-        </div>
-        <div className="field" style={{marginTop:4}}>
-          <div className="field-label">Block Color</div>
-          <div className="swatch-grid">
-            {BLOCK_COLORS.map(c=>(
-              <div key={c} className={`swatch${color===c?' selected':''}`} style={{background:c}} onClick={()=>setColor(c)}/>
-            ))}
-          </div>
-        </div>
-        <div className="modal-actions">
-          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
-          <button className="btn btn-primary" onClick={submit} disabled={!name.trim()}>Add Block</button>
-        </div>
-      </div>
-    </div>
+  return h('div',{className:'mo', onClick:props.onClose},
+    h('div',{className:'md', onClick:function(e){e.stopPropagation()}},
+      h('div',{className:'mt'},'New Block'),
+      h('div',{className:'ms'},'Add a language / programming block'),
+      h('div',{className:'fi',style:{marginBottom:14}},
+        h('div',{className:'fl'},'Block Name'),
+        h('input',{value:name, onChange:function(e){setName(e.target.value)}, placeholder:'e.g. 한국어 — Korean', autoFocus:true})
+      ),
+      h('div',{className:'fg'},
+        h('div',{className:'fi'},
+          h('div',{className:'fl'},'Genre / Language'),
+          h('input',{value:genre, onChange:function(e){setGenre(e.target.value)}, placeholder:'Korean'})
+        ),
+        h('div',{className:'fi',style:{maxWidth:100}},
+          h('div',{className:'fl'},'UTC Start'),
+          h('input',{value:start, onChange:function(e){setStart(e.target.value)}, placeholder:'HH:MM'})
+        )
+      ),
+      h('div',{className:'fi',style:{marginTop:4}},
+        h('div',{className:'fl'},'Block Color'),
+        h('div',{className:'swg'},
+          COLORS.map(function(c){ return h('div',{key:c,className:'sw'+(color===c?' sel':''),style:{background:c},onClick:function(){setColor(c)}}); })
+        )
+      ),
+      h('div',{className:'ma'},
+        h('button',{className:'btn bg2', onClick:props.onClose},'Cancel'),
+        h('button',{className:'btn bp', onClick:submit, disabled:!name.trim()},'Add Block')
+      )
+    )
   );
 }
 
-function ItemRow({ item, index, onUpdate, onDelete, onDragStart, onDrop }) {
-  return (
-    <div
-      className="item-row"
-      draggable
-      onDragStart={() => onDragStart(index)}
-      onDragOver={e => e.preventDefault()}
-      onDrop={() => onDrop(index)}
-    >
-      <div className="item-num" title="Drag to reorder">⠿</div>
-      <input value={item.t} onChange={e=>onUpdate(index,'t',e.target.value)} placeholder="Video title"/>
-      <input
-        value={item.archiveId}
-        onChange={e=>onUpdate(index,'archiveId',e.target.value)}
-        placeholder="Archive.org ID  (e.g. youtube-AbCdEf)"
-        style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--dim)'}}
-      />
-      <div className="dur-display">{fmtDur(item.dur)}</div>
-      <button className="btn-icon" onClick={()=>onDelete(index)} title="Remove">✕</button>
-    </div>
+// ── Item Row ──────────────────────────────────────────────────
+function ItemRow(props) {
+  var item=props.item, i=props.index;
+  return h('div',{
+    className:'ir', draggable:true,
+    onDragStart:function(){props.onDragStart(i);},
+    onDragOver:function(e){e.preventDefault();},
+    onDrop:function(){props.onDrop(i);}
+  },
+    h('div',{className:'in',title:'Drag to reorder'},'⠿'),
+    h('input',{value:item.t, placeholder:'Video title', onChange:function(e){props.onUpdate(i,'t',e.target.value);}}),
+    h('input',{value:item.archiveId, placeholder:'Archive.org ID (e.g. youtube-AbCdEf)',
+      style:{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--dim)'},
+      onChange:function(e){props.onUpdate(i,'archiveId',e.target.value);}}),
+    h('div',{className:'dd'},fmtDur(item.dur)),
+    h('button',{className:'bic',title:'Remove',onClick:function(){props.onDelete(i);}}, '✕')
   );
 }
 
-function BlockEditor({ block, onChange, onDelete }) {
-  const [dragFrom, setDragFrom] = useState(null);
+// ── Block Editor ──────────────────────────────────────────────
+function BlockEditor(props) {
+  var block=props.block;
+  var _df=useState(null); var dragFrom=_df[0]; var setDragFrom=_df[1];
 
-  const updateField = (f,v) => onChange({...block,[f]:v});
-  const updateItem  = (i,f,v) => onChange({...block,items:block.items.map((it,j)=>j===i?{...it,[f]:v}:it)});
-  const addItem     = () => onChange({...block,items:[...block.items,{id:uid(),t:'',archiveId:'',dur:0}]});
-  const deleteItem  = i => onChange({...block,items:block.items.filter((_,j)=>j!==i)});
-  const handleDrop  = i => {
-    if (dragFrom===null||dragFrom===i) return;
-    const items=[...block.items];
-    const [m]=items.splice(dragFrom,1);
-    items.splice(i,0,m);
-    onChange({...block,items});
+  function upField(f,v){ props.onChange(Object.assign({},block,{[f]:v})); }
+  function upItem(i,f,v){
+    var items=block.items.map(function(it,j){ return j===i ? Object.assign({},it,{[f]:v}) : it; });
+    props.onChange(Object.assign({},block,{items:items}));
+  }
+  function addItem(){
+    props.onChange(Object.assign({},block,{items:block.items.concat([{id:uid(),t:'',archiveId:'',dur:0}])}));
+  }
+  function delItem(i){
+    props.onChange(Object.assign({},block,{items:block.items.filter(function(_,j){return j!==i;})}));
+  }
+  function handleDrop(i){
+    if(dragFrom===null||dragFrom===i) return;
+    var items=block.items.slice();
+    var moved=items.splice(dragFrom,1)[0];
+    items.splice(i,0,moved);
+    props.onChange(Object.assign({},block,{items:items}));
     setDragFrom(null);
-  };
+  }
 
-  const totalDur = block.items.reduce((s,it)=>s+(parseInt(it.dur)||0),0);
+  var totalDur=block.items.reduce(function(s,it){return s+(parseInt(it.dur)||0);},0);
+  var col=block.color||COLORS[0];
 
-  return (
-    <div>
-      <div className="editor-header">
-        <div className="editor-title-group">
-          <div className="editor-title" style={{color:block.color||'var(--primary)'}}>
-            {block.name||'Untitled Block'}
-          </div>
-          <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--dim)',letterSpacing:'.2em'}}>
-            UTC {block.start} · {block.items.length} ITEMS · {fmtDur(totalDur)} TOTAL
-          </span>
-        </div>
-        <div className="editor-actions">
-          <button className="btn btn-danger" onClick={onDelete}>Delete Block</button>
-        </div>
-      </div>
-
-      <div className="field-group">
-        <div className="field" style={{flex:2}}>
-          <div className="field-label">Block Name</div>
-          <input value={block.name} onChange={e=>updateField('name',e.target.value)} placeholder="Language block name"/>
-        </div>
-        <div className="field">
-          <div className="field-label">Genre Label</div>
-          <input value={block.genre} onChange={e=>updateField('genre',e.target.value)} placeholder="Language"/>
-        </div>
-        <div className="field" style={{maxWidth:110}}>
-          <div className="field-label">UTC Start (HH:MM)</div>
-          <input value={block.start} onChange={e=>updateField('start',e.target.value)} placeholder="00:00"/>
-        </div>
-        <div className="field" style={{maxWidth:80}}>
-          <div className="field-label">Color</div>
-          <select value={block.color||BLOCK_COLORS[0]} onChange={e=>updateField('color',e.target.value)}
-            style={{background:`${block.color||BLOCK_COLORS[0]}22`,borderColor:block.color||BLOCK_COLORS[0]}}>
-            {BLOCK_COLORS.map(c=><option key={c} value={c} style={{background:'var(--surface2)'}}>{c}</option>)}
-          </select>
-        </div>
-      </div>
-
-      <div className="items-header">
-        <div className="items-label">Playlist Items</div>
-        <div className="items-count">{block.items.length} items</div>
-      </div>
-      <div style={{display:'grid',gridTemplateColumns:'24px 1fr 220px 72px 36px',gap:6,padding:'4px 12px',marginBottom:4}}>
-        <div/>
-        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>TITLE</div>
-        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>ARCHIVE.ORG ID</div>
-        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em',textAlign:'center'}}>DUR</div>
-        <div/>
-      </div>
-      {block.items.map((item,i)=>(
-        <ItemRow key={item.id} item={item} index={i}
-          onUpdate={updateItem} onDelete={deleteItem}
-          onDragStart={setDragFrom} onDrop={handleDrop}/>
-      ))}
-      <button className="add-item-btn" onClick={addItem}>+ Add Item</button>
-
-      <div style={{marginTop:20,padding:'12px 16px',background:'var(--surface2)',border:'1px solid var(--border)'}}>
-        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.3em',marginBottom:8}}>DURATION NOTE</div>
-        <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',lineHeight:1.7}}>
-          Duration is in seconds. Find it at{' '}
-          <span style={{color:'var(--offwhite)'}}>archive.org/metadata/&lt;id&gt;</span>{' '}
-          under the file's <code style={{color:'var(--primary)'}}>length</code> field.
-          Items loop within each block's time window automatically.
-        </div>
-      </div>
-    </div>
+  return h('div',null,
+    // Header
+    h('div',{className:'eh'},
+      h('div',{className:'etg'},
+        h('div',{className:'et',style:{color:col}}, block.name||'Untitled Block'),
+        h('span',{style:{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--dim)',letterSpacing:'.2em'}},
+          'UTC '+block.start+' · '+block.items.length+' ITEMS · '+fmtDur(totalDur)+' TOTAL')
+      ),
+      h('div',{className:'ea'},
+        h('button',{className:'btn bdr',onClick:props.onDelete},'Delete Block')
+      )
+    ),
+    // Fields
+    h('div',{className:'fg'},
+      h('div',{className:'fi',style:{flex:2}},
+        h('div',{className:'fl'},'Block Name'),
+        h('input',{value:block.name,placeholder:'Language block name',onChange:function(e){upField('name',e.target.value);}})
+      ),
+      h('div',{className:'fi'},
+        h('div',{className:'fl'},'Genre Label'),
+        h('input',{value:block.genre,placeholder:'Language',onChange:function(e){upField('genre',e.target.value);}})
+      ),
+      h('div',{className:'fi',style:{maxWidth:120}},
+        h('div',{className:'fl'},'UTC Start'),
+        h('input',{value:block.start,placeholder:'HH:MM',onChange:function(e){upField('start',e.target.value);}})
+      ),
+      h('div',{className:'fi',style:{maxWidth:80}},
+        h('div',{className:'fl'},'Color'),
+        h('select',{value:col,style:{background:col+'22',borderColor:col},onChange:function(e){upField('color',e.target.value);}},
+          COLORS.map(function(c){return h('option',{key:c,value:c,style:{background:'var(--s2)'}},c);})
+        )
+      )
+    ),
+    // Items header
+    h('div',{className:'ih'},
+      h('div',{className:'il'},'Playlist Items'),
+      h('div',{className:'ic'},block.items.length+' items')
+    ),
+    // Column labels
+    h('div',{style:{display:'grid',gridTemplateColumns:'24px 1fr 200px 64px 32px',gap:6,padding:'4px 12px',marginBottom:4}},
+      h('div',null),
+      h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}},'TITLE'),
+      h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}},'ARCHIVE.ORG ID'),
+      h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em',textAlign:'center'}},'DUR'),
+      h('div',null)
+    ),
+    // Item rows
+    block.items.map(function(item,i){
+      return h(ItemRow,{key:item.id,item:item,index:i,onUpdate:upItem,onDelete:delItem,onDragStart:setDragFrom,onDrop:handleDrop});
+    }),
+    h('button',{className:'aib',onClick:addItem},'+ Add Item'),
+    // Note
+    h('div',{className:'note'},
+      h('div',{className:'noteh'},'DURATION NOTE'),
+      h('div',{className:'noteb'},
+        'Duration is in seconds. Find it at ',
+        h('span',{style:{color:'var(--off)'}},'archive.org/metadata/<id>'),
+        ' under the file\'s ',h('code',null,'length'),' field. Items loop within each block\'s time window.'
+      )
+    )
   );
 }
 
+// ── Main App ──────────────────────────────────────────────────
 function App() {
-  const [user,         setUser]         = useState(null);
-  const [authChecked,  setAuthChecked]  = useState(false);
-  const [blocks,       setBlocks]       = useState([]);
-  const [activeId,     setActiveId]     = useState(null);
-  const [isDirty,      setIsDirty]      = useState(false);
-  const [isSaving,     setIsSaving]     = useState(false);
-  const [isLoading,    setIsLoading]    = useState(true);
-  const [toast,        setToast]        = useState(null);
-  const [showAddBlock, setShowAddBlock] = useState(false);
-  const [liveStatus,   setLiveStatus]   = useState('connecting');
-  const [lastSaved,    setLastSaved]    = useState(null);
-  const toastTimer     = useRef(null);
-  const firestoreUnsub = useRef(null);
+  var _u=useState(null);      var user=_u[0];         var setUser=_u[1];
+  var _ac=useState(false);    var authChecked=_ac[0];  var setAuthChecked=_ac[1];
+  var _bl=useState([]);       var blocks=_bl[0];       var setBlocks=_bl[1];
+  var _ai=useState(null);     var activeId=_ai[0];     var setActiveId=_ai[1];
+  var _di=useState(false);    var isDirty=_di[0];      var setIsDirty=_di[1];
+  var _is=useState(false);    var isSaving=_is[0];     var setIsSaving=_is[1];
+  var _il=useState(true);     var isLoading=_il[0];    var setIsLoading=_il[1];
+  var _to=useState(null);     var toast=_to[0];        var setToast=_to[1];
+  var _ab=useState(false);    var showAdd=_ab[0];      var setShowAdd=_ab[1];
+  var _ls=useState('connecting'); var liveStatus=_ls[0]; var setLiveStatus=_ls[1];
+  var _sv=useState(null);     var lastSaved=_sv[0];    var setLastSaved=_sv[1];
+
+  var toastTimer  = useRef(null);
+  var fsUnsub     = useRef(null);
+
+  function showToast(msg) {
+    setToast(msg);
+    if(toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(function(){setToast(null);}, 3500);
+  }
 
   // Auth listener
-  useEffect(() => {
-    return auth.onAuthStateChanged(u => {
-      if (u && ALLOWED_EMAILS.includes(u.email)) {
+  useEffect(function(){
+    return auth.onAuthStateChanged(function(u){
+      if(u && ALLOWED_EMAILS.indexOf(u.email) !== -1) {
         setUser(u);
       } else {
         setUser(null);
@@ -448,22 +464,24 @@ function App() {
   }, []);
 
   // Firestore listener
-  useEffect(() => {
-    if (!user) return;
-    if (firestoreUnsub.current) firestoreUnsub.current();
+  useEffect(function(){
+    if(!user) return;
+    if(fsUnsub.current) fsUnsub.current();
 
-    firestoreUnsub.current = db.collection('broadcast').doc('schedule')
-      .onSnapshot(snap => {
+    fsUnsub.current = db.collection('broadcast').doc('schedule')
+      .onSnapshot(function(snap){
         setLiveStatus('live');
-        if (snap.exists) {
-          const data = snap.data();
-          if (data && Array.isArray(data.blocks)) {
-            const hydrated = data.blocks.map(b=>({
-              ...b, id:b.id||uid(),
-              items:(b.items||[]).map(it=>({...it,id:it.id||uid()}))
-            }));
+        if(snap.exists) {
+          var data = snap.data();
+          if(data && Array.isArray(data.blocks)) {
+            var hydrated = data.blocks.map(function(b){
+              return Object.assign({},b,{
+                id: b.id||uid(),
+                items: (b.items||[]).map(function(it){ return Object.assign({},it,{id:it.id||uid()}); })
+              });
+            });
             setBlocks(hydrated);
-            setActiveId(id => id || (hydrated[0]&&hydrated[0].id) || null);
+            setActiveId(function(id){ return id || (hydrated[0]&&hydrated[0].id) || null; });
           }
         } else {
           setBlocks(DEFAULT_BLOCKS);
@@ -471,157 +489,159 @@ function App() {
         }
         setIsLoading(false);
         setIsDirty(false);
-      }, err => {
+      }, function(err){
         console.error('Firestore error:', err);
         setLiveStatus('error');
         setIsLoading(false);
       });
 
-    return () => { if (firestoreUnsub.current) firestoreUnsub.current(); };
+    return function(){ if(fsUnsub.current) fsUnsub.current(); };
   }, [user]);
 
-  const showToast = msg => {
-    setToast(msg);
-    if (toastTimer.current) clearTimeout(toastTimer.current);
-    toastTimer.current = setTimeout(()=>setToast(null), 3500);
-  };
-
-  const handleBlockChange = updated => { setBlocks(p=>p.map(b=>b.id===updated.id?updated:b)); setIsDirty(true); };
-  const handleAddBlock    = block   => { setBlocks(p=>[...p,block]); setActiveId(block.id); setIsDirty(true); };
-  const handleDeleteBlock = id      => {
-    const next = blocks.filter(b=>b.id!==id);
+  function handleBlockChange(updated) {
+    setBlocks(function(prev){ return prev.map(function(b){ return b.id===updated.id ? updated : b; }); });
+    setIsDirty(true);
+  }
+  function handleAddBlock(block) {
+    setBlocks(function(prev){ return prev.concat([block]); });
+    setActiveId(block.id);
+    setIsDirty(true);
+  }
+  function handleDeleteBlock(id) {
+    var next = blocks.filter(function(b){ return b.id!==id; });
     setBlocks(next);
     setActiveId(next.length ? next[next.length-1].id : null);
     setIsDirty(true);
-  };
+  }
 
-  async function publishSchedule() {
+  function publishSchedule() {
     setIsSaving(true);
-    try {
-      const toSave = blocks.map(b=>({
-        id:b.id, name:b.name, genre:b.genre, start:b.start, color:b.color||BLOCK_COLORS[0],
-        items:b.items.map(it=>({ id:it.id, t:it.t, archiveId:it.archiveId, dur:parseInt(it.dur)||0 }))
-      }));
-      await db.collection('broadcast').doc('schedule').set({
-        blocks: toSave,
-        publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
-        publishedBy: user.email,
-      });
+    var toSave = blocks.map(function(b){
+      return {
+        id:b.id, name:b.name, genre:b.genre, start:b.start, color:b.color||COLORS[0],
+        items:b.items.map(function(it){
+          return {id:it.id, t:it.t, archiveId:it.archiveId, dur:parseInt(it.dur)||0};
+        })
+      };
+    });
+    db.collection('broadcast').doc('schedule').set({
+      blocks: toSave,
+      publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      publishedBy: user.email
+    }).then(function(){
       setIsDirty(false);
       setLastSaved(new Date());
       showToast('✓ SCHEDULE PUBLISHED — LIVE IN ~1 SECOND');
-    } catch(e) {
+      setIsSaving(false);
+    }).catch(function(e){
       showToast('✗ PUBLISH FAILED: ' + e.message);
-    }
-    setIsSaving(false);
+      setIsSaving(false);
+    });
   }
 
-  async function handleSignOut() {
-    if (firestoreUnsub.current) firestoreUnsub.current();
-    await auth.signOut();
+  function handleSignOut() {
+    if(fsUnsub.current) fsUnsub.current();
+    auth.signOut();
     setUser(null); setBlocks([]); setActiveId(null);
   }
 
+  // ── Render ───────────────────────────────────────────────
   if (!authChecked) {
-    return <div className="loading-wrap"><div className="spinner"/><span className="loading-text">Initialising…</span></div>;
+    return h('div',{className:'ldw'}, h(Spinner), h('span',{className:'ldt'},'Initialising…'));
   }
-  if (!user) return <LoginScreen onLogin={setUser}/>;
+  if (!user) return h(LoginScreen,{onLogin:setUser});
 
-  const activeBlock   = blocks.find(b=>b.id===activeId);
-  const sortedBlocks  = blocks.slice().sort((a,b)=>{
-    const [ah,am]=a.start.split(':').map(Number);
-    const [bh,bm]=b.start.split(':').map(Number);
-    return (ah*60+am)-(bh*60+bm);
+  var activeBlock = blocks.find(function(b){ return b.id===activeId; });
+  var sorted = blocks.slice().sort(function(a,b){
+    var av=a.start.split(':').map(Number); var bv=b.start.split(':').map(Number);
+    return (av[0]*60+av[1])-(bv[0]*60+bv[1]);
   });
 
-  return (
-    <div className="app">
-      <div className="topbar">
-        <div className="topbar-left">
-          <div className="topbar-logo">RFA</div>
-          <div className="topbar-label">Schedule Admin</div>
-        </div>
-        <div className="topbar-right">
-          <div className={`status-pill${liveStatus==='live'?' live':''}`}>
-            <div className="status-dot"/>
-            {liveStatus==='live'?'FIRESTORE LIVE':liveStatus==='error'?'OFFLINE':'CONNECTING'}
-          </div>
-          <div className="user-badge">
-            {user.photoURL
-              ? <img className="user-avatar" src={user.photoURL} alt=""/>
-              : <div className="user-avatar-ph">{(user.email||'?')[0].toUpperCase()}</div>
-            }
-            <span>{user.email}</span>
-          </div>
-          <button className="btn btn-ghost" style={{padding:'6px 12px',fontSize:'9px'}} onClick={handleSignOut}>
-            Sign Out
-          </button>
-        </div>
-      </div>
+  var statusLabel = liveStatus==='live' ? 'FIRESTORE LIVE' : liveStatus==='error' ? 'OFFLINE' : 'CONNECTING';
+  var saveLabel   = isDirty ? '● UNSAVED CHANGES' : lastSaved ? '✓ SAVED '+lastSaved.toLocaleTimeString() : '✓ IN SYNC WITH FIRESTORE';
 
-      <div className="main">
-        <div className="sidebar">
-          <div className="sidebar-section">
-            <div className="sidebar-heading">Blocks — {blocks.length}</div>
-            <div className="block-list">
-              {sortedBlocks.map(b=>(
-                <div key={b.id} className={`block-item${activeId===b.id?' active':''}`} onClick={()=>setActiveId(b.id)}>
-                  <div className="block-dot" style={{background:b.color||'#61C230'}}/>
-                  <div className="block-info">
-                    <div className="block-name">{b.name}</div>
-                    <div className="block-meta">UTC {b.start}</div>
-                  </div>
-                  <div className="block-count">{b.items.length}</div>
-                </div>
-              ))}
-            </div>
-          </div>
-          <button className="sidebar-add-btn" onClick={()=>setShowAddBlock(true)}>+ New Block</button>
-        </div>
+  return h('div',{className:'app'},
+    // Topbar
+    h('div',{className:'tb'},
+      h('div',{className:'tbl'},
+        h('div',{className:'tlo'},'RFA'),
+        h('div',{className:'tla'},'Schedule Admin')
+      ),
+      h('div',{className:'tbr'},
+        h('div',{className:'sp'+(liveStatus==='live'?' live':'')},
+          h('div',{className:'sd'}), statusLabel
+        ),
+        h('div',{className:'ub'},
+          user.photoURL
+            ? h('img',{className:'ua',src:user.photoURL,alt:''})
+            : h('div',{className:'uap'}, (user.email||'?')[0].toUpperCase()),
+          h('span',null,user.email)
+        ),
+        h('button',{className:'btn bg2',style:{padding:'6px 12px',fontSize:'9px'},onClick:handleSignOut},'Sign Out')
+      )
+    ),
 
-        <div className="editor">
-          {isLoading ? (
-            <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:12}}>
-              <div className="spinner"/>
-              <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',letterSpacing:'.2em'}}>LOADING FROM FIRESTORE…</span>
-            </div>
-          ) : activeBlock ? (
-            <BlockEditor key={activeBlock.id} block={activeBlock} onChange={handleBlockChange} onDelete={()=>handleDeleteBlock(activeBlock.id)}/>
-          ) : (
-            <div className="editor-empty">
-              <div className="editor-empty-icon">📡</div>
-              <div className="editor-empty-text">Select or create a block to edit</div>
-            </div>
-          )}
-        </div>
-      </div>
+    // Main
+    h('div',{className:'main'},
+      // Sidebar
+      h('div',{className:'sb'},
+        h('div',{className:'sbs'},
+          h('div',{className:'sbh'},'Blocks — '+blocks.length),
+          h('div',{className:'bl'},
+            sorted.map(function(b){
+              return h('div',{key:b.id,className:'bi'+(activeId===b.id?' act':''),onClick:function(){setActiveId(b.id);}},
+                h('div',{className:'bdo',style:{background:b.color||'#61C230'}}),
+                h('div',{className:'bin'},
+                  h('div',{className:'bn'},b.name),
+                  h('div',{className:'bm'},'UTC '+b.start)
+                ),
+                h('div',{className:'bc'},b.items.length)
+              );
+            })
+          )
+        ),
+        h('button',{className:'sadd',onClick:function(){setShowAdd(true);}}, '+ New Block')
+      ),
 
-      <div className="publish-bar">
-        <div>
-          <div className={`publish-status ${isDirty?'unsaved':'saved'}`}>
-            {isDirty ? '● UNSAVED CHANGES' : lastSaved ? `✓ SAVED ${lastSaved.toLocaleTimeString()}` : '✓ IN SYNC WITH FIRESTORE'}
-          </div>
-          <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',marginTop:4,letterSpacing:'.15em'}}>
-            Publishing pushes the schedule live instantly — no page reload needed on viewer.
-          </div>
-        </div>
-        <div className="publish-actions">
-          <button className="btn btn-ghost" onClick={()=>{setIsDirty(false);showToast('Changes discarded');}} disabled={!isDirty}>
-            Discard
-          </button>
-          <button className="btn btn-primary" onClick={publishSchedule} disabled={isSaving||!isDirty}>
-            {isSaving ? <><div className="spinner"/>Publishing…</> : '⬆ Publish to Live'}
-          </button>
-        </div>
-      </div>
+      // Editor
+      h('div',{className:'ed'},
+        isLoading
+          ? h('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:12}},
+              h(Spinner),
+              h('span',{style:{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',letterSpacing:'.2em'}},'LOADING FROM FIRESTORE…')
+            )
+          : activeBlock
+            ? h(BlockEditor,{key:activeBlock.id, block:activeBlock, onChange:handleBlockChange, onDelete:function(){handleDeleteBlock(activeBlock.id);}})
+            : h('div',{className:'ee'},
+                h('div',{className:'eei'},'📡'),
+                h('div',{className:'eet'},'Select or create a block to edit')
+              )
+      )
+    ),
 
-      {showAddBlock && <AddBlockModal onAdd={handleAddBlock} onClose={()=>setShowAddBlock(false)}/>}
-      {toast && <Toast message={toast}/>}
-    </div>
+    // Publish bar
+    h('div',{className:'pb'},
+      h('div',null,
+        h('div',{className:'ps '+(isDirty?'unsaved':'saved')}, saveLabel),
+        h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',marginTop:4,letterSpacing:'.15em'}},
+          'Publishing pushes the schedule live instantly — no page reload needed on viewer.')
+      ),
+      h('div',{className:'pa'},
+        h('button',{className:'btn bg2',disabled:!isDirty,onClick:function(){setIsDirty(false);showToast('Changes discarded');}}, 'Discard'),
+        h('button',{className:'btn bp',disabled:isSaving||!isDirty,onClick:publishSchedule},
+          isSaving ? h(Spinner) : null,
+          isSaving ? ' Publishing…' : '⬆ Publish to Live'
+        )
+      )
+    ),
+
+    showAdd ? h(AddBlockModal,{onAdd:handleAddBlock,onClose:function(){setShowAdd(false);}}) : null,
+    toast   ? h(Toast,{message:toast}) : null
   );
 }
 
-ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
+// ── Boot ──────────────────────────────────────────────────────
+ReactDOM.createRoot(document.getElementById('root')).render(h(App,null));
 </script>
 </body>
 </html>
