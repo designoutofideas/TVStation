@@ -3,974 +3,960 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>TVStation — Admin</title>
+<title>RFA Admin — Schedule Editor</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@300;400;600;700&family=Bebas+Neue&display=swap');
-
   *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 
   :root {
-    --bg: #0f0f0f;
-    --panel: #161616;
-    --border: #2a2a2a;
-    --amber: #ffb700;
-    --amber-dim: #5a4200;
-    --amber-mid: #a37000;
-    --red: #ff3b1f;
-    --green: #39ff8a;
-    --text: #c8c8c8;
-    --text-dim: #555;
-    --font: 'IBM Plex Mono', monospace;
+    --primary:   #61C230;
+    --primary-d: #4a9624;
+    --primary-g: rgba(97,194,48,0.08);
+    --light:     #CCEDD0;
+    --dim:       #627568;
+    --offwhite:  #F0F6F0;
+    --white:     #FFFFFF;
+    --bg:        #080e09;
+    --surface:   #0e1a10;
+    --surface2:  #141f15;
+    --border:    rgba(97,194,48,0.14);
+    --border-h:  rgba(97,194,48,0.35);
+    --red:       #ff4433;
+    --red-d:     rgba(255,68,51,0.12);
+    --amber:     #f5a623;
+    --mono: 'IBM Plex Mono', monospace;
+    --sans: 'IBM Plex Sans', sans-serif;
+    --display: 'Bebas Neue', cursive;
   }
 
-  html, body { height: 100%; background: var(--bg); color: var(--text); font-family: var(--font); font-size: 13px; }
+  html, body, #root {
+    width: 100%; min-height: 100vh;
+    background: var(--bg);
+    color: var(--offwhite);
+    font-family: var(--sans);
+    font-size: 14px;
+  }
+
+  /* scrollbars */
+  ::-webkit-scrollbar { width: 4px; }
+  ::-webkit-scrollbar-track { background: transparent; }
+  ::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+  /* ── LOGIN ── */
+  .login-wrap {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    min-height: 100vh; gap: 32px;
+    background: radial-gradient(ellipse at 50% 30%, rgba(97,194,48,0.06) 0%, transparent 70%);
+  }
+  .login-logo {
+    font-family: var(--display);
+    font-size: 64px; letter-spacing: .12em;
+    color: var(--primary);
+    text-shadow: 0 0 40px rgba(97,194,48,0.4);
+    line-height: 1;
+  }
+  .login-sub {
+    font-family: var(--mono);
+    font-size: 9px; letter-spacing: .4em;
+    color: var(--dim); text-transform: uppercase; margin-top: -20px;
+  }
+  .login-card {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    padding: 40px 48px;
+    display: flex; flex-direction: column; align-items: center; gap: 20px;
+    min-width: 360px;
+  }
+  .login-title {
+    font-family: var(--mono); font-size: 10px;
+    letter-spacing: .32em; color: var(--dim); text-transform: uppercase;
+  }
+  .login-error {
+    font-family: var(--mono); font-size: 10px;
+    color: var(--red); letter-spacing: .12em; text-align: center;
+    background: var(--red-d); border: 1px solid rgba(255,68,51,0.2);
+    padding: 8px 16px; width: 100%;
+  }
+  .btn-google {
+    display: flex; align-items: center; gap: 12px;
+    background: var(--white); color: #333;
+    border: none; cursor: pointer;
+    padding: 12px 24px; font-family: var(--sans); font-size: 14px; font-weight: 500;
+    width: 100%; justify-content: center;
+    transition: opacity 0.15s;
+  }
+  .btn-google:hover { opacity: 0.9; }
+  .btn-google svg { width: 18px; height: 18px; flex-shrink: 0; }
 
   /* ── LAYOUT ── */
-  .app { display: grid; grid-template-rows: 56px 1fr; height: 100vh; }
+  .app { display: flex; flex-direction: column; min-height: 100vh; }
 
-  header {
-    background: var(--panel);
-    border-bottom: 1px solid var(--border);
+  /* ── TOPBAR ── */
+  .topbar {
     display: flex; align-items: center; justify-content: space-between;
-    padding: 0 24px;
+    padding: 0 28px;
+    height: 56px;
+    background: var(--surface);
+    border-bottom: 1px solid var(--border);
     position: sticky; top: 0; z-index: 50;
   }
-
-  .header-left { display: flex; align-items: center; gap: 16px; }
-  .logo {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 22px;
-    letter-spacing: 0.12em;
-    color: var(--amber);
-    text-shadow: 0 0 12px rgba(255,183,0,0.4);
+  .topbar-left { display: flex; align-items: center; gap: 16px; }
+  .topbar-logo {
+    font-family: var(--display); font-size: 28px;
+    letter-spacing: .12em; color: var(--primary);
+    text-shadow: 0 0 16px rgba(97,194,48,0.4);
+    line-height: 1;
   }
-  .logo span {
-    font-family: var(--font);
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.3em;
-    color: var(--amber-dim);
-    margin-left: 6px;
-    vertical-align: middle;
+  .topbar-label {
+    font-family: var(--mono); font-size: 8px;
+    letter-spacing: .3em; color: var(--dim); text-transform: uppercase;
+    border-left: 1px solid var(--border); padding-left: 16px;
   }
-
-  .header-actions { display: flex; gap: 10px; align-items: center; }
-
-  .btn {
-    font-family: var(--font);
-    font-size: 10px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    padding: 7px 16px;
+  .topbar-right { display: flex; align-items: center; gap: 12px; }
+  .user-badge {
+    display: flex; align-items: center; gap: 8px;
+    font-family: var(--mono); font-size: 10px; color: var(--dim);
+    letter-spacing: .1em;
+  }
+  .user-avatar {
+    width: 26px; height: 26px; border-radius: 50%;
     border: 1px solid var(--border);
-    background: transparent;
-    color: var(--text);
-    cursor: pointer;
-    transition: all 0.15s;
+    object-fit: cover;
   }
-  .btn:hover { border-color: var(--amber-mid); color: var(--amber); }
-  .btn-primary { background: var(--amber); color: var(--bg); border-color: var(--amber); font-weight: 700; }
-  .btn-primary:hover { background: #ffd060; border-color: #ffd060; color: var(--bg); }
-  .btn-danger { color: var(--red); border-color: #3a1a1a; }
-  .btn-danger:hover { background: rgba(255,59,31,0.1); border-color: var(--red); color: var(--red); }
-  .btn-sm { padding: 4px 10px; font-size: 9px; }
+  .user-avatar-placeholder {
+    width: 26px; height: 26px; border-radius: 50%;
+    background: var(--primary-d);
+    display: flex; align-items: center; justify-content: center;
+    font-family: var(--mono); font-size: 10px; color: var(--white);
+  }
 
-  .main { display: grid; grid-template-columns: 380px 1fr; overflow: hidden; }
+  /* status pill */
+  .status-pill {
+    display: flex; align-items: center; gap: 6px;
+    font-family: var(--mono); font-size: 9px; letter-spacing: .2em;
+    color: var(--dim); text-transform: uppercase;
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 4px 10px;
+  }
+  .status-pill.live { color: var(--primary); border-color: rgba(97,194,48,0.3); }
+  .status-dot { width: 6px; height: 6px; border-radius: 50%; background: var(--dim); }
+  .status-pill.live .status-dot { background: var(--primary); box-shadow: 0 0 6px var(--primary); animation: blink 1.4s infinite; }
+  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:.2} }
 
-  /* ── LEFT PANEL: Search ── */
-  .search-panel {
-    background: var(--panel);
+  /* ── MAIN ── */
+  .main { display: flex; flex: 1; }
+
+  /* ── SIDEBAR ── */
+  .sidebar {
+    width: 280px; flex-shrink: 0;
+    background: var(--surface);
     border-right: 1px solid var(--border);
     display: flex; flex-direction: column;
-    overflow: hidden;
+    position: sticky; top: 56px; height: calc(100vh - 56px); overflow-y: auto;
+  }
+  .sidebar-section { padding: 20px 16px 12px; }
+  .sidebar-heading {
+    font-family: var(--mono); font-size: 8px;
+    letter-spacing: .35em; color: var(--dim); text-transform: uppercase;
+    margin-bottom: 12px;
+  }
+  .block-list { display: flex; flex-direction: column; gap: 2px; }
+  .block-item {
+    display: flex; align-items: center; gap: 10px;
+    padding: 9px 12px; cursor: pointer;
+    border: 1px solid transparent;
+    transition: all 0.12s;
+    border-radius: 2px;
+  }
+  .block-item:hover { background: var(--primary-g); border-color: var(--border); }
+  .block-item.active { background: rgba(97,194,48,0.1); border-color: rgba(97,194,48,0.3); }
+  .block-dot { width: 8px; height: 8px; border-radius: 50%; flex-shrink: 0; }
+  .block-info { flex: 1; min-width: 0; }
+  .block-name {
+    font-family: var(--sans); font-size: 12px; font-weight: 500;
+    color: var(--offwhite); white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+  }
+  .block-meta {
+    font-family: var(--mono); font-size: 9px; color: var(--dim); margin-top: 1px;
+  }
+  .block-count {
+    font-family: var(--mono); font-size: 9px; color: var(--dim);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 2px 6px; border-radius: 2px; flex-shrink: 0;
   }
 
-  .panel-header {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    font-size: 9px;
-    font-weight: 700;
-    letter-spacing: 0.3em;
-    color: var(--amber-mid);
-    text-transform: uppercase;
+  .sidebar-add-btn {
+    margin: 0 16px 16px;
+    display: flex; align-items: center; justify-content: center; gap: 8px;
+    padding: 10px;
+    background: transparent;
+    border: 1px dashed rgba(97,194,48,0.25);
+    color: var(--dim); font-family: var(--mono); font-size: 10px;
+    letter-spacing: .2em; cursor: pointer; text-transform: uppercase;
+    transition: all 0.12s;
   }
+  .sidebar-add-btn:hover { border-color: var(--primary); color: var(--primary); }
 
-  .search-form {
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--border);
-    display: flex; flex-direction: column; gap: 10px;
+  /* ── EDITOR ── */
+  .editor { flex: 1; padding: 28px 32px; overflow-y: auto; }
+
+  .editor-empty {
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    height: 100%; gap: 16px; opacity: 0.4;
   }
+  .editor-empty-icon { font-size: 48px; line-height: 1; }
+  .editor-empty-text { font-family: var(--mono); font-size: 10px; letter-spacing: .3em; color: var(--dim); text-transform: uppercase; }
 
-  input, select, textarea {
-    font-family: var(--font);
-    font-size: 12px;
-    background: var(--bg);
-    border: 1px solid var(--border);
-    color: var(--text);
-    padding: 8px 12px;
-    width: 100%;
-    outline: none;
+  .editor-header {
+    display: flex; align-items: flex-start; justify-content: space-between;
+    margin-bottom: 28px; gap: 20px;
+  }
+  .editor-title-group { display: flex; flex-direction: column; gap: 8px; flex: 1; }
+  .editor-title {
+    font-family: var(--display); font-size: 36px; letter-spacing: .08em;
+    color: var(--primary); line-height: 1;
+  }
+  .editor-actions { display: flex; gap: 8px; flex-shrink: 0; }
+
+  /* inputs */
+  .field-group { display: flex; gap: 12px; margin-bottom: 20px; flex-wrap: wrap; }
+  .field { display: flex; flex-direction: column; gap: 6px; flex: 1; min-width: 140px; }
+  .field-label {
+    font-family: var(--mono); font-size: 8px;
+    letter-spacing: .3em; color: var(--dim); text-transform: uppercase;
+  }
+  .field input, .field select {
+    background: var(--surface2); border: 1px solid var(--border);
+    color: var(--offwhite); font-family: var(--mono); font-size: 13px;
+    padding: 8px 12px; outline: none; width: 100%;
     transition: border-color 0.15s;
   }
-  input:focus, select:focus { border-color: var(--amber-mid); }
-  input::placeholder { color: var(--text-dim); }
+  .field input:focus, .field select:focus { border-color: var(--primary); }
+  .field select option { background: var(--surface2); }
 
-  select option { background: var(--bg); }
-
-  .search-row { display: flex; gap: 8px; }
-  .search-row input { flex: 1; }
-
-  .results-list {
-    flex: 1;
-    overflow-y: auto;
-    padding: 8px 0;
-  }
-  .results-list::-webkit-scrollbar { width: 4px; }
-  .results-list::-webkit-scrollbar-track { background: transparent; }
-  .results-list::-webkit-scrollbar-thumb { background: var(--border); }
-
-  .result-item {
-    padding: 12px 20px;
-    border-bottom: 1px solid var(--border);
-    cursor: pointer;
-    transition: background 0.12s;
-    display: flex; flex-direction: column; gap: 4px;
-  }
-  .result-item:hover { background: rgba(255,183,0,0.05); }
-
-  .result-title {
-    font-size: 12px;
-    font-weight: 600;
-    color: var(--text);
-    line-height: 1.3;
-    /* clamp to 2 lines */
-    display: -webkit-box;
-    -webkit-line-clamp: 2;
-    -webkit-box-orient: vertical;
-    overflow: hidden;
-  }
-  .result-meta {
-    font-size: 10px;
-    color: var(--text-dim);
-    display: flex; gap: 12px;
-  }
-  .result-meta span { display: flex; align-items: center; gap: 4px; }
-
-  .result-add-btn {
-    align-self: flex-start;
-    margin-top: 4px;
-  }
-
-  .no-results, .searching {
-    padding: 40px 20px;
-    text-align: center;
-    color: var(--text-dim);
-    font-size: 11px;
-    letter-spacing: 0.15em;
-  }
-
-  /* ── RIGHT PANEL: Schedule ── */
-  .schedule-panel {
-    display: flex; flex-direction: column;
-    overflow: hidden;
-    background: var(--bg);
-  }
-
-  .schedule-toolbar {
-    padding: 14px 24px;
-    border-bottom: 1px solid var(--border);
+  /* items table */
+  .items-header {
     display: flex; align-items: center; justify-content: space-between;
-    gap: 16px;
-    background: var(--panel);
+    margin-bottom: 12px;
+  }
+  .items-label {
+    font-family: var(--mono); font-size: 8px;
+    letter-spacing: .32em; color: var(--dim); text-transform: uppercase;
+  }
+  .items-count {
+    font-family: var(--mono); font-size: 9px; color: var(--dim);
+    background: var(--surface2); border: 1px solid var(--border);
+    padding: 2px 8px;
   }
 
-  .schedule-toolbar-left {
-    display: flex; align-items: center; gap: 12px;
-    font-size: 9px; font-weight: 700; letter-spacing: 0.3em; color: var(--amber-mid);
-  }
-
-  .block-tabs {
-    display: flex; gap: 0;
-    border: 1px solid var(--border);
-  }
-  .block-tab {
-    padding: 6px 14px;
-    font-family: var(--font);
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    background: transparent;
-    color: var(--text-dim);
-    border: none;
-    border-right: 1px solid var(--border);
-    cursor: pointer;
-    transition: all 0.15s;
-  }
-  .block-tab:last-child { border-right: none; }
-  .block-tab:hover { color: var(--text); background: rgba(255,255,255,0.04); }
-  .block-tab.active { background: var(--amber); color: var(--bg); font-weight: 700; }
-
-  .schedule-content {
-    flex: 1;
-    overflow-y: auto;
-    padding: 20px 24px;
-  }
-  .schedule-content::-webkit-scrollbar { width: 4px; }
-  .schedule-content::-webkit-scrollbar-track { background: transparent; }
-  .schedule-content::-webkit-scrollbar-thumb { background: var(--border); }
-
-  /* Block editor */
-  .block-editor { display: none; }
-  .block-editor.active { display: block; }
-
-  .block-header {
-    display: flex; align-items: center; justify-content: space-between;
-    margin-bottom: 16px;
-  }
-
-  .block-title-row {
-    display: flex; align-items: center; gap: 12px;
-  }
-
-  .block-name-input {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 26px;
-    letter-spacing: 0.08em;
-    background: transparent;
-    border: none;
-    border-bottom: 1px solid var(--border);
-    color: var(--amber);
-    padding: 4px 0;
-    width: 280px;
-  }
-  .block-name-input:focus { border-bottom-color: var(--amber); outline: none; }
-
-  .block-time-row {
-    display: flex; align-items: center; gap: 12px; margin-top: 10px; margin-bottom: 20px;
-  }
-
-  .block-time-row label {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.25em; color: var(--text-dim);
-    text-transform: uppercase;
-  }
-
-  .block-time-row input[type="time"] {
-    width: auto;
-    padding: 4px 8px;
-    font-size: 13px;
-  }
-
-  /* Drag list */
-  .item-list { display: flex; flex-direction: column; gap: 8px; min-height: 80px; }
-
-  .sched-item {
+  .item-row {
     display: grid;
-    grid-template-columns: 24px 1fr auto auto;
-    align-items: center;
-    gap: 12px;
-    padding: 10px 14px;
-    background: var(--panel);
+    grid-template-columns: 24px 1fr 220px 72px 36px;
+    gap: 6px; align-items: center;
+    padding: 8px 12px;
     border: 1px solid var(--border);
-    cursor: grab;
-    transition: border-color 0.15s, background 0.15s;
-    position: relative;
+    margin-bottom: 4px;
+    background: var(--surface2);
+    transition: border-color 0.12s;
   }
-  .sched-item:active { cursor: grabbing; }
-  .sched-item:hover { border-color: var(--amber-dim); }
-  .sched-item.dragging { opacity: 0.4; }
-  .sched-item.drag-over { border-color: var(--amber); background: rgba(255,183,0,0.06); }
+  .item-row:hover { border-color: var(--border-h); }
+  .item-row.dragging { opacity: 0.4; }
 
-  .drag-handle {
-    color: var(--text-dim);
-    font-size: 14px;
-    cursor: grab;
-    user-select: none;
+  .item-num {
+    font-family: var(--mono); font-size: 10px; color: var(--dim);
+    text-align: center; cursor: grab; user-select: none;
   }
+  .item-num:active { cursor: grabbing; }
+  .item-row input {
+    background: transparent; border: none; border-bottom: 1px solid transparent;
+    color: var(--offwhite); font-family: var(--mono); font-size: 12px;
+    padding: 2px 4px; outline: none; width: 100%;
+    transition: border-color 0.12s;
+  }
+  .item-row input:focus { border-bottom-color: var(--primary); }
+  .item-row input::placeholder { color: rgba(98,117,104,0.5); }
 
-  .sched-item-info { overflow: hidden; }
-  .sched-item-title {
-    font-size: 12px;
-    font-weight: 600;
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    color: var(--text);
-  }
-  .sched-item-meta {
-    font-size: 10px;
-    color: var(--text-dim);
-    margin-top: 2px;
-    display: flex; gap: 10px;
-  }
-
-  .sched-item-time {
-    font-size: 10px;
-    color: var(--amber-mid);
-    font-weight: 600;
-    white-space: nowrap;
-  }
-
-  .empty-block {
-    border: 1px dashed var(--border);
-    padding: 32px;
+  .dur-display {
+    font-family: var(--mono); font-size: 10px; color: var(--dim);
     text-align: center;
-    color: var(--text-dim);
-    font-size: 11px;
-    letter-spacing: 0.2em;
   }
 
-  /* Add item modal */
-  .modal-backdrop {
-    display: none;
-    position: fixed; inset: 0; z-index: 200;
-    background: rgba(0,0,0,0.8);
-    align-items: center; justify-content: center;
+  .btn-icon {
+    width: 28px; height: 28px; display: flex; align-items: center; justify-content: center;
+    background: transparent; border: 1px solid transparent;
+    cursor: pointer; color: var(--dim); font-size: 14px;
+    transition: all 0.12s; border-radius: 2px;
   }
-  .modal-backdrop.open { display: flex; }
+  .btn-icon:hover { color: var(--red); border-color: rgba(255,68,51,0.3); background: var(--red-d); }
 
-  .modal {
-    background: var(--panel);
-    border: 1px solid var(--border);
-    width: 480px;
-    max-width: 95vw;
-    padding: 28px;
-    display: flex; flex-direction: column; gap: 16px;
+  .add-item-btn {
+    display: flex; align-items: center; gap: 8px;
+    padding: 10px 16px; margin-top: 8px;
+    background: transparent; border: 1px dashed rgba(97,194,48,0.2);
+    color: var(--dim); font-family: var(--mono); font-size: 10px;
+    letter-spacing: .2em; cursor: pointer; text-transform: uppercase; width: 100%;
+    transition: all 0.12s;
   }
+  .add-item-btn:hover { border-color: var(--primary); color: var(--primary); }
 
-  .modal-title {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 24px;
-    letter-spacing: 0.08em;
-    color: var(--amber);
+  /* buttons */
+  .btn {
+    display: flex; align-items: center; gap: 7px;
+    padding: 9px 18px;
+    font-family: var(--mono); font-size: 10px; letter-spacing: .2em;
+    text-transform: uppercase; cursor: pointer; border: 1px solid;
+    transition: all 0.15s; white-space: nowrap;
   }
-
-  .form-row { display: flex; flex-direction: column; gap: 6px; }
-  .form-row label {
-    font-size: 9px; font-weight: 700; letter-spacing: 0.25em;
-    color: var(--text-dim); text-transform: uppercase;
+  .btn-primary {
+    background: var(--primary); border-color: var(--primary); color: #050d06;
+    font-weight: 600;
   }
+  .btn-primary:hover { background: #74d63d; border-color: #74d63d; }
+  .btn-primary:disabled { opacity: 0.4; cursor: not-allowed; }
+  .btn-ghost {
+    background: transparent; border-color: var(--border); color: var(--dim);
+  }
+  .btn-ghost:hover { border-color: var(--border-h); color: var(--offwhite); }
+  .btn-danger {
+    background: transparent; border-color: rgba(255,68,51,0.3); color: var(--red);
+  }
+  .btn-danger:hover { background: var(--red-d); }
 
-  .modal-actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 8px; }
-
-  /* Status bar */
-  .status-bar {
-    padding: 8px 24px;
+  /* publish bar */
+  .publish-bar {
+    position: sticky; bottom: 0;
+    background: var(--surface);
     border-top: 1px solid var(--border);
-    background: var(--panel);
-    display: flex; align-items: center; justify-content: space-between;
-    font-size: 10px;
-    color: var(--text-dim);
-    letter-spacing: 0.1em;
+    padding: 14px 32px;
+    display: flex; align-items: center; justify-content: space-between; gap: 16px;
+    z-index: 40;
   }
-  .status-msg { transition: color 0.3s; }
-  .status-msg.ok { color: var(--green); }
-  .status-msg.err { color: var(--red); }
-
-  /* Duration picker util */
-  .duration-row { display: flex; gap: 8px; align-items: center; }
-  .duration-row input { width: 80px; }
-  .duration-row span { color: var(--text-dim); font-size: 11px; }
-
-  /* JSON preview */
-  .json-preview {
-    font-size: 10px;
-    background: #0a0a0a;
-    border: 1px solid var(--border);
-    padding: 12px;
-    max-height: 180px;
-    overflow-y: auto;
-    color: #7aff9a;
-    white-space: pre;
-    line-height: 1.6;
+  .publish-status {
+    font-family: var(--mono); font-size: 9px; color: var(--dim); letter-spacing: .15em;
   }
+  .publish-status.saved { color: var(--primary); }
+  .publish-status.unsaved { color: var(--amber); }
+  .publish-actions { display: flex; gap: 10px; }
+
+  /* toast */
+  .toast {
+    position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+    background: var(--surface); border: 1px solid var(--primary);
+    color: var(--primary); font-family: var(--mono); font-size: 10px;
+    letter-spacing: .25em; padding: 10px 24px; z-index: 200;
+    pointer-events: none;
+    animation: toast-in 0.3s ease forwards;
+  }
+  @keyframes toast-in { from{opacity:0;transform:translateX(-50%) translateY(8px)} to{opacity:1;transform:translateX(-50%) translateY(0)} }
+
+  /* spinner */
+  .spinner {
+    width: 16px; height: 16px; border: 2px solid rgba(97,194,48,0.2);
+    border-top-color: var(--primary); border-radius: 50%;
+    animation: spin 0.6s linear infinite;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* modal */
+  .modal-overlay {
+    position: fixed; inset: 0; z-index: 100;
+    background: rgba(0,0,0,0.7); backdrop-filter: blur(4px);
+    display: flex; align-items: center; justify-content: center;
+  }
+  .modal {
+    background: var(--surface); border: 1px solid var(--border);
+    padding: 32px; min-width: 380px; max-width: 480px; width: 100%;
+  }
+  .modal-title {
+    font-family: var(--display); font-size: 28px; letter-spacing: .08em;
+    color: var(--primary); margin-bottom: 8px;
+  }
+  .modal-sub {
+    font-family: var(--mono); font-size: 9px; color: var(--dim);
+    letter-spacing: .2em; text-transform: uppercase; margin-bottom: 24px;
+  }
+  .modal-actions { display: flex; gap: 10px; margin-top: 24px; justify-content: flex-end; }
+
+  /* color swatches for block identification */
+  .swatch-grid { display: flex; gap: 8px; flex-wrap: wrap; }
+  .swatch {
+    width: 24px; height: 24px; border-radius: 50%;
+    border: 2px solid transparent; cursor: pointer; transition: border-color 0.12s;
+  }
+  .swatch.selected { border-color: var(--white); }
 </style>
 </head>
 <body>
+<div id="root"></div>
 
-<div class="app">
-  <!-- HEADER -->
-  <header>
-    <div class="header-left">
-      <div class="logo">TVStation <span>ADMIN</span></div>
-    </div>
-    <div class="header-actions">
-      <a href="index.html" class="btn btn-sm">← WATCH LIVE</a>
-      <button class="btn btn-sm" id="btn-import">IMPORT JSON</button>
-      <button class="btn btn-primary btn-sm" id="btn-export">EXPORT SCHEDULE.JSON</button>
-    </div>
-  </header>
+<!-- React + Babel -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+<script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
 
-  <div class="main">
-    <!-- LEFT: Archive.org Search -->
-    <div class="search-panel">
-      <div class="panel-header">ARCHIVE.ORG SEARCH</div>
-      <div class="search-form">
-        <div class="search-row">
-          <input type="text" id="search-input" placeholder="Search archive.org..." />
-          <button class="btn" id="btn-search">GO</button>
-        </div>
-        <select id="media-type">
-          <option value="movies">Movies / Video</option>
-          <option value="audio">Audio / Radio</option>
-          <option value="movies,audio">All Media</option>
-        </select>
-        <select id="search-collection">
-          <option value="">Any Collection</option>
-          <option value="prelinger">Prelinger Archives (Industrial Films)</option>
-          <option value="feature_films">Feature Films</option>
-          <option value="old_time_radio">Old Time Radio</option>
-          <option value="classic_tv">Classic TV</option>
-          <option value="TV_archive">Television Archive</option>
-          <option value="classic-cartoons">Classic Cartoons</option>
-          <option value="newsandpublicaffairs">News & Public Affairs</option>
-          <option value="opensource_movies">Open Source Movies</option>
-        </select>
-      </div>
-      <div class="results-list" id="results-list">
-        <div class="no-results">SEARCH ARCHIVE.ORG TO FIND CONTENT</div>
-      </div>
-    </div>
+<!-- Firebase -->
+<script type="module">
+  import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+  import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-auth.js';
+  import { getFirestore, doc, getDoc, setDoc, onSnapshot, serverTimestamp }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
 
-    <!-- RIGHT: Schedule Editor -->
-    <div class="schedule-panel">
-      <div class="schedule-toolbar">
-        <div class="schedule-toolbar-left">
-          GENRE BLOCKS
-        </div>
-        <div style="display:flex;gap:10px;align-items:center">
-          <div class="block-tabs" id="block-tabs">
-            <!-- tabs rendered by JS -->
-          </div>
-          <button class="btn btn-sm" id="btn-add-block">+ BLOCK</button>
-        </div>
-      </div>
+  // ─────────────────────────────────────────────────────────────
+  //  🔧 PASTE YOUR FIREBASE CONFIG HERE (same as index.html)
+  // ─────────────────────────────────────────────────────────────
+  const firebaseConfig = {
+    apiKey:            "PASTE_YOUR_API_KEY",
+    authDomain:        "PASTE_YOUR_AUTH_DOMAIN",
+    projectId:         "PASTE_YOUR_PROJECT_ID",
+    storageBucket:     "PASTE_YOUR_STORAGE_BUCKET",
+    messagingSenderId: "PASTE_YOUR_MESSAGING_SENDER_ID",
+    appId:             "PASTE_YOUR_APP_ID"
+  };
 
-      <div class="schedule-content" id="schedule-content">
-        <!-- block editors rendered by JS -->
-      </div>
+  // ─────────────────────────────────────────────────────────────
+  //  🔒 ALLOWED TEAM EMAILS — add your team's Google accounts
+  // ─────────────────────────────────────────────────────────────
+  const ALLOWED_EMAILS = [
+    "yourname@gmail.com",
+    "teammate@gmail.com",
+    // add more...
+  ];
 
-      <div class="status-bar">
-        <span class="status-msg" id="status-msg">READY</span>
-        <span id="total-duration">0h 0m total</span>
-      </div>
-    </div>
-  </div>
-</div>
+  const app      = initializeApp(firebaseConfig);
+  const auth     = getAuth(app);
+  const db       = getFirestore(app);
+  const provider = new GoogleAuthProvider();
 
-<!-- ADD TO BLOCK MODAL -->
-<div class="modal-backdrop" id="add-modal">
-  <div class="modal">
-    <div class="modal-title">ADD TO SCHEDULE</div>
+  // Expose to React app via window
+  window.__RFA__ = { auth, db, provider, ALLOWED_EMAILS, signInWithPopup, signOut, onAuthStateChanged, doc, getDoc, setDoc, onSnapshot, serverTimestamp };
+</script>
 
-    <div class="form-row">
-      <label>Title</label>
-      <input type="text" id="modal-title" />
-    </div>
-    <div class="form-row">
-      <label>Archive.org Identifier</label>
-      <input type="text" id="modal-identifier" placeholder="e.g. prelinger_industrial_1950" />
-    </div>
-    <div class="form-row">
-      <label>Direct URL (overrides identifier)</label>
-      <input type="text" id="modal-url" placeholder="https://archive.org/download/..." />
-    </div>
-    <div class="form-row">
-      <label>Filename (optional, for multi-file identifiers)</label>
-      <input type="text" id="modal-filename" placeholder="e.g. myvideo.mp4" />
-    </div>
-    <div class="form-row">
-      <label>Duration</label>
-      <div class="duration-row">
-        <input type="number" id="modal-hours" placeholder="0" min="0" max="12" />
-        <span>h</span>
-        <input type="number" id="modal-minutes" placeholder="30" min="0" max="59" />
-        <span>m</span>
-        <input type="number" id="modal-seconds" placeholder="0" min="0" max="59" />
-        <span>s</span>
-      </div>
-    </div>
-    <div class="form-row">
-      <label>Add to Block</label>
-      <select id="modal-block-select"></select>
-    </div>
+<script type="text/babel">
+const { useState, useEffect, useRef, useCallback } = React;
 
-    <div class="modal-actions">
-      <button class="btn" id="modal-cancel">CANCEL</button>
-      <button class="btn btn-primary" id="modal-confirm">ADD TO BLOCK</button>
-    </div>
-  </div>
-</div>
+// ── HELPERS ──────────────────────────────────────────────────
+const BLOCK_COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
 
-<!-- IMPORT MODAL -->
-<div class="modal-backdrop" id="import-modal">
-  <div class="modal">
-    <div class="modal-title">IMPORT SCHEDULE.JSON</div>
-    <div class="form-row">
-      <label>Paste JSON or load file</label>
-      <textarea id="import-textarea" rows="10" style="font-family:monospace;font-size:11px;resize:vertical;background:#0a0a0a;color:#7aff9a;border:1px solid #2a2a2a;padding:10px;" placeholder='{"blocks":[...]}'></textarea>
-    </div>
-    <input type="file" id="import-file" accept=".json" style="display:none"/>
-    <div class="modal-actions">
-      <button class="btn" id="import-file-btn">LOAD FILE</button>
-      <button class="btn" id="import-cancel">CANCEL</button>
-      <button class="btn btn-primary" id="import-confirm">IMPORT</button>
-    </div>
-  </div>
-</div>
+function fmtDur(sec) {
+  const m = Math.floor(sec/60), s = sec % 60;
+  return `${m}:${String(s).padStart(2,'0')}`;
+}
 
-<script>
-// ═══════════════════════════════════════════════════════
-// STATE
-// ═══════════════════════════════════════════════════════
+function uid() { return Math.random().toString(36).slice(2,9); }
+
+const SCHEDULE_REF = () => window.__RFA__.doc(window.__RFA__.db, 'broadcast', 'schedule');
+
+// ── DEFAULT BLOCKS ───────────────────────────────────────────
 const DEFAULT_BLOCKS = [
-  { id: 'b1', name: 'Morning', genre: 'morning', startTime: '06:00', items: [] },
-  { id: 'b2', name: 'Afternoon', genre: 'afternoon', startTime: '12:00', items: [] },
-  { id: 'b3', name: 'Prime Time', genre: 'primetime', startTime: '19:00', items: [] },
-  { id: 'b4', name: 'Late Night', genre: 'latenight', startTime: '23:00', items: [] },
-  { id: 'b5', name: 'Overnight', genre: 'overnight', startTime: '01:00', items: [] },
+  { id: uid(), name: '普通話 — Mandarin Chinese', genre: 'Mandarin Chinese', start: '00:00', color: '#61C230',
+    items: [
+      { id: uid(), t: "Hong Kong's Face Readers Reshape the Future", archiveId: 'youtube-MJVRwBrkzsg', dur: 272 },
+      { id: uid(), t: "Hong Kong Protesters Disappointed With Talks", archiveId: 'youtube-hlSlk-vcnRU', dur: 203 },
+      { id: uid(), t: "Chinese Police Quash Month-Long Land Protest", archiveId: 'youtube-jMk4o81qxL0', dur: 156 },
+    ]
+  },
+  { id: uid(), name: 'မြန်မာဘာသာ — Burmese', genre: 'Burmese', start: '02:40', color: '#3bb0f5',
+    items: [
+      { id: uid(), t: "Myanmar's Jasmine Garland Sellers Go Back to School", archiveId: 'youtube-9Nma364RVCg', dur: 183 },
+      { id: uid(), t: "Myanmar Insurance Industry Grows As Economy Opens",   archiveId: 'youtube-zbq6lEW9FNU', dur: 214 },
+    ]
+  },
 ];
 
-let blocks = JSON.parse(JSON.stringify(DEFAULT_BLOCKS));
-let activeBlockId = blocks[0].id;
-let pendingAdd = null; // item waiting to be added
-
-// ═══════════════════════════════════════════════════════
-// DOM REFS
-// ═══════════════════════════════════════════════════════
-const blockTabsEl = document.getElementById('block-tabs');
-const scheduleContent = document.getElementById('schedule-content');
-const resultsList = document.getElementById('results-list');
-const statusMsg = document.getElementById('status-msg');
-const totalDuration = document.getElementById('total-duration');
-
-// ═══════════════════════════════════════════════════════
-// RENDER
-// ═══════════════════════════════════════════════════════
-function render() {
-  renderTabs();
-  renderBlocks();
-  updateTotalDuration();
+// ── TOAST ─────────────────────────────────────────────────────
+function Toast({ message }) {
+  return <div className="toast">{message}</div>;
 }
 
-function renderTabs() {
-  blockTabsEl.innerHTML = blocks.map(b => `
-    <button class="block-tab ${b.id === activeBlockId ? 'active' : ''}" 
-            data-id="${b.id}">${b.name}</button>
-  `).join('');
-  blockTabsEl.querySelectorAll('.block-tab').forEach(btn => {
-    btn.addEventListener('click', () => { activeBlockId = btn.dataset.id; render(); });
-  });
+// ── LOGIN ─────────────────────────────────────────────────────
+function LoginScreen({ onLogin }) {
+  const [error, setError] = useState('');
+  const [loading, setLoading] = useState(false);
+  const { auth, provider, ALLOWED_EMAILS, signInWithPopup } = window.__RFA__;
+
+  async function handleGoogleSignIn() {
+    setLoading(true); setError('');
+    try {
+      const result = await signInWithPopup(auth, provider);
+      const email = result.user.email;
+      if (!ALLOWED_EMAILS.includes(email)) {
+        await window.__RFA__.signOut(auth);
+        setError(`Access denied: ${email} is not on the approved list.`);
+        setLoading(false); return;
+      }
+      onLogin(result.user);
+    } catch (e) {
+      setError(e.message);
+      setLoading(false);
+    }
+  }
+
+  return (
+    <div className="login-wrap">
+      <div style={{textAlign:'center'}}>
+        <div className="login-logo">RFA</div>
+        <div className="login-sub">Schedule Admin · Broadcast Control</div>
+      </div>
+      <div className="login-card">
+        <div className="login-title">Team Sign-In Required</div>
+        {error && <div className="login-error">{error}</div>}
+        <button className="btn-google" onClick={handleGoogleSignIn} disabled={loading}>
+          {loading ? <div className="spinner"/> : (
+            <svg viewBox="0 0 48 48"><path fill="#FFC107" d="M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z"/><path fill="#FF3D00" d="M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z"/><path fill="#4CAF50" d="M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z"/><path fill="#1976D2" d="M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z"/></svg>
+          )}
+          {loading ? 'Signing in…' : 'Continue with Google'}
+        </button>
+      </div>
+    </div>
+  );
 }
 
-function renderBlocks() {
-  scheduleContent.innerHTML = '';
-  blocks.forEach(block => {
-    const el = document.createElement('div');
-    el.className = 'block-editor' + (block.id === activeBlockId ? ' active' : '');
-    el.dataset.blockId = block.id;
+// ── ADD BLOCK MODAL ───────────────────────────────────────────
+function AddBlockModal({ onAdd, onClose }) {
+  const [name, setName] = useState('');
+  const [genre, setGenre] = useState('');
+  const [start, setStart] = useState('00:00');
+  const [color, setColor] = useState(BLOCK_COLORS[0]);
 
-    let itemsHtml = '';
-    let cursor = parseTimeStr(block.startTime);
-    block.items.forEach((item, idx) => {
-      const t = fmtSeconds(cursor);
-      const dur = item.duration || 0;
-      cursor += dur;
-      itemsHtml += `
-        <div class="sched-item" draggable="true" data-idx="${idx}">
-          <div class="drag-handle">⠿</div>
-          <div class="sched-item-info">
-            <div class="sched-item-title">${esc(item.title || item.identifier || '?')}</div>
-            <div class="sched-item-meta">
-              <span>${item.identifier || '—'}</span>
-              <span>${fmtDuration(dur)}</span>
-            </div>
-          </div>
-          <div class="sched-item-time">${t}</div>
-          <button class="btn btn-danger btn-sm" data-remove="${idx}">✕</button>
-        </div>`;
-    });
+  function submit() {
+    if (!name.trim()) return;
+    onAdd({ id: uid(), name: name.trim(), genre: genre.trim() || name.trim(), start, color, items: [] });
+    onClose();
+  }
 
-    el.innerHTML = `
-      <div class="block-header">
-        <div>
-          <div class="block-title-row">
-            <input class="block-name-input" value="${esc(block.name)}" data-field="name" />
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-title">New Block</div>
+        <div className="modal-sub">Add a language / programming block</div>
+        <div className="field" style={{marginBottom:14}}>
+          <div className="field-label">Block Name</div>
+          <input value={name} onChange={e=>setName(e.target.value)} placeholder="e.g. 한국어 — Korean" autoFocus/>
+        </div>
+        <div className="field-group">
+          <div className="field">
+            <div className="field-label">Genre / Language</div>
+            <input value={genre} onChange={e=>setGenre(e.target.value)} placeholder="Korean"/>
           </div>
-          <div class="block-time-row">
-            <label>STARTS AT</label>
-            <input type="time" value="${block.startTime}" data-field="startTime" style="width:auto"/>
+          <div className="field" style={{maxWidth:100}}>
+            <div className="field-label">UTC Start</div>
+            <input value={start} onChange={e=>setStart(e.target.value)} placeholder="HH:MM"/>
           </div>
         </div>
-        <button class="btn btn-danger btn-sm" data-delete-block="${block.id}">DELETE BLOCK</button>
+        <div className="field" style={{marginTop:4}}>
+          <div className="field-label">Block Color</div>
+          <div className="swatch-grid" style={{marginTop:6}}>
+            {BLOCK_COLORS.map(c => (
+              <div key={c} className={`swatch${color===c?' selected':''}`} style={{background:c}} onClick={()=>setColor(c)}/>
+            ))}
+          </div>
+        </div>
+        <div className="modal-actions">
+          <button className="btn btn-ghost" onClick={onClose}>Cancel</button>
+          <button className="btn btn-primary" onClick={submit} disabled={!name.trim()}>Add Block</button>
+        </div>
       </div>
-      <div class="item-list" id="list-${block.id}">
-        ${itemsHtml || '<div class="empty-block">NO ITEMS — SEARCH AND ADD CONTENT FROM THE LEFT PANEL</div>'}
-      </div>`;
-
-    // Events
-    el.querySelectorAll('[data-field]').forEach(inp => {
-      inp.addEventListener('input', e => {
-        block[e.target.dataset.field] = e.target.value;
-        updateTotalDuration();
-      });
-    });
-    el.querySelectorAll('[data-remove]').forEach(btn => {
-      btn.addEventListener('click', e => {
-        const idx = parseInt(btn.dataset.remove);
-        block.items.splice(idx, 1);
-        render();
-      });
-    });
-    el.querySelectorAll('[data-delete-block]').forEach(btn => {
-      btn.addEventListener('click', () => {
-        if (!confirm(`Delete block "${block.name}"?`)) return;
-        blocks = blocks.filter(b => b.id !== block.id);
-        activeBlockId = blocks[0]?.id || '';
-        render();
-      });
-    });
-
-    // Drag-and-drop reorder
-    setupDragDrop(el.querySelector('.item-list'), block);
-
-    scheduleContent.appendChild(el);
-  });
+    </div>
+  );
 }
 
-function setupDragDrop(listEl, block) {
-  if (!listEl) return;
-  let dragIdx = null;
-  listEl.querySelectorAll('.sched-item').forEach((item, idx) => {
-    item.addEventListener('dragstart', () => { dragIdx = idx; item.classList.add('dragging'); });
-    item.addEventListener('dragend', () => item.classList.remove('dragging'));
-    item.addEventListener('dragover', e => { e.preventDefault(); item.classList.add('drag-over'); });
-    item.addEventListener('dragleave', () => item.classList.remove('drag-over'));
-    item.addEventListener('drop', e => {
-      e.preventDefault();
-      item.classList.remove('drag-over');
-      if (dragIdx === null || dragIdx === idx) return;
-      const moved = block.items.splice(dragIdx, 1)[0];
-      block.items.splice(idx, 0, moved);
-      dragIdx = null;
-      render();
-    });
-  });
+// ── ITEM ROW ─────────────────────────────────────────────────
+function ItemRow({ item, index, onUpdate, onDelete, onDragStart, onDragOver, onDrop }) {
+  return (
+    <div
+      className="item-row"
+      draggable
+      onDragStart={() => onDragStart(index)}
+      onDragOver={e => { e.preventDefault(); onDragOver(index); }}
+      onDrop={() => onDrop(index)}
+    >
+      <div className="item-num" title="Drag to reorder">⠿</div>
+      <input
+        value={item.t}
+        onChange={e => onUpdate(index, 't', e.target.value)}
+        placeholder="Video title"
+      />
+      <input
+        value={item.archiveId}
+        onChange={e => onUpdate(index, 'archiveId', e.target.value)}
+        placeholder="Archive.org ID (e.g. youtube-AbCdEf)"
+        style={{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--dim)'}}
+      />
+      <div className="dur-display">{fmtDur(item.dur)}</div>
+      <button className="btn-icon" onClick={() => onDelete(index)} title="Remove">✕</button>
+    </div>
+  );
 }
 
-// ═══════════════════════════════════════════════════════
-// ARCHIVE.ORG SEARCH
-// Uses the public Archive.org Metadata/Search APIs directly.
-// archive.org sends Access-Control-Allow-Origin: * on its
-// JSON endpoints, so no proxy is needed.
-// ═══════════════════════════════════════════════════════
+// ── BLOCK EDITOR ─────────────────────────────────────────────
+function BlockEditor({ block, onChange, onDelete }) {
+  const [dragFrom, setDragFrom] = useState(null);
 
-document.getElementById('btn-search').addEventListener('click', doSearch);
-document.getElementById('search-input').addEventListener('keydown', e => {
-  if (e.key === 'Enter') doSearch();
-});
+  function updateField(field, val) {
+    onChange({ ...block, [field]: val });
+  }
 
-async function doSearch() {
-  const q = document.getElementById('search-input').value.trim();
-  if (!q) return;
-  const mediatype = document.getElementById('media-type').value;
-  const collection = document.getElementById('search-collection').value;
+  function updateItem(idx, field, val) {
+    const items = block.items.map((it, i) => i === idx ? { ...it, [field]: val } : it);
+    onChange({ ...block, items });
+  }
 
-  resultsList.innerHTML = '<div class="searching">SEARCHING ARCHIVE.ORG...</div>';
+  function addItem() {
+    onChange({ ...block, items: [...block.items, { id: uid(), t: '', archiveId: '', dur: 0 }] });
+  }
 
-  // Build query string
-  const mediatypeClause = mediatype.split(',').map(m => `mediatype:${m}`).join(' OR ');
-  const collClause = collection ? ` AND collection:(${collection})` : '';
-  const fullQuery = `(${q}) AND (${mediatypeClause})${collClause}`;
+  function deleteItem(idx) {
+    onChange({ ...block, items: block.items.filter((_, i) => i !== idx) });
+  }
 
-  // Archive.org's advancedsearch endpoint supports CORS for JSON responses
-  const params = new URLSearchParams({
-    q: fullQuery,
-    'fl[]': 'identifier,title,mediatype,runtime,date',
-    rows: '24',
-    page: '1',
-    output: 'json',
-    'sort[]': 'downloads desc'
-  });
+  function handleDragStart(idx) { setDragFrom(idx); }
+  function handleDragOver(idx) {}
+  function handleDrop(idx) {
+    if (dragFrom === null || dragFrom === idx) return;
+    const items = [...block.items];
+    const [moved] = items.splice(dragFrom, 1);
+    items.splice(idx, 0, moved);
+    onChange({ ...block, items });
+    setDragFrom(null);
+  }
 
-  // fl[] needs to be repeated — URLSearchParams deduplicates, so build manually
-  const fields = ['identifier','title','mediatype','runtime','date'];
-  const flParams = fields.map(f => `fl[]=${encodeURIComponent(f)}`).join('&');
-  const url = `https://archive.org/advancedsearch.php?q=${encodeURIComponent(fullQuery)}&${flParams}&rows=24&output=json&sort[]=downloads+desc`;
+  const totalDur = block.items.reduce((s, it) => s + (parseInt(it.dur) || 0), 0);
 
-  try {
-    const resp = await fetch(url, { headers: { 'Accept': 'application/json' } });
-    if (!resp.ok) throw new Error(`HTTP ${resp.status}`);
-    const data = await resp.json();
-    const docs = data?.response?.docs || [];
+  return (
+    <div>
+      <div className="editor-header">
+        <div className="editor-title-group">
+          <div className="editor-title" style={{color: block.color || 'var(--primary)'}}>{block.name || 'Untitled Block'}</div>
+          <div style={{display:'flex', gap:16, alignItems:'center'}}>
+            <span style={{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--dim)',letterSpacing:'.2em'}}>
+              UTC {block.start} · {block.items.length} ITEMS · {fmtDur(totalDur)} TOTAL
+            </span>
+          </div>
+        </div>
+        <div className="editor-actions">
+          <button className="btn btn-danger" onClick={onDelete}>Delete Block</button>
+        </div>
+      </div>
 
-    if (docs.length === 0) {
-      resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND — TRY DIFFERENT KEYWORDS</div>';
-      return;
-    }
-    renderResults(docs);
+      {/* Block metadata */}
+      <div className="field-group">
+        <div className="field" style={{flex:2}}>
+          <div className="field-label">Block Name</div>
+          <input value={block.name} onChange={e=>updateField('name',e.target.value)} placeholder="Language block name"/>
+        </div>
+        <div className="field">
+          <div className="field-label">Genre Label</div>
+          <input value={block.genre} onChange={e=>updateField('genre',e.target.value)} placeholder="Language"/>
+        </div>
+        <div className="field" style={{maxWidth:110}}>
+          <div className="field-label">UTC Start</div>
+          <input value={block.start} onChange={e=>updateField('start',e.target.value)} placeholder="HH:MM"/>
+        </div>
+        <div className="field" style={{maxWidth:80}}>
+          <div className="field-label">Color</div>
+          <select value={block.color||BLOCK_COLORS[0]} onChange={e=>updateField('color',e.target.value)}
+            style={{background:`${block.color||BLOCK_COLORS[0]}22`,borderColor:block.color||BLOCK_COLORS[0]}}>
+            {BLOCK_COLORS.map(c => <option key={c} value={c} style={{background:'var(--surface2)'}}>{c}</option>)}
+          </select>
+        </div>
+      </div>
 
-  } catch(err) {
-    console.warn('advancedsearch failed, trying scrape API:', err.message);
+      {/* Items */}
+      <div className="items-header">
+        <div className="items-label">Playlist Items</div>
+        <div className="items-count">{block.items.length} items</div>
+      </div>
 
-    // Fallback: scrape API (also CORS-enabled)
-    try {
-      const scrapeUrl = `https://archive.org/services/search/v1/scrape?q=${encodeURIComponent(fullQuery)}&fields=identifier,title,mediatype,runtime,date&count=24`;
-      const resp2 = await fetch(scrapeUrl, { headers: { 'Accept': 'application/json' } });
-      if (!resp2.ok) throw new Error(`HTTP ${resp2.status}`);
-      const data2 = await resp2.json();
-      const items = data2?.items || [];
+      {/* Column headers */}
+      <div style={{display:'grid',gridTemplateColumns:'24px 1fr 220px 72px 36px',gap:6,padding:'4px 12px',marginBottom:4}}>
+        <div/><div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>TITLE</div>
+        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}}>ARCHIVE.ORG ID</div>
+        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em',textAlign:'center'}}>DUR</div>
+        <div/>
+      </div>
 
-      if (items.length === 0) {
-        resultsList.innerHTML = '<div class="no-results">NO RESULTS FOUND</div>';
-        return;
+      {block.items.map((item, i) => (
+        <ItemRow
+          key={item.id}
+          item={item}
+          index={i}
+          onUpdate={updateItem}
+          onDelete={deleteItem}
+          onDragStart={handleDragStart}
+          onDragOver={handleDragOver}
+          onDrop={handleDrop}
+        />
+      ))}
+
+      <button className="add-item-btn" onClick={addItem}>+ Add Item</button>
+
+      <div style={{marginTop:20,padding:'12px 16px',background:'var(--surface2)',border:'1px solid var(--border)'}}>
+        <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.3em',marginBottom:8}}>
+          DURATION FIELD NOTE
+        </div>
+        <div style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',lineHeight:1.7}}>
+          Duration (<code style={{color:'var(--primary)'}}>dur</code>) is in seconds. You can get exact durations from{' '}
+          <span style={{color:'var(--offwhite)'}}>archive.org/metadata/&lt;id&gt;</span> under the file's length field.
+          Items automatically loop within each block's time window.
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// ── MAIN APP ─────────────────────────────────────────────────
+function App() {
+  const [user, setUser] = useState(null);
+  const [authChecked, setAuthChecked] = useState(false);
+  const [blocks, setBlocks] = useState([]);
+  const [activeId, setActiveId] = useState(null);
+  const [isDirty, setIsDirty] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [toast, setToast] = useState(null);
+  const [showAddBlock, setShowAddBlock] = useState(false);
+  const [liveStatus, setLiveStatus] = useState('connecting');
+  const [lastSaved, setLastSaved] = useState(null);
+  const toastTimer = useRef(null);
+
+  const { auth, onAuthStateChanged, signOut, ALLOWED_EMAILS, onSnapshot, doc, db, setDoc, serverTimestamp } = window.__RFA__;
+
+  // Auth state
+  useEffect(() => {
+    return onAuthStateChanged(auth, u => {
+      if (u && ALLOWED_EMAILS.includes(u.email)) {
+        setUser(u);
+      } else {
+        setUser(null);
       }
-      renderResults(items);
-
-    } catch(err2) {
-      resultsList.innerHTML = `
-        <div class="no-results">
-          SEARCH UNAVAILABLE<br><br>
-          <span style="font-size:10px;color:#555;line-height:1.8">
-            Archive.org may be temporarily down.<br>
-            You can still add items manually:<br><br>
-            1. Find a video on archive.org<br>
-            2. Copy the identifier from the URL<br>
-            &nbsp;&nbsp;&nbsp;<em style="color:#7a5800">archive.org/details/<strong style="color:#ffb700">IDENTIFIER</strong></em><br>
-            3. Click "+ ADD ITEM MANUALLY" below
-          </span><br><br>
-          <button class="btn btn-sm" id="manual-add-btn">+ ADD ITEM MANUALLY</button>
-        </div>`;
-      document.getElementById('manual-add-btn')?.addEventListener('click', () => {
-        openAddModal({ identifier: '', title: '', runtime: '' });
-      });
-      console.error('Both search attempts failed:', err2);
-    }
-  }
-}
-
-function renderResults(items) {
-  resultsList.innerHTML = items.map(d => {
-    const runtime = Array.isArray(d.runtime) ? d.runtime[0] : (d.runtime || '');
-    const date = d.date ? String(d.date).substring(0,4) : '';
-    const title = d.title || d.identifier || 'Untitled';
-    const archiveLink = `https://archive.org/details/${encodeURIComponent(d.identifier)}`;
-    return `
-    <div class="result-item">
-      <div class="result-title">${esc(title)}</div>
-      <div class="result-meta">
-        ${date ? `<span>📅 ${esc(date)}</span>` : ''}
-        ${runtime ? `<span>⏱ ${esc(runtime)}</span>` : ''}
-        <span style="text-transform:uppercase">${esc(d.mediatype||'')}</span>
-        <a href="${archiveLink}" target="_blank" style="color:var(--amber-dim);text-decoration:none;font-size:9px" title="Preview on archive.org">↗</a>
-      </div>
-      <button class="btn btn-sm result-add-btn"
-        data-id="${esc(d.identifier)}"
-        data-title="${esc(title)}"
-        data-runtime="${esc(runtime)}">+ ADD TO BLOCK</button>
-    </div>`;
-  }).join('');
-
-  resultsList.querySelectorAll('.result-add-btn').forEach(btn => {
-    btn.addEventListener('click', e => {
-      e.stopPropagation();
-      openAddModal({
-        identifier: btn.dataset.id,
-        title: btn.dataset.title,
-        runtime: btn.dataset.runtime
-      });
+      setAuthChecked(true);
     });
-  });
-}
+  }, []);
 
-// ═══════════════════════════════════════════════════════
-// ADD MODAL
-// ═══════════════════════════════════════════════════════
-const addModal = document.getElementById('add-modal');
+  // Load schedule from Firestore
+  useEffect(() => {
+    if (!user) return;
+    const ref = window.__RFA__.doc(window.__RFA__.db, 'broadcast', 'schedule');
+    const unsub = onSnapshot(ref, snap => {
+      setLiveStatus('live');
+      if (snap.exists()) {
+        const data = snap.data();
+        if (data.blocks) {
+          // Ensure all items have local IDs for React keys
+          const hydrated = data.blocks.map(b => ({
+            ...b,
+            id: b.id || uid(),
+            items: (b.items || []).map(it => ({ ...it, id: it.id || uid() }))
+          }));
+          setBlocks(hydrated);
+          if (!activeId && hydrated.length > 0) setActiveId(hydrated[0].id);
+        }
+      } else {
+        // No schedule yet — seed with defaults
+        setBlocks(DEFAULT_BLOCKS);
+        setActiveId(DEFAULT_BLOCKS[0].id);
+      }
+      setIsLoading(false);
+      setIsDirty(false);
+    }, err => {
+      setLiveStatus('error');
+      console.error('Firestore error:', err);
+      setIsLoading(false);
+    });
+    return unsub;
+  }, [user]);
 
-function openAddModal(item) {
-  pendingAdd = item;
-  document.getElementById('modal-title').value = item.title || '';
-  document.getElementById('modal-identifier').value = item.identifier || '';
-  document.getElementById('modal-url').value = '';
-  document.getElementById('modal-filename').value = '';
-
-  // Parse runtime "HH:MM:SS" or "MM:SS"
-  const [h,m,s] = parseRuntime(item.runtime);
-  document.getElementById('modal-hours').value = h;
-  document.getElementById('modal-minutes').value = m;
-  document.getElementById('modal-seconds').value = s;
-
-  // Populate block select
-  const sel = document.getElementById('modal-block-select');
-  sel.innerHTML = blocks.map(b => `<option value="${b.id}">${b.name}</option>`).join('');
-  sel.value = activeBlockId;
-
-  addModal.classList.add('open');
-}
-
-document.getElementById('modal-cancel').addEventListener('click', () => addModal.classList.remove('open'));
-document.getElementById('modal-confirm').addEventListener('click', () => {
-  const title = document.getElementById('modal-title').value.trim();
-  const identifier = document.getElementById('modal-identifier').value.trim();
-  const url = document.getElementById('modal-url').value.trim();
-  const filename = document.getElementById('modal-filename').value.trim();
-  const h = parseInt(document.getElementById('modal-hours').value) || 0;
-  const m = parseInt(document.getElementById('modal-minutes').value) || 0;
-  const s = parseInt(document.getElementById('modal-seconds').value) || 0;
-  const duration = h*3600 + m*60 + s;
-  const blockId = document.getElementById('modal-block-select').value;
-
-  const block = blocks.find(b => b.id === blockId);
-  if (!block) return;
-
-  const newItem = { title, identifier, duration };
-  if (url) newItem.url = url;
-  if (filename) newItem.filename = filename;
-
-  block.items.push(newItem);
-  activeBlockId = blockId;
-  addModal.classList.remove('open');
-  render();
-  setStatus(`Added "${title}" to ${block.name}`, 'ok');
-});
-
-// ═══════════════════════════════════════════════════════
-// ADD BLOCK
-// ═══════════════════════════════════════════════════════
-document.getElementById('btn-add-block').addEventListener('click', () => {
-  const id = 'b' + Date.now();
-  blocks.push({ id, name: 'New Block', genre: 'custom', startTime: '00:00', items: [] });
-  activeBlockId = id;
-  render();
-});
-
-// ═══════════════════════════════════════════════════════
-// EXPORT
-// ═══════════════════════════════════════════════════════
-document.getElementById('btn-export').addEventListener('click', exportSchedule);
-
-function exportSchedule() {
-  const data = buildScheduleData();
-  const json = JSON.stringify(data, null, 2);
-  const blob = new Blob([json], { type: 'application/json' });
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = 'schedule.json';
-  a.click();
-  setStatus('SCHEDULE.JSON EXPORTED — PLACE IN SAME DIRECTORY AS INDEX.HTML', 'ok');
-}
-
-function buildScheduleData() {
-  return {
-    version: 1,
-    generated: new Date().toISOString(),
-    blocks: blocks.map(b => ({
-      id: b.id,
-      name: b.name,
-      genre: b.genre || b.name.toLowerCase(),
-      startTime: b.startTime,
-      items: b.items.map(item => ({
-        ...item,
-        scheduledStart: b.startTime  // will be refined by player's timeline builder
-      }))
-    }))
-  };
-}
-
-// ═══════════════════════════════════════════════════════
-// IMPORT
-// ═══════════════════════════════════════════════════════
-const importModal = document.getElementById('import-modal');
-document.getElementById('btn-import').addEventListener('click', () => importModal.classList.add('open'));
-document.getElementById('import-cancel').addEventListener('click', () => importModal.classList.remove('open'));
-
-document.getElementById('import-file-btn').addEventListener('click', () => {
-  document.getElementById('import-file').click();
-});
-document.getElementById('import-file').addEventListener('change', e => {
-  const file = e.target.files[0];
-  if (!file) return;
-  const reader = new FileReader();
-  reader.onload = ev => { document.getElementById('import-textarea').value = ev.target.result; };
-  reader.readAsText(file);
-});
-
-document.getElementById('import-confirm').addEventListener('click', () => {
-  try {
-    const data = JSON.parse(document.getElementById('import-textarea').value);
-    if (!data.blocks) throw new Error('Missing blocks array');
-    blocks = data.blocks.map(b => ({
-      id: b.id || 'b' + Date.now() + Math.random(),
-      name: b.name,
-      genre: b.genre,
-      startTime: b.startTime || '00:00',
-      items: (b.items || []).map(item => ({ ...item }))
-    }));
-    activeBlockId = blocks[0]?.id || '';
-    importModal.classList.remove('open');
-    render();
-    setStatus('SCHEDULE IMPORTED SUCCESSFULLY', 'ok');
-  } catch(e) {
-    setStatus('IMPORT FAILED: ' + e.message, 'err');
+  function showToast(msg) {
+    setToast(msg);
+    if (toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(() => setToast(null), 3000);
   }
-});
 
-// ═══════════════════════════════════════════════════════
-// UTILS
-// ═══════════════════════════════════════════════════════
-function esc(s) {
-  return String(s || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  function handleBlockChange(updated) {
+    setBlocks(prev => prev.map(b => b.id === updated.id ? updated : b));
+    setIsDirty(true);
+  }
+
+  function handleAddBlock(block) {
+    setBlocks(prev => [...prev, block]);
+    setActiveId(block.id);
+    setIsDirty(true);
+  }
+
+  function handleDeleteBlock(id) {
+    const next = blocks.filter(b => b.id !== id);
+    setBlocks(next);
+    setActiveId(next.length > 0 ? next[next.length - 1].id : null);
+    setIsDirty(true);
+  }
+
+  async function publishSchedule() {
+    setIsSaving(true);
+    try {
+      // Strip local-only 'id' fields from items before saving — keep archiveId/t/dur
+      const toSave = blocks.map(b => ({
+        id: b.id,
+        name: b.name,
+        genre: b.genre,
+        start: b.start,
+        color: b.color || BLOCK_COLORS[0],
+        items: b.items.map(it => ({
+          id: it.id,
+          t: it.t,
+          archiveId: it.archiveId,
+          dur: parseInt(it.dur) || 0,
+        }))
+      }));
+
+      const ref = window.__RFA__.doc(window.__RFA__.db, 'broadcast', 'schedule');
+      await window.__RFA__.setDoc(ref, {
+        blocks: toSave,
+        publishedAt: serverTimestamp(),
+        publishedBy: user.email,
+      });
+
+      setIsDirty(false);
+      setLastSaved(new Date());
+      showToast('✓ SCHEDULE PUBLISHED — LIVE IN ~1 SECOND');
+    } catch (e) {
+      showToast('✗ PUBLISH FAILED: ' + e.message);
+    }
+    setIsSaving(false);
+  }
+
+  async function handleSignOut() {
+    await signOut(auth);
+    setUser(null);
+  }
+
+  // ── RENDER ────────────────────────────────────────────────
+  if (!authChecked) {
+    return <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100vh'}}>
+      <div className="spinner"/>
+    </div>;
+  }
+
+  if (!user) return <LoginScreen onLogin={setUser}/>;
+
+  const activeBlock = blocks.find(b => b.id === activeId);
+
+  return (
+    <div className="app">
+      {/* Top bar */}
+      <div className="topbar">
+        <div className="topbar-left">
+          <div className="topbar-logo">RFA</div>
+          <div className="topbar-label">Schedule Admin</div>
+        </div>
+        <div className="topbar-right">
+          <div className={`status-pill${liveStatus==='live'?' live':''}`}>
+            <div className="status-dot"/>
+            {liveStatus === 'live' ? 'FIRESTORE LIVE' : liveStatus === 'error' ? 'OFFLINE' : 'CONNECTING'}
+          </div>
+          <div className="user-badge">
+            {user.photoURL
+              ? <img className="user-avatar" src={user.photoURL} alt=""/>
+              : <div className="user-avatar-placeholder">{(user.email||'?')[0].toUpperCase()}</div>
+            }
+            <span>{user.email}</span>
+          </div>
+          <button className="btn btn-ghost" style={{padding:'6px 12px',fontSize:'9px'}} onClick={handleSignOut}>Sign Out</button>
+        </div>
+      </div>
+
+      <div className="main">
+        {/* Sidebar */}
+        <div className="sidebar">
+          <div className="sidebar-section">
+            <div className="sidebar-heading">Programming Blocks — {blocks.length}</div>
+            <div className="block-list">
+              {blocks
+                .slice()
+                .sort((a,b) => {
+                  const [ah,am] = a.start.split(':').map(Number);
+                  const [bh,bm] = b.start.split(':').map(Number);
+                  return (ah*60+am) - (bh*60+bm);
+                })
+                .map(b => (
+                  <div
+                    key={b.id}
+                    className={`block-item${activeId===b.id?' active':''}`}
+                    onClick={() => setActiveId(b.id)}
+                  >
+                    <div className="block-dot" style={{background: b.color || '#61C230'}}/>
+                    <div className="block-info">
+                      <div className="block-name">{b.name}</div>
+                      <div className="block-meta">UTC {b.start}</div>
+                    </div>
+                    <div className="block-count">{b.items.length}</div>
+                  </div>
+                ))
+              }
+            </div>
+          </div>
+
+          <button className="sidebar-add-btn" onClick={() => setShowAddBlock(true)}>
+            + New Block
+          </button>
+        </div>
+
+        {/* Editor */}
+        <div className="editor">
+          {isLoading ? (
+            <div style={{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:12}}>
+              <div className="spinner"/>
+              <span style={{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',letterSpacing:'.2em'}}>LOADING FROM FIRESTORE…</span>
+            </div>
+          ) : activeBlock ? (
+            <BlockEditor
+              key={activeBlock.id}
+              block={activeBlock}
+              onChange={handleBlockChange}
+              onDelete={() => handleDeleteBlock(activeBlock.id)}
+            />
+          ) : (
+            <div className="editor-empty">
+              <div className="editor-empty-icon">📡</div>
+              <div className="editor-empty-text">Select or create a block to edit</div>
+            </div>
+          )}
+        </div>
+      </div>
+
+      {/* Publish bar */}
+      <div className="publish-bar">
+        <div>
+          <div className={`publish-status ${isDirty ? 'unsaved' : 'saved'}`}>
+            {isDirty ? '● UNSAVED CHANGES' : lastSaved ? `✓ SAVED ${lastSaved.toLocaleTimeString()}` : '✓ IN SYNC WITH FIRESTORE'}
+          </div>
+          <div style={{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',marginTop:4,letterSpacing:'.15em'}}>
+            Publishing pushes the schedule live instantly — no page reload needed on viewer.
+          </div>
+        </div>
+        <div className="publish-actions">
+          <button className="btn btn-ghost" onClick={() => { setIsDirty(false); showToast('Changes discarded'); }}>
+            Discard
+          </button>
+          <button
+            className="btn btn-primary"
+            onClick={publishSchedule}
+            disabled={isSaving || !isDirty}
+          >
+            {isSaving ? <><div className="spinner"/>Publishing…</> : '⬆ Publish to Live'}
+          </button>
+        </div>
+      </div>
+
+      {/* Modals & toasts */}
+      {showAddBlock && <AddBlockModal onAdd={handleAddBlock} onClose={() => setShowAddBlock(false)}/>}
+      {toast && <Toast message={toast}/>}
+    </div>
+  );
 }
 
-function parseTimeStr(t) {
-  if (!t) return 0;
-  const [h, m] = t.split(':').map(Number);
-  return (h||0)*3600 + (m||0)*60;
-}
-
-function fmtSeconds(s) {
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  return `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-}
-
-function fmtDuration(s) {
-  if (!s) return '?m';
-  const h = Math.floor(s / 3600);
-  const m = Math.floor((s % 3600) / 60);
-  const sec = s % 60;
-  if (h > 0) return `${h}h ${m}m`;
-  if (m > 0) return `${m}m ${sec > 0 ? sec+'s' : ''}`.trim();
-  return `${sec}s`;
-}
-
-function parseRuntime(rt) {
-  if (!rt) return [0,0,0];
-  const parts = rt.split(':').map(Number);
-  if (parts.length === 3) return [parts[0], parts[1], parts[2]];
-  if (parts.length === 2) return [0, parts[0], parts[1]];
-  return [0, parseInt(rt)||0, 0];
-}
-
-function updateTotalDuration() {
-  let total = 0;
-  blocks.forEach(b => b.items.forEach(i => total += i.duration || 0));
-  const h = Math.floor(total / 3600);
-  const m = Math.floor((total % 3600) / 60);
-  totalDuration.textContent = `${h}h ${m}m total scheduled`;
-}
-
-function setStatus(msg, type = '') {
-  statusMsg.textContent = msg;
-  statusMsg.className = 'status-msg ' + type;
-  if (type) setTimeout(() => { statusMsg.textContent = 'READY'; statusMsg.className = 'status-msg'; }, 5000);
-}
-
-// ═══════════════════════════════════════════════════════
-// INIT
-// ═══════════════════════════════════════════════════════
-render();
+ReactDOM.createRoot(document.getElementById('root')).render(<App/>);
 </script>
 </body>
 </html>
