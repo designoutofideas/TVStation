@@ -18,128 +18,154 @@
 html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font-family:var(--sans);font-size:14px}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
 
-/* ── LOADING ── */
+/* BOOT */
 #boot{display:flex;align-items:center;justify-content:center;height:100vh;gap:14px;flex-direction:column}
-.spin{width:20px;height:20px;border:2px solid rgba(97,194,48,.2);border-top-color:var(--p);border-radius:50%;animation:spn .7s linear infinite}
+.spin{width:20px;height:20px;border:2px solid rgba(97,194,48,.2);border-top-color:var(--p);border-radius:50%;animation:spn .7s linear infinite;flex-shrink:0}
 @keyframes spn{to{transform:rotate(360deg)}}
 .boot-txt{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.3em;text-transform:uppercase}
 
-/* ── LOGIN ── */
+/* LOGIN */
 #login{display:none;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:28px;background:radial-gradient(ellipse at 50% 30%,rgba(97,194,48,.06),transparent 70%)}
 .ll{font-family:var(--disp);font-size:60px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 40px rgba(97,194,48,.4);line-height:1}
 .lsub{font-family:var(--mono);font-size:9px;letter-spacing:.4em;color:var(--dim);text-transform:uppercase;margin-top:-18px}
 .lcard{background:var(--s1);border:1px solid var(--b);padding:40px 48px;display:flex;flex-direction:column;align-items:center;gap:20px;min-width:340px}
 .ltitle{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
 .lerr{font-family:var(--mono);font-size:10px;color:var(--red);background:var(--redd);border:1px solid rgba(255,68,51,.2);padding:8px 14px;width:100%;text-align:center;display:none}
-/* Google button container — GIS injects into this div */
 #g_btn{width:100%}
 
-/* ── APP ── */
+/* APP */
 #app{display:none;flex-direction:column;min-height:100vh}
 
-/* topbar */
-.tb{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;background:var(--s1);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:50}
-.tbl{display:flex;align-items:center;gap:16px}
-.tlo{font-family:var(--disp);font-size:28px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 16px rgba(97,194,48,.4)}
-.tla{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;border-left:1px solid var(--b);padding-left:16px}
-.tbr{display:flex;align-items:center;gap:12px}
+/* TOPBAR */
+.tb{display:flex;align-items:center;justify-content:space-between;padding:0 22px;height:54px;background:var(--s1);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:50}
+.tbl{display:flex;align-items:center;gap:14px}
+.tlo{font-family:var(--disp);font-size:26px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 16px rgba(97,194,48,.4)}
+.tla{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;border-left:1px solid var(--b);padding-left:14px}
+.tbr{display:flex;align-items:center;gap:10px}
+.watch-link{display:inline-flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--p);text-decoration:none;text-transform:uppercase;border:1px solid rgba(97,194,48,.3);padding:5px 11px;transition:all .15s}
+.watch-link:hover{background:rgba(97,194,48,.08);border-color:var(--p)}
+.watch-dot{width:6px;height:6px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:blk 1.4s infinite;flex-shrink:0}
+@keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}
 .spill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;background:var(--s2);border:1px solid var(--b);padding:4px 10px}
 .spill.live{color:var(--p);border-color:rgba(97,194,48,.3)}
 .sdot{width:6px;height:6px;border-radius:50%;background:var(--dim)}
 .spill.live .sdot{background:var(--p);box-shadow:0 0 6px var(--p);animation:blk 1.4s infinite}
-@keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}
-.ubadge{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--dim)}
-.uav{width:26px;height:26px;border-radius:50%;border:1px solid var(--b);object-fit:cover}
-.uavp{width:26px;height:26px;border-radius:50%;background:var(--pd);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--wh);font-weight:600}
-.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap;background:transparent}
-.btn-ghost{border-color:var(--b);color:var(--dim)}.btn-ghost:hover{border-color:var(--bh);color:var(--off)}
-.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
-.btn-primary{background:var(--p);border-color:var(--p);color:#050d06;font-weight:600}
-.btn-primary:hover:not(:disabled){background:#74d63d;border-color:#74d63d}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed}
-.btn-danger{border-color:rgba(255,68,51,.3);color:var(--red)}.btn-danger:hover{background:var(--redd)}
+.ubadge{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:10px;color:var(--dim)}
+.uav{width:24px;height:24px;border-radius:50%;border:1px solid var(--b);object-fit:cover}
+.uavp{width:24px;height:24px;border-radius:50%;background:var(--pd);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--wh);font-weight:600}
 
-/* main layout */
+/* BUTTONS */
+.btn{display:inline-flex;align-items:center;gap:7px;padding:7px 14px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap;background:transparent}
+.btn-ghost{border-color:var(--b);color:var(--dim)}.btn-ghost:hover{border-color:var(--bh);color:var(--off)}.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
+.btn-primary{background:var(--p);border-color:var(--p);color:#050d06;font-weight:600}.btn-primary:hover:not(:disabled){background:#74d63d;border-color:#74d63d}.btn-primary:disabled{opacity:.4;cursor:not-allowed}
+.btn-danger{border-color:rgba(255,68,51,.3);color:var(--red)}.btn-danger:hover{background:var(--redd)}
+.btn-sm{padding:4px 10px;font-size:9px}
+
+/* MAIN LAYOUT */
 .main{display:flex;flex:1}
-.sb{width:270px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
-.sbsec{padding:18px 14px 10px}
-.sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:10px}
+.sb{width:260px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto}
+.sbsec{padding:16px 13px 8px}
+.sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:9px}
 .blist{display:flex;flex-direction:column;gap:2px}
-.bitem{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;border:1px solid transparent;transition:all .12s;border-radius:2px}
+.bitem{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border:1px solid transparent;transition:all .12s;border-radius:2px}
 .bitem:hover{background:var(--pg);border-color:var(--b)}
 .bitem.act{background:rgba(97,194,48,.1);border-color:rgba(97,194,48,.3)}
 .bdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .binfo{flex:1;min-width:0}
 .bname{font-size:12px;font-weight:500;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .bmeta{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:1px}
-.bcnt{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 6px;border-radius:2px;flex-shrink:0}
-.sb-addbtn{margin:0 14px 14px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:transparent;border:1px dashed rgba(97,194,48,.22);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;transition:all .12s}
+.bcnt{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 5px;border-radius:2px;flex-shrink:0}
+.sb-addbtn{margin:0 13px 13px;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px;background:transparent;border:1px dashed rgba(97,194,48,.22);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;transition:all .12s}
 .sb-addbtn:hover{border-color:var(--p);color:var(--p)}
 
-/* editor */
-.ed{flex:1;padding:28px 30px;overflow-y:auto}
-.ed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;opacity:.35}
-.ed-empty-icon{font-size:44px}
-.ed-empty-txt{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
-.ed-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px}
-.ed-title{font-family:var(--disp);font-size:34px;letter-spacing:.08em;line-height:1}
-.ed-meta{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.18em;margin-top:6px}
+/* EDITOR */
+.ed{flex:1;padding:24px 28px 100px;overflow-y:auto}
+.ed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;gap:14px;opacity:.35}
+.ed-empty-icon{font-size:44px}.ed-empty-txt{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+.ed-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:14px}
+.ed-title{font-family:var(--disp);font-size:32px;letter-spacing:.08em;line-height:1}
+.ed-meta{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.18em;margin-top:5px}
 
-/* fields */
-.fg{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
-.fi{display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px}
+/* FIELDS */
+.fg{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
+.fi{display:flex;flex-direction:column;gap:5px;flex:1;min-width:120px}
 .fl{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
-.fi input,.fi select{background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:8px 11px;outline:none;width:100%;transition:border-color .15s}
+.fi input,.fi select{background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:7px 10px;outline:none;width:100%;transition:border-color .15s}
 .fi input:focus,.fi select:focus{border-color:var(--p)}
 .fi select option{background:var(--s2)}
 
-/* items */
-.ih{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+/* ITEMS TABLE */
+.ih{display:flex;align-items:center;justify-content:space-between;margin-bottom:8px}
 .il{font-family:var(--mono);font-size:8px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
 .ic{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 7px}
-.icols{display:grid;grid-template-columns:22px 1fr 190px 60px 30px;gap:6px;padding:3px 11px;margin-bottom:3px}
-.icolh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.22em}
-.irow{display:grid;grid-template-columns:22px 1fr 190px 60px 30px;gap:6px;align-items:center;padding:7px 11px;border:1px solid var(--b);margin-bottom:3px;background:var(--s2);transition:border-color .12s;cursor:default}
+
+/* grid: handle | air-time | title | archive-id | dur | del */
+.icols{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 28px;gap:5px;padding:3px 10px;margin-bottom:2px}
+.icolh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase}
+.irow{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 28px;gap:5px;align-items:center;padding:6px 10px;border:1px solid var(--b);margin-bottom:3px;background:var(--s2);transition:border-color .12s}
 .irow:hover{border-color:var(--bh)}
 .irow.drag-over{border-color:var(--p);border-style:dashed}
 .ihandle{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;cursor:grab;user-select:none}
-.irow input{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--off);font-family:var(--mono);font-size:12px;padding:2px 3px;outline:none;width:100%;transition:border-color .12s}
+.irow input{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--off);font-family:var(--mono);font-size:11px;padding:2px 3px;outline:none;width:100%;transition:border-color .12s}
 .irow input:focus{border-bottom-color:var(--p)}
 .irow input::placeholder{color:rgba(98,117,104,.4)}
+.irow input.airtime-input{color:var(--p);letter-spacing:.05em}
+.irow input.airtime-input::placeholder{color:rgba(97,194,48,.3)}
 .idur{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
-.idel{width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;cursor:pointer;color:var(--dim);font-size:13px;transition:all .12s}
+.idel{width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;cursor:pointer;color:var(--dim);font-size:12px;transition:all .12s}
 .idel:hover{color:var(--red);border-color:rgba(255,68,51,.3);background:var(--redd)}
-.add-item{display:flex;align-items:center;gap:8px;padding:9px 14px;margin-top:6px;background:transparent;border:1px dashed rgba(97,194,48,.18);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.18em;cursor:pointer;text-transform:uppercase;width:100%;transition:all .12s}
+
+/* AIR TIME badge on scheduled items */
+.airtime-badge{display:inline-block;font-family:var(--mono);font-size:9px;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.25);padding:1px 5px;letter-spacing:.05em;white-space:nowrap}
+
+.add-item-row{display:flex;gap:8px;margin-top:6px}
+.add-item{display:flex;align-items:center;gap:7px;padding:8px 13px;background:transparent;border:1px dashed rgba(97,194,48,.18);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.18em;cursor:pointer;text-transform:uppercase;flex:1;transition:all .12s}
 .add-item:hover{border-color:var(--p);color:var(--p)}
+.search-item{background:rgba(97,194,48,.05);border:1px dashed rgba(97,194,48,.3);color:var(--p)}
+.search-item:hover{background:rgba(97,194,48,.12)}
 
-/* note box */
-.note{margin-top:18px;padding:12px 14px;background:var(--s2);border:1px solid var(--b)}
-.noteh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.28em;margin-bottom:7px}
-.noteb{font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.7}
-.noteb code{color:var(--p)}
+/* PUBLISH BAR */
+.pbar{position:sticky;bottom:0;background:var(--s1);border-top:1px solid var(--b);padding:12px 28px;display:flex;align-items:center;justify-content:space-between;gap:14px;z-index:40}
+.pstat{font-family:var(--mono);font-size:9px;letter-spacing:.15em}
+.pstat.saved{color:var(--p)}.pstat.unsaved{color:var(--amb)}
+.pnote{font-family:var(--mono);font-size:8px;color:var(--dim);margin-top:3px;letter-spacing:.1em}
+.pacts{display:flex;gap:8px}
 
-/* color swatches */
+/* MODALS */
+.modal-bg{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.8);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
+.modal-bg.show{display:flex}
+.modal{background:var(--s1);border:1px solid var(--b);padding:28px;width:100%;max-height:90vh;overflow-y:auto}
+.modal-title{font-family:var(--disp);font-size:24px;letter-spacing:.08em;color:var(--p);margin-bottom:5px}
+.modal-sub{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-bottom:20px}
+.modal-acts{display:flex;gap:10px;margin-top:20px;justify-content:flex-end}
+
+/* SEARCH MODAL */
+#search-modal .modal{max-width:680px}
+.search-bar{display:flex;gap:8px;margin-bottom:16px}
+.search-bar input{flex:1;background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s}
+.search-bar input:focus{border-color:var(--p)}
+.search-results{display:flex;flex-direction:column;gap:6px;max-height:380px;overflow-y:auto}
+.sresult{display:flex;gap:12px;align-items:center;padding:10px 12px;background:var(--s2);border:1px solid var(--b);cursor:pointer;transition:all .12s}
+.sresult:hover{border-color:var(--p);background:var(--pg)}
+.sresult-thumb{width:80px;height:50px;object-fit:cover;flex-shrink:0;background:var(--bg)}
+.sresult-info{flex:1;min-width:0}
+.sresult-title{font-size:12px;font-weight:500;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;margin-bottom:4px}
+.sresult-meta{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.1em}
+.sresult-add{font-family:var(--mono);font-size:9px;color:var(--p);letter-spacing:.15em;text-transform:uppercase;border:1px solid rgba(97,194,48,.3);padding:4px 9px;flex-shrink:0;cursor:pointer;transition:all .12s}
+.sresult-add:hover{background:rgba(97,194,48,.12)}
+.search-empty{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.2em;text-align:center;padding:32px 0}
+.search-loading{display:flex;align-items:center;justify-content:center;gap:10px;padding:32px 0;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.2em}
+
+/* ADD BLOCK MODAL */
+#add-modal .modal{max-width:440px}
+
+/* SWATCHES */
 .swg{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}
 .sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .12s}
 .sw.sel{border-color:var(--wh)}
 
-/* publish bar */
-.pbar{position:sticky;bottom:0;background:var(--s1);border-top:1px solid var(--b);padding:13px 30px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:40}
-.pstat{font-family:var(--mono);font-size:9px;letter-spacing:.15em}
-.pstat.saved{color:var(--p)}.pstat.unsaved{color:var(--amb)}
-.pnote{font-family:var(--mono);font-size:8px;color:var(--dim);margin-top:3px;letter-spacing:.12em}
-.pacts{display:flex;gap:10px}
-
-/* modal */
-.modal-bg{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
-.modal-bg.show{display:flex}
-.modal{background:var(--s1);border:1px solid var(--b);padding:30px;min-width:360px;max-width:460px;width:100%}
-.modal-title{font-family:var(--disp);font-size:26px;letter-spacing:.08em;color:var(--p);margin-bottom:6px}
-.modal-sub{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-bottom:22px}
-.modal-acts{display:flex;gap:10px;margin-top:22px;justify-content:flex-end}
-
-/* toast */
-.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.22em;padding:10px 22px;z-index:200;pointer-events:none;display:none}
+/* TOAST */
+.toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.22em;padding:10px 20px;z-index:300;pointer-events:none;display:none;white-space:nowrap}
 .toast.show{display:block;animation:tst .3s ease forwards}
 @keyframes tst{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>
@@ -167,25 +193,26 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 
 <!-- APP -->
 <div id="app">
-  <!-- Topbar -->
   <div class="tb">
     <div class="tbl">
       <div class="tlo">RFA</div>
       <div class="tla">Schedule Admin</div>
     </div>
     <div class="tbr">
+      <a class="watch-link" href="https://designoutofideas.github.io/TVStation/" target="_blank">
+        <div class="watch-dot"></div>Watch Live
+      </a>
       <div class="spill" id="status-pill"><div class="sdot"></div><span id="status-txt">CONNECTING</span></div>
       <div class="ubadge">
         <div class="uavp" id="uavp">?</div>
         <img class="uav" id="uav" style="display:none" alt="">
-        <span id="uemail" style="font-family:var(--mono);font-size:10px"></span>
+        <span id="uemail" style="font-family:var(--mono);font-size:10px;color:var(--dim)"></span>
       </div>
-      <button class="btn btn-ghost" style="padding:6px 12px;font-size:9px" onclick="signOut()">Sign Out</button>
+      <button class="btn btn-ghost btn-sm" onclick="signOut()">Sign Out</button>
     </div>
   </div>
 
   <div class="main">
-    <!-- Sidebar -->
     <div class="sb">
       <div class="sbsec">
         <div class="sbh" id="sb-heading">Blocks — 0</div>
@@ -193,8 +220,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
       </div>
       <button class="sb-addbtn" onclick="openAddModal()">+ New Block</button>
     </div>
-
-    <!-- Editor -->
     <div class="ed" id="editor">
       <div class="ed-empty">
         <div class="ed-empty-icon">📡</div>
@@ -203,11 +228,10 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
     </div>
   </div>
 
-  <!-- Publish bar -->
   <div class="pbar">
     <div>
       <div class="pstat saved" id="pstat">✓ IN SYNC WITH FIRESTORE</div>
-      <div class="pnote">Publishing pushes the schedule live instantly — no page reload needed on viewer.</div>
+      <div class="pnote">Publishing pushes the schedule live instantly — no reload needed on viewer.</div>
     </div>
     <div class="pacts">
       <button class="btn btn-ghost" id="discard-btn" disabled onclick="discardChanges()">Discard</button>
@@ -216,12 +240,12 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
   </div>
 </div>
 
-<!-- Add Block Modal -->
-<div class="modal-bg" id="add-modal">
+<!-- ADD BLOCK MODAL -->
+<div class="modal-bg" id="add-modal" onclick="closeAddModal()">
   <div class="modal" onclick="event.stopPropagation()">
     <div class="modal-title">New Block</div>
     <div class="modal-sub">Add a language / programming block</div>
-    <div class="fg" style="flex-direction:column;gap:12px">
+    <div style="display:flex;flex-direction:column;gap:12px">
       <div class="fi">
         <div class="fl">Block Name</div>
         <input id="m-name" placeholder="e.g. 한국어 — Korean">
@@ -232,7 +256,7 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
           <input id="m-genre" placeholder="Korean">
         </div>
         <div class="fi" style="max-width:110px">
-          <div class="fl">UTC Start</div>
+          <div class="fl">Block UTC Start</div>
           <input id="m-start" placeholder="HH:MM" value="00:00">
         </div>
       </div>
@@ -248,19 +272,51 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
   </div>
 </div>
 
-<!-- Toast -->
+<!-- ARCHIVE.ORG SEARCH MODAL -->
+<div class="modal-bg" id="search-modal" onclick="closeSearchModal()">
+  <div class="modal" onclick="event.stopPropagation()" style="max-width:700px">
+    <div class="modal-title">Add Video</div>
+    <div class="modal-sub">Search Archive.org or paste an ID / URL directly</div>
+
+    <!-- Paste ID/URL -->
+    <div style="margin-bottom:14px">
+      <div class="fl" style="margin-bottom:6px">Paste Archive.org ID or URL</div>
+      <div class="search-bar">
+        <input id="paste-id" placeholder="e.g. youtube-AbCdEfGhIj  or  https://archive.org/details/youtube-AbCdEfGhIj">
+        <button class="btn btn-primary btn-sm" onclick="addFromPaste()">Add</button>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid var(--b);margin-bottom:14px"></div>
+
+    <!-- Keyword search -->
+    <div class="fl" style="margin-bottom:6px">Search by keyword</div>
+    <div class="search-bar">
+      <input id="search-query" placeholder="e.g. Hong Kong protest 2019" onkeydown="if(event.key==='Enter')doSearch()">
+      <button class="btn btn-primary btn-sm" onclick="doSearch()">Search</button>
+    </div>
+    <div id="search-results" class="search-results">
+      <div class="search-empty">Enter a keyword above to search Archive.org</div>
+    </div>
+    <div class="modal-acts">
+      <button class="btn btn-ghost" onclick="closeSearchModal()">Close</button>
+    </div>
+  </div>
+</div>
+
+<!-- TOAST -->
 <div class="toast" id="toast"></div>
 
 <script>
 // ─────────────────────────────────────────────────────────────
-//  🔧  PASTE YOUR FIREBASE CONFIG VALUES BELOW
+//  🔧 PASTE YOUR FIREBASE CONFIG VALUES HERE
 // ─────────────────────────────────────────────────────────────
-var API_KEY     = "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o";
-var PROJECT_ID  = "rfa-legacy";
-var CLIENT_ID   = "760753759019-s2f8tvintss5gtjtcmj2sdtd768hh601.apps.googleusercontent.com";  // from Google Cloud Console → Credentials
+var API_KEY    = "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o";
+var PROJECT_ID = "rfa-legacy";
+var CLIENT_ID  = "760753759019-s2f8tvintss5gtjtcmj2sdtd768hh601.apps.googleusercontent.com";
 
 // ─────────────────────────────────────────────────────────────
-//  🔒  ALLOWED TEAM EMAILS
+//  🔒 ALLOWED TEAM EMAILS
 // ─────────────────────────────────────────────────────────────
 var ALLOWED_EMAILS = [
   "hutchinsonj@rfa.org",
@@ -268,96 +324,110 @@ var ALLOWED_EMAILS = [
 ];
 
 // ─────────────────────────────────────────────────────────────
-//  Firestore REST base URL
+//  Firestore REST
 // ─────────────────────────────────────────────────────────────
-var FS_BASE = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents";
+var FS_BASE = "https://firestore.googleapis.com/v1/projects/"+PROJECT_ID+"/databases/(default)/documents";
 
-// ── State ─────────────────────────────────────────────────────
-var STATE = {
-  idToken:   null,
-  userEmail: null,
-  userPhoto: null,
-  userName:  null,
-  blocks:    [],
-  activeId:  null,
-  dirty:     false,
-  saving:    false,
-  pollTimer: null,
-  lastEtag:  null,
-  selectedColor: '#61C230'
-};
+// ─────────────────────────────────────────────────────────────
+//  All 9 RFA language blocks (default seed)
+// ─────────────────────────────────────────────────────────────
+var LANG_BLOCKS = [
+  { name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230' },
+  { name:'廣東話 — Cantonese',        genre:'Cantonese',        start:'02:40', color:'#3bb0f5' },
+  { name:'မြန်မာဘာသာ — Burmese',      genre:'Burmese',          start:'05:20', color:'#f5a623' },
+  { name:'ខ្មែរ — Khmer',             genre:'Khmer',            start:'08:00', color:'#e040fb' },
+  { name:'한국어 — Korean',            genre:'Korean',           start:'10:40', color:'#ff6b6b' },
+  { name:'ພາສາລາວ — Lao',             genre:'Lao',              start:'13:20', color:'#00e5cc' },
+  { name:'བོད་སྐད་ — Tibetan',         genre:'Tibetan',          start:'16:00', color:'#ffd600' },
+  { name:'ئۇيغۇرچە — Uyghur',         genre:'Uyghur',           start:'18:40', color:'#ff7043' },
+  { name:'Tiếng Việt — Vietnamese',   genre:'Vietnamese',       start:'21:20', color:'#69f0ae' },
+];
 
 var COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
 
-function uid() { return Math.random().toString(36).slice(2,9); }
-function fmtDur(s) { s=parseInt(s)||0; return Math.floor(s/60)+':'+(s%60<10?'0':'')+(s%60); }
+// ─────────────────────────────────────────────────────────────
+//  STATE
+// ─────────────────────────────────────────────────────────────
+var STATE = {
+  idToken: null, userEmail: null, userPhoto: null,
+  blocks: [], activeId: null,
+  dirty: false, saving: false,
+  pollTimer: null,
+  selectedColor: COLORS[0],
+  searchTargetBlockId: null
+};
 
-// ── UI helpers ────────────────────────────────────────────────
-function show(id)  { var el=document.getElementById(id); el.style.display='flex'; }
-function hide(id)  { document.getElementById(id).style.display='none'; }
-function setText(id,t){ document.getElementById(id).textContent=t; }
+function uid(){ return Math.random().toString(36).slice(2,9); }
+function fmtDur(s){ s=parseInt(s)||0; return Math.floor(s/60)+':'+(s%60<10?'0':'')+(s%60); }
+function escH(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function escA(s){ return String(s).replace(/"/g,'&quot;'); }
 
-var toastTimer;
-function showToast(msg) {
-  var t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){ t.classList.remove('show'); }, 3500);
+function defaultBlocks(){
+  return LANG_BLOCKS.map(function(l){
+    return { id:uid(), name:l.name, genre:l.genre, start:l.start, color:l.color, items:[] };
+  });
 }
 
-function setDirty(val) {
+// ─────────────────────────────────────────────────────────────
+//  UI HELPERS
+// ─────────────────────────────────────────────────────────────
+function show(id){ document.getElementById(id).style.display='flex'; }
+function hide(id){ document.getElementById(id).style.display='none'; }
+function setText(id,t){ document.getElementById(id).textContent=t; }
+
+var _toastTimer;
+function showToast(msg){
+  var t=document.getElementById('toast');
+  t.textContent=msg; t.classList.add('show');
+  clearTimeout(_toastTimer);
+  _toastTimer=setTimeout(function(){ t.classList.remove('show'); },3500);
+}
+
+function setDirty(val){
   STATE.dirty=val;
   var ps=document.getElementById('pstat');
   var db=document.getElementById('discard-btn');
   var pb=document.getElementById('publish-btn');
-  if(val) {
-    ps.textContent='● UNSAVED CHANGES'; ps.className='pstat unsaved';
-    db.disabled=false; pb.disabled=false;
-  } else {
-    db.disabled=true; pb.disabled=true;
-  }
+  if(val){ ps.textContent='● UNSAVED CHANGES'; ps.className='pstat unsaved'; db.disabled=false; pb.disabled=false; }
+  else   { db.disabled=true; pb.disabled=true; }
 }
 
-function setStatus(mode) {
-  var pill=document.getElementById('status-pill');
-  var txt=document.getElementById('status-txt');
-  if(mode==='live'){ pill.className='spill live'; txt.textContent='FIRESTORE LIVE'; }
-  else if(mode==='error'){ pill.className='spill'; txt.textContent='OFFLINE'; }
+function setStatus(m){
+  var pill=document.getElementById('status-pill'), txt=document.getElementById('status-txt');
+  if(m==='live'){ pill.className='spill live'; txt.textContent='FIRESTORE LIVE'; }
+  else if(m==='error'){ pill.className='spill'; txt.textContent='OFFLINE'; }
   else { pill.className='spill'; txt.textContent='CONNECTING'; }
 }
 
-// ── Firestore REST ────────────────────────────────────────────
-function fsHeaders() {
-  return { 'Content-Type':'application/json', 'Authorization':'Bearer '+STATE.idToken };
-}
+// ─────────────────────────────────────────────────────────────
+//  FIRESTORE REST
+// ─────────────────────────────────────────────────────────────
+function fsHdr(){ return {'Content-Type':'application/json','Authorization':'Bearer '+STATE.idToken}; }
 
-// Convert Firestore document → plain JS object
-function fromFirestore(doc) {
-  if (!doc || !doc.fields) return null;
-  var f = doc.fields;
-  // blocks is an arrayValue of mapValues
-  var blocks = [];
-  if (f.blocks && f.blocks.arrayValue && f.blocks.arrayValue.values) {
-    blocks = f.blocks.arrayValue.values.map(function(bv) {
-      var bm = bv.mapValue.fields;
-      var items = [];
-      if (bm.items && bm.items.arrayValue && bm.items.arrayValue.values) {
-        items = bm.items.arrayValue.values.map(function(iv) {
-          var im = iv.mapValue.fields;
+function fromFirestore(doc){
+  if(!doc||!doc.fields) return null;
+  var f=doc.fields, blocks=[];
+  if(f.blocks&&f.blocks.arrayValue&&f.blocks.arrayValue.values){
+    blocks=f.blocks.arrayValue.values.map(function(bv){
+      var bm=bv.mapValue.fields, items=[];
+      if(bm.items&&bm.items.arrayValue&&bm.items.arrayValue.values){
+        items=bm.items.arrayValue.values.map(function(iv){
+          var im=iv.mapValue.fields;
           return {
-            id:        (im.id        && im.id.stringValue)        || uid(),
-            t:         (im.t         && im.t.stringValue)         || '',
-            archiveId: (im.archiveId && im.archiveId.stringValue) || '',
-            dur:       (im.dur       && parseInt(im.dur.integerValue||im.dur.doubleValue)) || 0
+            id:        (im.id        &&im.id.stringValue)         ||uid(),
+            t:         (im.t         &&im.t.stringValue)          ||'',
+            archiveId: (im.archiveId &&im.archiveId.stringValue)  ||'',
+            dur:       parseInt(im.dur&&(im.dur.integerValue||im.dur.doubleValue))||0,
+            airTime:   (im.airTime   &&im.airTime.stringValue)    ||''
           };
         });
       }
       return {
-        id:    (bm.id    && bm.id.stringValue)    || uid(),
-        name:  (bm.name  && bm.name.stringValue)  || '',
-        genre: (bm.genre && bm.genre.stringValue) || '',
-        start: (bm.start && bm.start.stringValue) || '00:00',
-        color: (bm.color && bm.color.stringValue) || '#61C230',
+        id:    (bm.id    &&bm.id.stringValue)   ||uid(),
+        name:  (bm.name  &&bm.name.stringValue) ||'',
+        genre: (bm.genre &&bm.genre.stringValue)||'',
+        start: (bm.start &&bm.start.stringValue)||'00:00',
+        color: (bm.color &&bm.color.stringValue)||'#61C230',
         items: items
       };
     });
@@ -365,250 +435,275 @@ function fromFirestore(doc) {
   return blocks;
 }
 
-// Convert plain JS blocks → Firestore document body
-function toFirestore(blocks, email) {
+function toFirestore(blocks, email){
   return {
-    fields: {
-      publishedBy: { stringValue: email },
-      blocks: {
-        arrayValue: {
-          values: blocks.map(function(b) {
-            return {
-              mapValue: {
-                fields: {
-                  id:    { stringValue: b.id    || '' },
-                  name:  { stringValue: b.name  || '' },
-                  genre: { stringValue: b.genre || '' },
-                  start: { stringValue: b.start || '00:00' },
-                  color: { stringValue: b.color || '#61C230' },
-                  items: {
-                    arrayValue: {
-                      values: (b.items||[]).map(function(it) {
-                        return {
-                          mapValue: {
-                            fields: {
-                              id:        { stringValue: it.id        || uid() },
-                              t:         { stringValue: it.t         || '' },
-                              archiveId: { stringValue: it.archiveId || '' },
-                              dur:       { integerValue: String(parseInt(it.dur)||0) }
-                            }
-                          }
-                        };
-                      })
-                    }
-                  }
-                }
-              }
-            };
-          })
-        }
-      }
+    fields:{
+      publishedBy:{stringValue:email},
+      blocks:{arrayValue:{values:blocks.map(function(b){
+        return {mapValue:{fields:{
+          id:    {stringValue:b.id||''},
+          name:  {stringValue:b.name||''},
+          genre: {stringValue:b.genre||''},
+          start: {stringValue:b.start||'00:00'},
+          color: {stringValue:b.color||'#61C230'},
+          items: {arrayValue:{values:(b.items||[]).map(function(it){
+            return {mapValue:{fields:{
+              id:        {stringValue:it.id||uid()},
+              t:         {stringValue:it.t||''},
+              archiveId: {stringValue:it.archiveId||''},
+              dur:       {integerValue:String(parseInt(it.dur)||0)},
+              airTime:   {stringValue:it.airTime||''}
+            }}};
+          })}}
+        }}};
+      })}}
     }
   };
 }
 
-// GET schedule from Firestore
-function loadSchedule() {
-  return fetch(FS_BASE + '/broadcast/schedule', { headers: fsHeaders() })
-    .then(function(r) {
-      if (r.status === 404) return null; // doesn't exist yet
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function(doc) {
+function loadSchedule(){
+  return fetch(FS_BASE+'/broadcast/schedule',{headers:fsHdr()})
+    .then(function(r){ if(r.status===404) return null; if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+    .then(function(doc){
       setStatus('live');
-      if (!doc) {
-        // Seed with defaults
-        STATE.blocks = defaultBlocks();
-        STATE.activeId = STATE.blocks[0].id;
-        return;
-      }
-      var loaded = fromFirestore(doc);
-      if (loaded && loaded.length > 0) {
-        STATE.blocks = loaded;
-        if (!STATE.activeId || !STATE.blocks.find(function(b){ return b.id===STATE.activeId; })) {
-          STATE.activeId = STATE.blocks[0].id;
+      if(!doc){ STATE.blocks=defaultBlocks(); STATE.activeId=STATE.blocks[0].id; return; }
+      var loaded=fromFirestore(doc);
+      if(loaded&&loaded.length>0){
+        // Merge: keep loaded blocks, but ensure all 9 language blocks exist
+        var byName={};
+        loaded.forEach(function(b){ byName[b.name]=b; });
+        var merged=LANG_BLOCKS.map(function(l){
+          return byName[l.name]||{id:uid(),name:l.name,genre:l.genre,start:l.start,color:l.color,items:[]};
+        });
+        // Keep any custom blocks that aren't in the 9
+        loaded.forEach(function(b){
+          var isStandard=LANG_BLOCKS.some(function(l){ return l.name===b.name; });
+          if(!isStandard) merged.push(b);
+        });
+        STATE.blocks=merged;
+        if(!STATE.activeId||!STATE.blocks.find(function(b){ return b.id===STATE.activeId; })){
+          STATE.activeId=STATE.blocks[0].id;
         }
+      } else {
+        STATE.blocks=defaultBlocks();
+        STATE.activeId=STATE.blocks[0].id;
       }
     })
-    .catch(function(e) {
-      console.error('loadSchedule error:', e);
-      setStatus('error');
-    });
+    .catch(function(e){ console.error(e); setStatus('error'); });
 }
 
-// PATCH / create schedule in Firestore
-function saveSchedule() {
-  var url = FS_BASE + '/broadcast/schedule';
-  return fetch(url, {
-    method: 'PATCH',
-    headers: fsHeaders(),
-    body: JSON.stringify(toFirestore(STATE.blocks, STATE.userEmail))
-  }).then(function(r) {
-    if (!r.ok) return r.text().then(function(t){ throw new Error(t); });
-    return r.json();
-  });
+function saveSchedule(){
+  return fetch(FS_BASE+'/broadcast/schedule',{
+    method:'PATCH', headers:fsHdr(),
+    body:JSON.stringify(toFirestore(STATE.blocks,STATE.userEmail))
+  }).then(function(r){ if(!r.ok) return r.text().then(function(t){ throw new Error(t); }); return r.json(); });
 }
 
-// Poll every 8s for live updates (simulates onSnapshot without SDK)
-function startPolling() {
-  if (STATE.pollTimer) clearInterval(STATE.pollTimer);
-  STATE.pollTimer = setInterval(function() {
-    if (STATE.dirty || STATE.saving) return; // don't clobber local edits
-    loadSchedule().then(function() {
-      renderSidebar();
-      renderEditor();
-    });
-  }, 8000);
+function startPolling(){
+  if(STATE.pollTimer) clearInterval(STATE.pollTimer);
+  STATE.pollTimer=setInterval(function(){
+    if(STATE.dirty||STATE.saving) return;
+    loadSchedule().then(function(){ renderSidebar(); renderEditor(); });
+  },10000);
 }
 
-// ── Default blocks ────────────────────────────────────────────
-function defaultBlocks() {
-  return [
-    { id:uid(), name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230',
-      items:[
-        {id:uid(),t:"Hong Kong's Face Readers Reshape the Future",archiveId:'youtube-MJVRwBrkzsg',dur:272},
-        {id:uid(),t:"Hong Kong Protesters Disappointed With Talks",archiveId:'youtube-hlSlk-vcnRU',dur:203},
-        {id:uid(),t:"Chinese Police Quash Month-Long Land Protest",archiveId:'youtube-jMk4o81qxL0',dur:156}
-      ]
-    },
-    { id:uid(), name:'မြန်မာဘာသာ — Burmese', genre:'Burmese', start:'02:40', color:'#3bb0f5',
-      items:[
-        {id:uid(),t:"Myanmar's Jasmine Garland Sellers Go Back to School",archiveId:'youtube-9Nma364RVCg',dur:183},
-        {id:uid(),t:"Myanmar Insurance Industry Grows As Economy Opens",archiveId:'youtube-zbq6lEW9FNU',dur:214}
-      ]
-    }
-  ];
-}
-
-// ── Render sidebar ────────────────────────────────────────────
-function renderSidebar() {
-  var sorted = STATE.blocks.slice().sort(function(a,b){
+// ─────────────────────────────────────────────────────────────
+//  RENDER SIDEBAR
+// ─────────────────────────────────────────────────────────────
+function renderSidebar(){
+  var sorted=STATE.blocks.slice().sort(function(a,b){
     var av=a.start.split(':').map(Number), bv=b.start.split(':').map(Number);
     return (av[0]*60+av[1])-(bv[0]*60+bv[1]);
   });
-  setText('sb-heading', 'Blocks — '+STATE.blocks.length);
+  setText('sb-heading','Blocks — '+STATE.blocks.length);
   var list=document.getElementById('blist');
   list.innerHTML='';
-  sorted.forEach(function(b) {
+  sorted.forEach(function(b){
     var el=document.createElement('div');
     el.className='bitem'+(STATE.activeId===b.id?' act':'');
     el.onclick=function(){ STATE.activeId=b.id; renderSidebar(); renderEditor(); };
-    el.innerHTML=[
-      '<div class="bdot" style="background:'+b.color+'"></div>',
-      '<div class="binfo"><div class="bname">'+escHtml(b.name)+'</div><div class="bmeta">UTC '+escHtml(b.start)+'</div></div>',
-      '<div class="bcnt">'+b.items.length+'</div>'
-    ].join('');
+    el.innerHTML='<div class="bdot" style="background:'+b.color+'"></div>'
+      +'<div class="binfo"><div class="bname">'+escH(b.name)+'</div><div class="bmeta">UTC '+escH(b.start)+'</div></div>'
+      +'<div class="bcnt">'+b.items.length+'</div>';
     list.appendChild(el);
   });
 }
 
-// ── Render editor ─────────────────────────────────────────────
-function renderEditor() {
+// ─────────────────────────────────────────────────────────────
+//  RENDER EDITOR
+// ─────────────────────────────────────────────────────────────
+function renderEditor(){
   var ed=document.getElementById('editor');
   var block=STATE.blocks.find(function(b){ return b.id===STATE.activeId; });
-  if (!block) {
+  if(!block){
     ed.innerHTML='<div class="ed-empty"><div class="ed-empty-icon">📡</div><div class="ed-empty-txt">Select or create a block to edit</div></div>';
     return;
   }
-
-  var totalDur=block.items.reduce(function(s,it){ return s+(parseInt(it.dur)||0); },0);
   var col=block.color||'#61C230';
+  var totalDur=block.items.reduce(function(s,it){ return s+(parseInt(it.dur)||0); },0);
+
+  // Calculate what time each item airs based on block start + durations,
+  // overridden by an explicit airTime if set
+  var blockStartSec=timeToSec(block.start);
+  var cursor=blockStartSec;
+  var itemTimes=block.items.map(function(it){
+    var airtimeSec;
+    if(it.airTime&&it.airTime.trim()){
+      airtimeSec=timeToSec(it.airTime);
+      cursor=airtimeSec+(parseInt(it.dur)||0);
+    } else {
+      airtimeSec=cursor;
+      cursor+=parseInt(it.dur)||0;
+    }
+    return secToTime(airtimeSec);
+  });
 
   var html=[
     '<div class="ed-hdr">',
-    '  <div>',
-    '    <div class="ed-title" style="color:'+col+'">'+escHtml(block.name||'Untitled Block')+'</div>',
-    '    <div class="ed-meta">UTC '+escHtml(block.start)+' · '+block.items.length+' ITEMS · '+fmtDur(totalDur)+' TOTAL</div>',
-    '  </div>',
-    '  <button class="btn btn-danger" onclick="deleteBlock(\''+block.id+'\')">Delete Block</button>',
+    '<div><div class="ed-title" style="color:'+col+'">'+escH(block.name||'Untitled')+'</div>',
+    '<div class="ed-meta">UTC BLOCK START: '+escH(block.start)+'  ·  '+block.items.length+' ITEMS  ·  '+fmtDur(totalDur)+' TOTAL</div></div>',
+    '<button class="btn btn-danger btn-sm" onclick="deleteBlock(\''+block.id+'\')">Delete Block</button>',
     '</div>',
 
     '<div class="fg">',
-    '  <div class="fi" style="flex:2"><div class="fl">Block Name</div>',
-    '    <input value="'+escAttr(block.name)+'" oninput="updateBlock(\''+block.id+'\',\'name\',this.value)" placeholder="Language block name"></div>',
-    '  <div class="fi"><div class="fl">Genre Label</div>',
-    '    <input value="'+escAttr(block.genre)+'" oninput="updateBlock(\''+block.id+'\',\'genre\',this.value)" placeholder="Language"></div>',
-    '  <div class="fi" style="max-width:120px"><div class="fl">UTC Start</div>',
-    '    <input value="'+escAttr(block.start)+'" oninput="updateBlock(\''+block.id+'\',\'start\',this.value)" placeholder="HH:MM"></div>',
-    '  <div class="fi" style="max-width:80px"><div class="fl">Color</div>',
-    '    <select onchange="updateBlock(\''+block.id+'\',\'color\',this.value)" style="background:'+col+'22;border-color:'+col+'">',
+    '<div class="fi" style="flex:2"><div class="fl">Block Name</div>',
+    '<input value="'+escA(block.name)+'" oninput="updateBlock(\''+block.id+'\',\'name\',this.value)" placeholder="Language block name"></div>',
+    '<div class="fi"><div class="fl">Genre Label</div>',
+    '<input value="'+escA(block.genre)+'" oninput="updateBlock(\''+block.id+'\',\'genre\',this.value)" placeholder="Language"></div>',
+    '<div class="fi" style="max-width:110px"><div class="fl">Block UTC Start</div>',
+    '<input value="'+escA(block.start)+'" oninput="updateBlock(\''+block.id+'\',\'start\',this.value)" placeholder="HH:MM"></div>',
+    '<div class="fi" style="max-width:80px"><div class="fl">Color</div>',
+    '<select onchange="updateBlock(\''+block.id+'\',\'color\',this.value)" style="background:'+col+'22;border-color:'+col+'">',
     COLORS.map(function(c){ return '<option value="'+c+'"'+(c===col?' selected':'')+' style="background:var(--s2)">'+c+'</option>'; }).join(''),
-    '    </select></div>',
+    '</select></div>',
     '</div>',
 
-    '<div class="ih"><div class="il">Playlist Items</div><div class="ic">'+block.items.length+' items</div></div>',
+    '<div class="ih">',
+    '<div class="il">Playlist Items</div>',
+    '<div class="ic">'+block.items.length+' items</div>',
+    '</div>',
+
     '<div class="icols">',
-    '  <div></div>',
-    '  <div class="icolh">TITLE</div>',
-    '  <div class="icolh">ARCHIVE.ORG ID</div>',
-    '  <div class="icolh" style="text-align:center">DUR</div>',
-    '  <div></div>',
+    '<div></div>',
+    '<div class="icolh">Air Time (UTC)</div>',
+    '<div class="icolh">Title</div>',
+    '<div class="icolh">Archive.org ID</div>',
+    '<div class="icolh" style="text-align:center">Dur</div>',
+    '<div></div>',
     '</div>'
   ];
 
-  block.items.forEach(function(item,i) {
+  block.items.forEach(function(item,i){
+    var calcTime=itemTimes[i];
+    var hasScheduled=item.airTime&&item.airTime.trim();
     html.push(
-      '<div class="irow" draggable="true" id="irow-'+item.id+'"',
-      '  ondragstart="dragStart(event,\''+block.id+'\','+i+')"',
-      '  ondragover="dragOver(event,\''+block.id+'\','+i+')"',
-      '  ondrop="dragDrop(event,\''+block.id+'\','+i+')"',
-      '  ondragleave="dragLeave(event)">',
-      '  <div class="ihandle" title="Drag to reorder">⠿</div>',
-      '  <input value="'+escAttr(item.t)+'" placeholder="Video title" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'t\',this.value)">',
-      '  <input value="'+escAttr(item.archiveId)+'" placeholder="youtube-AbCdEf" style="font-size:11px;color:var(--dim)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'archiveId\',this.value)">',
-      '  <div class="idur">'+fmtDur(item.dur)+'</div>',
-      '  <button class="idel" onclick="deleteItem(\''+block.id+'\',\''+item.id+'\')" title="Remove">✕</button>',
+      '<div class="irow" draggable="true"',
+      ' ondragstart="dragStart(event,\''+block.id+'\','+i+')"',
+      ' ondragover="dragOver(event,\''+block.id+'\','+i+')"',
+      ' ondrop="dragDrop(event,\''+block.id+'\','+i+')"',
+      ' ondragleave="dragLeave(event)">',
+      '<div class="ihandle" title="Drag to reorder">⠿</div>',
+
+      // Air time — editable, shows calculated time as placeholder
+      '<input class="airtime-input" value="'+escA(item.airTime||'')+'"',
+      ' placeholder="'+escA(calcTime)+'"',
+      ' title="Leave blank to auto-calculate, or set a specific UTC air time"',
+      ' oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'airTime\',this.value)">',
+
+      '<input value="'+escA(item.t)+'" placeholder="Video title" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'t\',this.value)">',
+      '<input value="'+escA(item.archiveId)+'" placeholder="youtube-AbCdEfGhIj" style="font-size:10px;color:var(--dim)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'archiveId\',this.value)">',
+      '<div class="idur">'+fmtDur(item.dur)+'</div>',
+      '<button class="idel" onclick="deleteItem(\''+block.id+'\',\''+item.id+'\')" title="Remove">✕</button>',
       '</div>'
     );
   });
 
   html.push(
-    '<button class="add-item" onclick="addItem(\''+block.id+'\')">+ Add Item</button>',
-    '<div class="note">',
-    '  <div class="noteh">DURATION NOTE</div>',
-    '  <div class="noteb">Duration is in seconds. Find it at <span style="color:var(--off)">archive.org/metadata/&lt;id&gt;</span> under the file\'s <code>length</code> field. Items loop within each block\'s time window.</div>',
-    '</div>'
+    '<div class="add-item-row">',
+    '<button class="add-item" onclick="addBlankItem(\''+block.id+'\')">+ Add Item Manually</button>',
+    '<button class="add-item search-item" onclick="openSearchModal(\''+block.id+'\')">⌕ Search Archive.org</button>',
+    '</div>',
+    '<div style="margin-top:14px;padding:11px 13px;background:var(--s2);border:1px solid var(--b)">',
+    '<div style="font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.28em;margin-bottom:6px">AIR TIME NOTES</div>',
+    '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.7">',
+    'The <span style="color:var(--p)">Air Time</span> column shows when each item will play in UTC. ',
+    'Leave blank to auto-calculate from block start + duration of previous items. ',
+    'Or set a specific time like <code style="color:var(--p)">00:05:00</code> to hard-schedule that item to a precise moment.',
+    '</div></div>'
   );
 
   ed.innerHTML=html.join('');
 }
 
-// ── Block / Item mutations ────────────────────────────────────
-function updateBlock(id, field, val) {
-  STATE.blocks=STATE.blocks.map(function(b){ return b.id===id ? Object.assign({},b,{[field]:val}) : b; });
-  setDirty(true);
-  renderSidebar();
-  // Only re-render title/meta parts to avoid losing focus
-  var b=STATE.blocks.find(function(x){ return x.id===id; });
-  if(b){
-    var t=document.querySelector('.ed-title');
-    if(t) t.textContent=b.name||'Untitled Block';
-    var m=document.querySelector('.ed-meta');
-    if(m) m.textContent='UTC '+b.start+' · '+b.items.length+' ITEMS';
-  }
+// ─────────────────────────────────────────────────────────────
+//  TIME HELPERS
+// ─────────────────────────────────────────────────────────────
+function timeToSec(t){
+  if(!t) return 0;
+  var parts=t.split(':').map(Number);
+  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
+  if(parts.length===2) return parts[0]*3600+parts[1]*60;
+  return 0;
+}
+function secToTime(s){
+  s=Math.max(0,s)%86400;
+  var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
+  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;
 }
 
-function updateItem(blockId, itemId, field, val) {
+// ─────────────────────────────────────────────────────────────
+//  MUTATIONS
+// ─────────────────────────────────────────────────────────────
+function updateBlock(id,field,val){
+  STATE.blocks=STATE.blocks.map(function(b){ return b.id===id?Object.assign({},b,{[field]:val}):b; });
+  setDirty(true);
+  renderSidebar();
+}
+
+function updateItem(blockId,itemId,field,val){
   STATE.blocks=STATE.blocks.map(function(b){
     if(b.id!==blockId) return b;
     return Object.assign({},b,{items:b.items.map(function(it){
-      return it.id===itemId ? Object.assign({},it,{[field]:val}) : it;
+      return it.id===itemId?Object.assign({},it,{[field]:val}):it;
     })});
   });
   setDirty(true);
+  // Re-render air time column only (light refresh)
+  renderAirTimes(blockId);
 }
 
-function addItem(blockId) {
+function renderAirTimes(blockId){
+  // Recalculate and update just the airtime placeholders without clobbering inputs
+  var block=STATE.blocks.find(function(b){ return b.id===blockId; });
+  if(!block) return;
+  var cursor=timeToSec(block.start);
+  var rows=document.querySelectorAll('.irow');
+  block.items.forEach(function(it,i){
+    var airtimeSec;
+    if(it.airTime&&it.airTime.trim()){
+      airtimeSec=timeToSec(it.airTime);
+      cursor=airtimeSec+(parseInt(it.dur)||0);
+    } else {
+      airtimeSec=cursor;
+      cursor+=parseInt(it.dur)||0;
+    }
+    if(rows[i]){
+      var inp=rows[i].querySelector('.airtime-input');
+      if(inp&&!inp.value) inp.placeholder=secToTime(airtimeSec);
+    }
+  });
+}
+
+function addBlankItem(blockId){
   STATE.blocks=STATE.blocks.map(function(b){
     if(b.id!==blockId) return b;
-    return Object.assign({},b,{items:b.items.concat([{id:uid(),t:'',archiveId:'',dur:0}])});
+    return Object.assign({},b,{items:b.items.concat([{id:uid(),t:'',archiveId:'',dur:0,airTime:''}])});
   });
   setDirty(true);
   renderEditor();
 }
 
-function deleteItem(blockId, itemId) {
+function deleteItem(blockId,itemId){
   STATE.blocks=STATE.blocks.map(function(b){
     if(b.id!==blockId) return b;
     return Object.assign({},b,{items:b.items.filter(function(it){ return it.id!==itemId; })});
@@ -617,16 +712,18 @@ function deleteItem(blockId, itemId) {
   renderEditor();
 }
 
-function deleteBlock(id) {
-  if(!confirm('Delete this block? This cannot be undone.')) return;
+function deleteBlock(id){
+  if(!confirm('Delete this block?')) return;
   STATE.blocks=STATE.blocks.filter(function(b){ return b.id!==id; });
-  STATE.activeId=STATE.blocks.length ? STATE.blocks[STATE.blocks.length-1].id : null;
+  STATE.activeId=STATE.blocks.length?STATE.blocks[STATE.blocks.length-1].id:null;
   setDirty(true);
   renderSidebar();
   renderEditor();
 }
 
-// ── Drag & drop ───────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  DRAG & DROP
+// ─────────────────────────────────────────────────────────────
 var _dragIdx=null;
 function dragStart(e,blockId,i){ _dragIdx=i; e.dataTransfer.effectAllowed='move'; }
 function dragOver(e,blockId,i){
@@ -639,7 +736,7 @@ function dragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
 function dragDrop(e,blockId,i){
   e.preventDefault();
   document.querySelectorAll('.irow').forEach(function(r){ r.classList.remove('drag-over'); });
-  if(_dragIdx===null||_dragIdx===i) return;
+  if(_dragIdx===null||_dragIdx===i){ _dragIdx=null; return; }
   STATE.blocks=STATE.blocks.map(function(b){
     if(b.id!==blockId) return b;
     var items=b.items.slice();
@@ -652,25 +749,131 @@ function dragDrop(e,blockId,i){
   renderEditor();
 }
 
-// ── Publish ───────────────────────────────────────────────────
-function publishSchedule() {
+// ─────────────────────────────────────────────────────────────
+//  ARCHIVE.ORG SEARCH MODAL
+// ─────────────────────────────────────────────────────────────
+function openSearchModal(blockId){
+  STATE.searchTargetBlockId=blockId;
+  document.getElementById('search-query').value='';
+  document.getElementById('paste-id').value='';
+  document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div>';
+  document.getElementById('search-modal').classList.add('show');
+  setTimeout(function(){ document.getElementById('paste-id').focus(); },120);
+}
+function closeSearchModal(){ document.getElementById('search-modal').classList.remove('show'); }
+
+function addFromPaste(){
+  var raw=document.getElementById('paste-id').value.trim();
+  if(!raw){ showToast('Please paste an Archive.org ID or URL'); return; }
+  // Extract ID from URL if needed
+  var id=raw;
+  var m=raw.match(/archive\.org\/details\/([^\/?#]+)/);
+  if(m) id=m[1];
+  id=id.replace(/\/$/, '');
+
+  // Fetch metadata to get title and duration
+  document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Looking up '+escH(id)+'…</div>';
+
+  fetch('https://archive.org/metadata/'+id)
+    .then(function(r){ return r.json(); })
+    .then(function(meta){
+      var title=(meta.metadata&&(meta.metadata.title||meta.metadata.subject))||id;
+      var dur=0;
+      if(meta.files){
+        var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
+               ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
+        if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
+      }
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:String(title),archiveId:id,dur:dur,airTime:''});
+      document.getElementById('paste-id').value='';
+      document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div>';
+      showToast('✓ Added: '+String(title).slice(0,50));
+    })
+    .catch(function(){ showToast('Could not find that Archive.org ID'); document.getElementById('search-results').innerHTML='<div class="search-empty">Could not find that ID — check it and try again</div>'; });
+}
+
+function doSearch(){
+  var q=document.getElementById('search-query').value.trim();
+  if(!q) return;
+  document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div>';
+
+  // Use Archive.org advanced search API
+  var url='https://archive.org/advancedsearch.php?q='+encodeURIComponent(q)
+    +'&fl[]=identifier,title,description,subject,year,mediatype,item_image'
+    +'&rows=20&page=1&output=json&mediatype=movies';
+
+  fetch(url)
+    .then(function(r){ return r.json(); })
+    .then(function(data){
+      var docs=(data.response&&data.response.docs)||[];
+      if(!docs.length){
+        document.getElementById('search-results').innerHTML='<div class="search-empty">No results found for "'+escH(q)+'"</div>';
+        return;
+      }
+      var html=docs.map(function(doc){
+        var thumb='https://archive.org/services/img/'+doc.identifier;
+        var title=doc.title||doc.identifier;
+        var year=doc.year||'';
+        return '<div class="sresult" onclick="addSearchResult(\''+escA(doc.identifier)+'\',\''+escA(String(title).replace(/'/g,"\\'"))+'\')">'
+          +'<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.opacity=0.2" loading="lazy">'
+          +'<div class="sresult-info">'
+          +'<div class="sresult-title">'+escH(String(title))+'</div>'
+          +'<div class="sresult-meta">'+escH(doc.identifier)+(year?' · '+escH(year):'')+'</div>'
+          +'</div>'
+          +'<div class="sresult-add">+ Add</div>'
+          +'</div>';
+      }).join('');
+      document.getElementById('search-results').innerHTML=html;
+    })
+    .catch(function(e){ document.getElementById('search-results').innerHTML='<div class="search-empty">Search failed — check your connection</div>'; });
+}
+
+function addSearchResult(archiveId, title){
+  // Fetch duration in background then add
+  fetch('https://archive.org/metadata/'+archiveId)
+    .then(function(r){ return r.json(); })
+    .then(function(meta){
+      var dur=0;
+      if(meta.files){
+        var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
+               ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
+        if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
+      }
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:dur,airTime:''});
+      showToast('✓ Added: '+String(title).slice(0,50));
+    })
+    .catch(function(){
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:0,airTime:''});
+      showToast('✓ Added (duration unknown): '+String(title).slice(0,40));
+    });
+}
+
+function addVideoToBlock(blockId, item){
+  STATE.blocks=STATE.blocks.map(function(b){
+    if(b.id!==blockId) return b;
+    return Object.assign({},b,{items:b.items.concat([item])});
+  });
+  setDirty(true);
+  renderSidebar();
+  renderEditor();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  PUBLISH
+// ─────────────────────────────────────────────────────────────
+function publishSchedule(){
   if(STATE.saving) return;
   STATE.saving=true;
-  document.getElementById('publish-btn').disabled=true;
-  document.getElementById('publish-btn').textContent='Publishing…';
-
+  var pb=document.getElementById('publish-btn');
+  pb.disabled=true; pb.textContent='Publishing…';
   saveSchedule().then(function(){
-    STATE.saving=false;
-    setDirty(false);
+    STATE.saving=false; setDirty(false);
     var ps=document.getElementById('pstat');
-    ps.textContent='✓ SAVED '+new Date().toLocaleTimeString();
-    ps.className='pstat saved';
-    document.getElementById('publish-btn').textContent='⬆ Publish to Live';
+    ps.textContent='✓ SAVED '+new Date().toLocaleTimeString(); ps.className='pstat saved';
+    pb.textContent='⬆ Publish to Live';
     showToast('✓ SCHEDULE PUBLISHED — LIVE IN ~1 SECOND');
   }).catch(function(e){
-    STATE.saving=false;
-    document.getElementById('publish-btn').disabled=false;
-    document.getElementById('publish-btn').textContent='⬆ Publish to Live';
+    STATE.saving=false; pb.disabled=false; pb.textContent='⬆ Publish to Live';
     showToast('✗ PUBLISH FAILED: '+e.message);
   });
 }
@@ -679,7 +882,9 @@ function discardChanges(){
   loadSchedule().then(function(){ renderSidebar(); renderEditor(); setDirty(false); showToast('Changes discarded'); });
 }
 
-// ── Add block modal ───────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  ADD BLOCK MODAL
+// ─────────────────────────────────────────────────────────────
 function openAddModal(){
   STATE.selectedColor=COLORS[0];
   document.getElementById('m-name').value='';
@@ -705,18 +910,15 @@ function closeAddModal(){ document.getElementById('add-modal').classList.remove(
 function submitNewBlock(){
   var name=document.getElementById('m-name').value.trim();
   if(!name) return;
-  var genre=document.getElementById('m-genre').value.trim()||name;
-  var start=document.getElementById('m-start').value.trim()||'00:00';
-  var block={id:uid(),name:name,genre:genre,start:start,color:STATE.selectedColor,items:[]};
+  var block={id:uid(),name:name,genre:document.getElementById('m-genre').value.trim()||name,start:document.getElementById('m-start').value.trim()||'00:00',color:STATE.selectedColor,items:[]};
   STATE.blocks=STATE.blocks.concat([block]);
   STATE.activeId=block.id;
-  setDirty(true);
-  closeAddModal();
-  renderSidebar();
-  renderEditor();
+  setDirty(true); closeAddModal(); renderSidebar(); renderEditor();
 }
 
-// ── Sign-out ──────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  SIGN OUT
+// ─────────────────────────────────────────────────────────────
 function signOut(){
   clearInterval(STATE.pollTimer);
   STATE.idToken=null; STATE.userEmail=null;
@@ -724,93 +926,62 @@ function signOut(){
   google.accounts.id.disableAutoSelect();
 }
 
-// ── Auth (Google Identity Services) ──────────────────────────
-function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escAttr(s){ return String(s).replace(/"/g,'&quot;'); }
+// ─────────────────────────────────────────────────────────────
+//  AUTH — Google Identity Services + Firebase REST token exchange
+// ─────────────────────────────────────────────────────────────
+function onGoogleToken(response){
+  var parts=response.credential.split('.');
+  var payload=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
+  var email=payload.email;
 
-function onGoogleToken(response) {
-  // Decode JWT to get email/name/photo
-  var parts = response.credential.split('.');
-  var payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
-  var email = payload.email;
-
-  if (ALLOWED_EMAILS.indexOf(email) === -1) {
+  if(ALLOWED_EMAILS.indexOf(email)===-1){
     var le=document.getElementById('lerr');
     le.textContent='Access denied — '+email+' is not on the approved list.';
-    le.style.display='block';
-    return;
+    le.style.display='block'; return;
   }
 
-  // Exchange the Google ID token for a Firebase ID token via REST
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key='+API_KEY, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      postBody: 'id_token='+response.credential+'&providerId=google.com',
-      requestUri: window.location.href,
-      returnIdpCredential: true,
-      returnSecureToken: true
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    if(data.error){ throw new Error(data.error.message); }
-    STATE.idToken    = data.idToken;
-    STATE.userEmail  = email;
-    STATE.userPhoto  = payload.picture;
-    STATE.userName   = payload.name;
+  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key='+API_KEY,{
+    method:'POST', headers:{'Content-Type':'application/json'},
+    body:JSON.stringify({postBody:'id_token='+response.credential+'&providerId=google.com',requestUri:window.location.href,returnIdpCredential:true,returnSecureToken:true})
+  }).then(function(r){ return r.json(); }).then(function(data){
+    if(data.error) throw new Error(data.error.message);
+    STATE.idToken=data.idToken; STATE.userEmail=email;
 
-    // Update UI
-    document.getElementById('uemail').textContent=email;
+    setText('uemail',email);
     if(payload.picture){
       document.getElementById('uav').src=payload.picture;
       document.getElementById('uav').style.display='block';
       document.getElementById('uavp').style.display='none';
     } else {
-      document.getElementById('uavp').textContent=email[0].toUpperCase();
+      setText('uavp',email[0].toUpperCase());
     }
 
-    hide('login'); hide('boot');
-    show('app');
+    hide('login'); hide('boot'); show('app');
 
-    // Load schedule then start polling
     loadSchedule().then(function(){
-      renderSidebar();
-      renderEditor();
-      startPolling();
+      renderSidebar(); renderEditor(); startPolling();
     });
-  })
-  .catch(function(e){
+  }).catch(function(e){
     var le=document.getElementById('lerr');
-    le.textContent='Sign-in error: '+e.message;
-    le.style.display='block';
+    le.textContent='Sign-in error: '+e.message; le.style.display='block';
   });
 }
 
-// ── Boot ──────────────────────────────────────────────────────
-// Load Google Identity Services script, then render the sign-in button
-(function boot(){
-  var script=document.createElement('script');
-  script.src='https://accounts.google.com/gsi/client';
-  script.onload=function(){
-    hide('boot');
-    show('login');
-
-    google.accounts.id.initialize({
-      client_id: CLIENT_ID,
-      callback:  onGoogleToken,
-      auto_select: false
-    });
-
-    google.accounts.id.renderButton(
-      document.getElementById('g_btn'),
-      { theme:'outline', size:'large', width:280, text:'continue_with' }
-    );
+// ─────────────────────────────────────────────────────────────
+//  BOOT
+// ─────────────────────────────────────────────────────────────
+(function(){
+  var s=document.createElement('script');
+  s.src='https://accounts.google.com/gsi/client';
+  s.onload=function(){
+    hide('boot'); show('login');
+    google.accounts.id.initialize({client_id:CLIENT_ID,callback:onGoogleToken,auto_select:false});
+    google.accounts.id.renderButton(document.getElementById('g_btn'),{theme:'outline',size:'large',width:280,text:'continue_with'});
   };
-  script.onerror=function(){
-    document.getElementById('boot').innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--red);letter-spacing:.2em">FAILED TO LOAD GOOGLE AUTH — CHECK NETWORK</div>';
+  s.onerror=function(){
+    document.getElementById('boot').innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--red);letter-spacing:.2em">FAILED TO LOAD GOOGLE AUTH</div>';
   };
-  document.head.appendChild(script);
+  document.head.appendChild(s);
 })();
 </script>
 </body>
