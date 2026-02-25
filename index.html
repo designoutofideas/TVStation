@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Legacy | RFA</title>
+<title>Legacy — RFA 24/7</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -248,7 +248,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 
 <div id="tunein" onclick="tuneIn()">
   <div id="tunein-label">&#9654; CLICK TO<br>TUNE IN</div>
-  <div id="tunein-sub">TVStation &middot; RFA 24/7 Broadcast</div>
+  <div id="tunein-sub">Legacy &middot; RFA 24/7 Broadcast</div>
 </div>
 
 <!-- Firebase compat CDN (synchronous globals, no ES module race condition) -->
@@ -316,13 +316,18 @@ function buildTimeline(blocks){
   const sorted=blocks.slice().sort((a,b)=>toSec(a.start)-toSec(b.start));
   const tl=[];
   sorted.forEach((block,bi)=>{
+    if(!block.items||block.items.length===0) return;
     const bStart=toSec(block.start);
     const bEnd=bi+1<sorted.length?toSec(sorted[bi+1].start):DAY;
+    if(bEnd<=bStart) return;
     let cursor=bStart,i=0;
     while(cursor<bEnd&&i<5000){
       const item=block.items[i%block.items.length];
-      const end=Math.min(cursor+item.dur,bEnd);
-      tl.push({title:item.t,id:item.id,url:archiveUrl(item.id),blockName:block.name,genre:block.genre,startSec:cursor,endSec:end});
+      const archiveId=item.archiveId||item.id||'';
+      const dur=parseInt(item.dur)||0;
+      if(!archiveId||dur<=0){i++;continue;}
+      const end=Math.min(cursor+dur,bEnd);
+      tl.push({title:item.t||archiveId,id:archiveId,url:archiveUrl(archiveId),blockName:block.name,genre:block.genre,startSec:cursor,endSec:end});
       cursor=end;i++;
     }
   });
