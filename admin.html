@@ -797,35 +797,46 @@ function doSearch(){
   if(!q) return;
   document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div>';
 
-  // Use Archive.org advanced search API
-  var url='https://archive.org/advancedsearch.php?q='+encodeURIComponent(q)
-    +'&fl[]=identifier,title,description,subject,year,mediatype,item_image'
-    +'&rows=20&page=1&output=json&mediatype=movies';
+  // Use scrape API — this endpoint supports CORS unlike advancedsearch.php
+  // Filter to movies mediatype, search for the query term
+  var url='https://archive.org/services/search/v1/scrape'
+    +'?q='+encodeURIComponent('('+q+') AND mediatype:movies')
+    +'&fields=identifier,title,year,subject'
+    +'&count=20';
 
   fetch(url)
-    .then(function(r){ return r.json(); })
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    })
     .then(function(data){
-      var docs=(data.response&&data.response.docs)||[];
-      if(!docs.length){
-        document.getElementById('search-results').innerHTML='<div class="search-empty">No results found for "'+escH(q)+'"</div>';
+      var items=(data.items)||[];
+      if(!items.length){
+        document.getElementById('search-results').innerHTML='<div class="search-empty">No results found for "'+escH(q)+'" — try different keywords</div>';
         return;
       }
-      var html=docs.map(function(doc){
-        var thumb='https://archive.org/services/img/'+doc.identifier;
-        var title=doc.title||doc.identifier;
-        var year=doc.year||'';
-        return '<div class="sresult" onclick="addSearchResult(\''+escA(doc.identifier)+'\',\''+escA(String(title).replace(/'/g,"\\'"))+'\')">'
-          +'<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.opacity=0.2" loading="lazy">'
+      var html=items.map(function(item){
+        var thumb='https://archive.org/services/img/'+item.identifier;
+        var title=item.title||item.identifier;
+        var year=item.year||'';
+        // Escape for both HTML display and JS string in onclick
+        var safeId=item.identifier.replace(/'/g,'%27');
+        var safeTitle=String(title).replace(/'/g,'%27').replace(/"/g,'&quot;');
+        return '<div class="sresult">'
+          +'<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
           +'<div class="sresult-info">'
           +'<div class="sresult-title">'+escH(String(title))+'</div>'
-          +'<div class="sresult-meta">'+escH(doc.identifier)+(year?' · '+escH(year):'')+'</div>'
+          +'<div class="sresult-meta">'+escH(item.identifier)+(year?' · '+escH(String(year)):'')+'</div>'
           +'</div>'
-          +'<div class="sresult-add">+ Add</div>'
+          +'<div class="sresult-add" onclick="addSearchResult(\''+safeId+'\',\''+safeTitle+'\')">+ Add</div>'
           +'</div>';
       }).join('');
       document.getElementById('search-results').innerHTML=html;
     })
-    .catch(function(e){ document.getElementById('search-results').innerHTML='<div class="search-empty">Search failed — check your connection</div>'; });
+    .catch(function(e){
+      console.error('Search error:',e);
+      document.getElementById('search-results').innerHTML='<div class="search-empty">Search failed: '+escH(e.message)+'</div>';
+    });
 }
 
 function addSearchResult(archiveId, title){
