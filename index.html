@@ -3,715 +3,604 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Archive TV</title>
+<title>Legacy — RFA 24/7</title>
 <style>
-  @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  --primary:#61C230;
+  --light:#CCEDD0;
+  --dim:#627568;
+  --offwhite:#F0F6F0;
+  --white:#FFFFFF;
+  --red:#ff3b1f;
+  --hud-bg:rgba(4,12,6,0.78);
+}
+html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Share Tech Mono',monospace;color:var(--offwhite)}
 
-  *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+#screen{position:fixed;inset:0;background:#000}
+#player{width:100%;height:100%;object-fit:contain;display:block}
 
-  :root {
-    --amber: #ffb700;
-    --amber-dim: #7a5800;
-    --red: #ff3b1f;
-    --bg: #0a0a0a;
-    --scanline: rgba(0,0,0,0.25);
-    --glow: rgba(255,183,0,0.15);
-  }
+/* ── HUD ── */
+#hud{
+  position:fixed;inset:0;z-index:90;
+  display:flex;flex-direction:column;justify-content:space-between;
+  opacity:1;
+  transition:opacity 0.6s ease;
+  pointer-events:none;
+}
+#hud.hud-hidden{opacity:0;pointer-events:none}
+#hud.hud-visible{opacity:1}
 
-  html, body {
-    width: 100%; height: 100%;
-    background: var(--bg);
-    color: var(--amber);
-    font-family: 'Share Tech Mono', monospace;
-    overflow: hidden;
-  }
+/* Top bar */
+.hud-top{
+  display:flex;justify-content:space-between;align-items:stretch;
+  background:var(--hud-bg);
+  backdrop-filter:blur(6px);
+  border-bottom:1px solid rgba(97,194,48,0.2);
+  padding:14px 28px 12px;
+  pointer-events:all;
+}
 
-  /* CRT phosphor screen effect */
-  body::before {
-    content: '';
-    position: fixed; inset: 0; z-index: 100;
-    background: repeating-linear-gradient(
-      0deg,
-      var(--scanline) 0px,
-      var(--scanline) 1px,
-      transparent 1px,
-      transparent 3px
-    );
-    pointer-events: none;
-    animation: scanroll 8s linear infinite;
-  }
-  @keyframes scanroll {
-    0% { background-position: 0 0; }
-    100% { background-position: 0 300px; }
-  }
+.sid{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(28px,3.8vw,54px);
+  letter-spacing:.14em;
+  color:var(--primary);
+  text-shadow:0 0 22px rgba(97,194,48,0.6),0 0 60px rgba(97,194,48,0.2);
+  line-height:1;
+}
+.ssub{
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9px;font-weight:300;letter-spacing:.4em;
+  color:var(--dim);display:block;margin-top:5px;
+  text-transform:uppercase;
+}
+.live-row{
+  display:flex;align-items:center;gap:7px;margin-top:9px;
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:600;
+  letter-spacing:.25em;color:var(--red);text-shadow:0 0 10px var(--red);
+}
+.dot{
+  width:7px;height:7px;border-radius:50%;
+  background:var(--red);box-shadow:0 0 9px var(--red);
+  animation:blink 1.4s ease-in-out infinite;
+}
+@keyframes blink{0%,100%{opacity:1}50%{opacity:.08}}
 
-  /* Vignette */
-  body::after {
-    content: '';
-    position: fixed; inset: 0; z-index: 99;
-    background: radial-gradient(ellipse at center, transparent 55%, rgba(0,0,0,0.85) 100%);
-    pointer-events: none;
-  }
+.clk{text-align:right;display:flex;flex-direction:column;justify-content:center}
+#clock{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(22px,3.2vw,46px);
+  letter-spacing:.1em;color:var(--offwhite);
+  text-shadow:0 0 12px rgba(240,246,240,0.3);display:block;
+}
+#dateline{
+  font-family:'IBM Plex Mono',monospace;font-size:9px;
+  letter-spacing:.22em;color:var(--dim);margin-top:4px;
+}
 
-  #video-container {
-    position: fixed; inset: 0;
-    display: flex; align-items: center; justify-content: center;
-    background: #000;
-  }
+/* Bottom bar */
+.hud-bot{
+  display:flex;flex-direction:column;gap:0;
+  background:var(--hud-bg);
+  backdrop-filter:blur(6px);
+  border-top:1px solid rgba(97,194,48,0.2);
+  pointer-events:all;
+}
 
-  #player {
-    width: 100%; height: 100%;
-    object-fit: contain;
-    opacity: 0;
-    transition: opacity 1.2s ease;
-  }
-  #player.loaded { opacity: 1; }
+.ptrack{width:100%;height:3px;background:rgba(97,194,48,0.1);cursor:pointer}
+#pfill{height:100%;background:var(--primary);box-shadow:0 0 7px rgba(97,194,48,0.6);width:0%;transition:width 1s linear}
 
-  /* Static noise overlay when loading */
-  #static {
-    position: fixed; inset: 0; z-index: 50;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.3s;
-    background-image: url("data:image/svg+xml,%3Csvg viewBox='0 0 256 256' xmlns='http://www.w3.org/2000/svg'%3E%3Cfilter id='noise'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='4' stitchTiles='stitch'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23noise)' opacity='0.4'/%3E%3C/svg%3E");
-    background-size: 200px;
-    mix-blend-mode: overlay;
-  }
-  #static.active { opacity: 1; }
+.irow{
+  display:flex;justify-content:space-between;align-items:center;
+  gap:20px;padding:14px 28px 16px;
+}
+.ncol{flex:1;min-width:0}
+.lbl{
+  font-family:'IBM Plex Mono',monospace;font-size:8px;font-weight:600;
+  letter-spacing:.32em;color:var(--dim);text-transform:uppercase;margin-bottom:5px;
+}
+#now-title{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(16px,2.6vw,38px);
+  letter-spacing:.07em;color:var(--primary);
+  text-shadow:0 0 20px rgba(97,194,48,0.4);
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:58vw;
+}
+#genre{
+  display:inline-block;font-family:'IBM Plex Mono',monospace;
+  font-size:8px;font-weight:600;letter-spacing:.22em;
+  color:var(--white);background:var(--primary);padding:3px 8px;margin-top:5px;
+}
+#pub-date{
+  display:inline-block;font-family:'IBM Plex Mono',monospace;
+  font-size:8px;font-weight:300;letter-spacing:.18em;
+  color:var(--dim);margin-top:5px;margin-left:8px;
+  vertical-align:middle;
+}
 
-  /* HUD overlay */
-  #hud {
-    position: fixed; inset: 0; z-index: 90;
-    pointer-events: none;
-    display: flex; flex-direction: column; justify-content: space-between;
-    padding: 28px 36px;
-  }
+.xcol{text-align:right;min-width:160px;max-width:260px}
+#next-title{
+  font-family:'IBM Plex Mono',monospace;font-size:10px;font-weight:300;
+  color:var(--light);opacity:0.45;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
+}
+#tleft{
+  font-family:'IBM Plex Mono',monospace;font-size:9px;
+  color:var(--dim);margin-top:3px;
+}
 
-  /* Top bar */
-  .hud-top {
-    display: flex; justify-content: space-between; align-items: flex-start;
-  }
+/* Volume control */
+.vcol{
+  display:flex;flex-direction:row;align-items:center;gap:7px;
+  border-left:1px solid rgba(97,194,48,0.15);
+  padding-left:16px;
+  flex-shrink:0;
+}
+#vol-icon{font-size:11px;line-height:1;cursor:pointer}
+#vol-pct{font-family:'IBM Plex Mono',monospace;font-size:7px;color:var(--dim);letter-spacing:.08em;min-width:26px;text-align:right}
+#vol-slider{
+  -webkit-appearance:none;appearance:none;
+  width:70px;height:2px;
+  background:rgba(97,194,48,0.15);
+  outline:none;cursor:pointer;
+  border-radius:0;
+}
+#vol-slider::-webkit-slider-thumb{
+  -webkit-appearance:none;
+  width:9px;height:9px;
+  border-radius:50%;
+  background:var(--primary);
+  box-shadow:0 0 6px rgba(97,194,48,0.7);
+  cursor:pointer;
+}
+#vol-slider::-moz-range-thumb{
+  width:9px;height:9px;
+  border-radius:50%;border:none;
+  background:var(--primary);
+  box-shadow:0 0 6px rgba(97,194,48,0.7);
+  cursor:pointer;
+}
+#vol-slider::-webkit-slider-runnable-track{
+  background:linear-gradient(to right, var(--primary) 0%, var(--primary) var(--vol-pct, 100%), rgba(97,194,48,0.15) var(--vol-pct, 100%));
+  height:2px;
+}
 
-  .station-id {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(28px, 4vw, 52px);
-    letter-spacing: 0.12em;
-    color: var(--amber);
-    text-shadow: 0 0 20px var(--amber), 0 0 40px rgba(255,183,0,0.4);
-    line-height: 1;
-  }
-  .station-id span {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 0.3em;
-    font-weight: 300;
-    display: block;
-    letter-spacing: 0.3em;
-    color: var(--amber-dim);
-    text-shadow: none;
-    margin-top: 4px;
-  }
+/* Tune-in overlay */
+#tunein{
+  position:fixed;inset:0;z-index:300;
+  background:rgba(2,8,3,.95);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  gap:16px;cursor:pointer;
+}
+#tunein-label{
+  font-family:'Bebas Neue',cursive;
+  font-size:clamp(38px,7vw,90px);letter-spacing:.1em;
+  color:var(--primary);
+  text-shadow:0 0 40px rgba(97,194,48,0.7),0 0 80px rgba(97,194,48,0.2);
+  text-align:center;line-height:1;
+}
+#tunein-sub{
+  font-family:'IBM Plex Mono',monospace;font-size:10px;
+  letter-spacing:.26em;color:var(--dim);text-align:center;
+}
 
-  .live-badge {
-    display: flex; align-items: center; gap: 8px;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    font-weight: 600;
-    letter-spacing: 0.2em;
-    color: var(--red);
-    text-shadow: 0 0 10px var(--red);
-  }
-  .live-dot {
-    width: 8px; height: 8px;
-    border-radius: 50%;
-    background: var(--red);
-    box-shadow: 0 0 8px var(--red);
-    animation: blink 1.4s ease-in-out infinite;
-  }
-  @keyframes blink { 0%,100%{opacity:1} 50%{opacity:0.2} }
+/* Schedule reload toast */
+#reload-toast{
+  position:fixed;top:80px;left:50%;transform:translateX(-50%);
+  z-index:400;
+  background:rgba(97,194,48,0.15);
+  border:1px solid rgba(97,194,48,0.4);
+  backdrop-filter:blur(8px);
+  color:var(--primary);
+  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.25em;
+  padding:8px 20px;
+  opacity:0;transition:opacity 0.3s;
+  pointer-events:none;
+}
+#reload-toast.show{opacity:1}
 
-  .clock-block {
-    text-align: right;
-  }
-  #clock {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(22px, 3vw, 42px);
-    letter-spacing: 0.08em;
-    color: var(--amber);
-    text-shadow: 0 0 15px var(--amber);
-    display: block;
-  }
-  #date-display {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    letter-spacing: 0.25em;
-    color: var(--amber-dim);
-    text-align: right;
-    margin-top: 2px;
-  }
-
-  /* Bottom info bar */
-  .hud-bottom {
-    display: flex; flex-direction: column; gap: 10px;
-  }
-
-  .progress-bar-wrap {
-    width: 100%;
-    height: 2px;
-    background: rgba(255,183,0,0.12);
-    position: relative;
-  }
-  #progress-bar {
-    height: 100%;
-    background: var(--amber);
-    box-shadow: 0 0 8px var(--amber);
-    width: 0%;
-    transition: width 1s linear;
-  }
-
-  .now-playing-row {
-    display: flex; justify-content: space-between; align-items: flex-end;
-    gap: 20px;
-  }
-
-  .now-playing {
-    flex: 1;
-  }
-
-  .label {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.35em;
-    color: var(--amber-dim);
-    text-transform: uppercase;
-    margin-bottom: 5px;
-  }
-
-  #now-title {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(18px, 2.8vw, 38px);
-    letter-spacing: 0.06em;
-    line-height: 1.1;
-    color: var(--amber);
-    text-shadow: 0 0 20px rgba(255,183,0,0.5);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-    max-width: 65vw;
-  }
-
-  #genre-tag {
-    display: inline-block;
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 9px;
-    font-weight: 600;
-    letter-spacing: 0.25em;
-    color: var(--bg);
-    background: var(--amber-dim);
-    padding: 2px 8px;
-    margin-top: 5px;
-  }
-
-  .up-next {
-    text-align: right;
-    min-width: 220px;
-    max-width: 280px;
-  }
-  #next-title {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    font-weight: 300;
-    color: rgba(255,183,0,0.5);
-    white-space: nowrap;
-    overflow: hidden;
-    text-overflow: ellipsis;
-  }
-
-  #time-remaining {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 10px;
-    color: var(--amber-dim);
-    margin-top: 3px;
-  }
-
-  /* Channel change flash */
-  #channel-flash {
-    position: fixed; inset: 0; z-index: 95;
-    background: white;
-    opacity: 0;
-    pointer-events: none;
-    transition: opacity 0.05s;
-  }
-  #channel-flash.flash { opacity: 0.6; }
-
-  /* Error state */
-  #error-state {
-    position: fixed; inset: 0; z-index: 80;
-    display: none;
-    align-items: center; justify-content: center;
-    flex-direction: column; gap: 16px;
-    text-align: center;
-  }
-  #error-state.visible { display: flex; }
-  #error-state h2 {
-    font-family: 'Bebas Neue', cursive;
-    font-size: 48px;
-    letter-spacing: 0.1em;
-    color: var(--amber-dim);
-  }
-  #error-state p {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    color: var(--amber-dim);
-  }
-
-  /* No schedule */
-  #no-schedule {
-    position: fixed; inset: 0; z-index: 80;
-    display: none; align-items: center; justify-content: center;
-    flex-direction: column; gap: 20px;
-    text-align: center; padding: 40px;
-  }
-  #no-schedule.visible { display: flex; }
-  #no-schedule h1 {
-    font-family: 'Bebas Neue', cursive;
-    font-size: clamp(36px, 6vw, 80px);
-    letter-spacing: 0.08em;
-    color: var(--amber);
-    text-shadow: 0 0 30px var(--amber);
-  }
-  #no-schedule p {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 12px;
-    letter-spacing: 0.2em;
-    color: var(--amber-dim);
-    max-width: 500px;
-    line-height: 1.8;
-  }
-  #no-schedule a {
-    font-family: 'IBM Plex Mono', monospace;
-    font-size: 11px;
-    letter-spacing: 0.2em;
-    color: var(--amber);
-    text-decoration: none;
-    border: 1px solid var(--amber-dim);
-    padding: 10px 24px;
-    transition: all 0.2s;
-  }
-  #no-schedule a:hover {
-    background: var(--amber);
-    color: var(--bg);
-  }
+#flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
+#flash.on{opacity:.35}
 </style>
 </head>
 <body>
 
-<div id="channel-flash"></div>
-<div id="static"></div>
-
-<div id="video-container">
-  <video id="player" autoplay playsinline></video>
-</div>
-
-<div id="error-state">
-  <h2>SIGNAL LOST</h2>
-  <p>ATTEMPTING TO RESTORE BROADCAST...</p>
-</div>
-
-<div id="no-schedule" class="visible">
-  <h1>Archive TV</h1>
-  <p>NO SCHEDULE LOADED<br>
-  CREATE A SCHEDULE USING THE ADMIN PANEL<br>
-  AND SAVE SCHEDULE.JSON TO THIS DIRECTORY</p>
-  <a href="admin.html">OPEN ADMIN PANEL →</a>
+<div id="screen">
+  <video id="player" playsinline preload="auto"></video>
 </div>
 
 <div id="hud">
   <div class="hud-top">
     <div>
-      <div class="station-id">
-        Archive TV
-        <span>BROADCASTING 24/7</span>
-      </div>
-      <div class="live-badge" style="margin-top:12px">
-        <div class="live-dot"></div>
-        LIVE
-      </div>
+      <div class="sid">RFA | Legacy <span class="ssub">RFA · BROADCASTING 24/7</span></div>
+      <div class="live-row"><div class="dot"></div>LIVE</div>
     </div>
-    <div class="clock-block">
+    <div class="clk">
       <span id="clock">00:00:00</span>
-      <div id="date-display">---</div>
+      <div id="dateline"></div>
     </div>
   </div>
-
-  <div class="hud-bottom">
-    <div class="progress-bar-wrap">
-      <div id="progress-bar"></div>
-    </div>
-    <div class="now-playing-row">
-      <div class="now-playing">
-        <div class="label">Now Playing</div>
+  <div class="hud-bot">
+    <div class="ptrack"><div id="pfill"></div></div>
+    <div class="irow">
+      <div class="ncol">
+        <div class="lbl">Now Playing</div>
         <div id="now-title">—</div>
-        <div id="genre-tag">—</div>
+        <div id="genre">—</div><span id="pub-date"></span>
       </div>
-      <div class="up-next">
-        <div class="label" style="text-align:right">Up Next</div>
+      <div class="xcol">
+        <div class="lbl" style="text-align:right">Up Next</div>
         <div id="next-title">—</div>
-        <div id="time-remaining">—</div>
+        <div id="tleft">—</div>
+      </div>
+      <div class="vcol">
+        <span id="vol-icon">🔊</span>
+        <input type="range" id="vol-slider" min="0" max="100" value="100">
+        <span id="vol-pct">100%</span>
       </div>
     </div>
   </div>
 </div>
 
-<script>
-// ─── CONFIG ───────────────────────────────────────────────────────────────────
-const SCHEDULE_URL = './schedule.json';  // path to your schedule file
-const STATION_NAME = 'Archive TV';
+<div id="reload-toast">⟳ SCHEDULE UPDATED</div>
+<div id="flash"></div>
 
-// ─── STATE ────────────────────────────────────────────────────────────────────
-let schedule = [];
-let currentIndex = -1;
+<div id="tunein" onclick="tuneIn()">
+  <div id="tunein-label">&#9654; CLICK TO<br>TUNE IN</div>
+  <div id="tunein-sub">TVStation &middot; RFA 24/7 Broadcast</div>
+</div>
+
+<!-- Firebase SDK -->
+<script type="module">
+import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+
+// ─────────────────────────────────────────────────────────────
+//  🔧 PASTE YOUR FIREBASE CONFIG HERE
+//  Get this from: Firebase Console → Project Settings → Your Apps
+// ─────────────────────────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
+  authDomain:        "rfa-legacy.firebaseapp.com",
+  projectId:         "rfa-legacy",
+  storageBucket:     "rfa-legacy.firebasestorage.app",
+  messagingSenderId: "760753759019",
+  appId:             "1:760753759019:web:0d94416e5c2d2c80631b6e"
+};
+
+const app = initializeApp(firebaseConfig);
+const db  = getFirestore(app);
+
+// ─────────────────────────────────────────────────────────────
+//  FALLBACK SCHEDULE (used if Firestore is unreachable)
+// ─────────────────────────────────────────────────────────────
+const FALLBACK_BLOCKS = [
+  {
+    name:"普通話 — Mandarin Chinese", genre:"Mandarin Chinese", start:"00:00",
+    items:[
+      {t:"Hong Kong's Face Readers Reshape the Future",        id:"youtube-MJVRwBrkzsg", dur:272},
+      {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
+      {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
+      {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
+      {t:"China Culls Thousands of Pigs — African Swine Fever",id:"youtube-4NTCJgWqfwQ", dur:167},
+    ]
+  },
+  {
+    name:"မြန်မာဘာသာ — Burmese", genre:"Burmese", start:"02:40",
+    items:[
+      {t:"Myanmar's Jasmine Garland Sellers Go Back to School",  id:"youtube-9Nma364RVCg", dur:183},
+      {t:"Myanmar Insurance Industry Grows As Economy Opens",    id:"youtube-zbq6lEW9FNU", dur:214},
+      {t:"Myanmar Faces Flooding Emergency",                     id:"youtube-tkNpWKazyX0", dur:193},
+      {t:"RFA Journalist Forced to Leave Myanmar After 2021 Coup",id:"youtube-V4wtcXnsJRQ",dur:178},
+      {t:"Creative Outfits as Anti-Coup Demonstrations Continue",id:"youtube-SfDUJtzx_xA", dur:162},
+    ]
+  },
+];
+
+// ═══════════════════════════════════════════════════════════════════
+//  BROADCAST ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+const DAY = 86400;
+let BLOCKS   = FALLBACK_BLOCKS;
+let TIMELINE = [];
+
+function toSec(hhmm){const[h,m]=hhmm.split(':').map(Number);return h*3600+m*60}
+function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
+function utcSec(){const d=new Date();return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000}
+
+function buildTimeline(blocks){
+  const sorted=blocks.slice().sort((a,b)=>toSec(a.start)-toSec(b.start));
+  const tl=[];
+  sorted.forEach((block,bi)=>{
+    const bStart=toSec(block.start);
+    const bEnd=bi+1<sorted.length?toSec(sorted[bi+1].start):DAY;
+    let cursor=bStart,i=0;
+    while(cursor<bEnd&&i<5000){
+      const item=block.items[i%block.items.length];
+      const end=Math.min(cursor+item.dur,bEnd);
+      tl.push({title:item.t,id:item.id,url:archiveUrl(item.id),blockName:block.name,genre:block.genre,startSec:cursor,endSec:end});
+      cursor=end;i++;
+    }
+  });
+  return tl;
+}
+
+function findSlot(sec){
+  const s=((sec%DAY)+DAY)%DAY;
+  let idx=TIMELINE.findIndex(x=>s>=x.startSec&&s<x.endSec);
+  return idx===-1?0:idx;
+}
+
+// ── DOM ──────────────────────────────────────────────────────
+const player      = document.getElementById('player');
+const clockEl     = document.getElementById('clock');
+const dateEl      = document.getElementById('dateline');
+const nowTitleEl  = document.getElementById('now-title');
+const genreEl     = document.getElementById('genre');
+const nextTitleEl = document.getElementById('next-title');
+const tleftEl     = document.getElementById('tleft');
+const pfillEl     = document.getElementById('pfill');
+const flashEl     = document.getElementById('flash');
+const tuneinEl    = document.getElementById('tunein');
+const hudEl       = document.getElementById('hud');
+const volSlider   = document.getElementById('vol-slider');
+const volPct      = document.getElementById('vol-pct');
+const volIcon     = document.getElementById('vol-icon');
+const pubDateEl   = document.getElementById('pub-date');
+const toastEl     = document.getElementById('reload-toast');
+
+// ── STATE ────────────────────────────────────────────────────
+let currentIdx  = -1;
 let tickInterval = null;
-let scheduleLoaded = false;
+let metaCache   = {};
+let dateCache   = {};
+let hasBooted   = false;
 
-// ─── DOM ──────────────────────────────────────────────────────────────────────
-const player = document.getElementById('player');
-const clockEl = document.getElementById('clock');
-const dateEl = document.getElementById('date-display');
-const nowTitle = document.getElementById('now-title');
-const genreTag = document.getElementById('genre-tag');
-const nextTitle = document.getElementById('next-title');
-const timeRemaining = document.getElementById('time-remaining');
-const progressBar = document.getElementById('progress-bar');
-const noSchedule = document.getElementById('no-schedule');
-const errorState = document.getElementById('error-state');
-const staticEl = document.getElementById('static');
-const flashEl = document.getElementById('channel-flash');
+// ── FIRESTORE LIVE SCHEDULE ───────────────────────────────────
+// Listens for real-time updates from admin panel.
+// When schedule changes, rebuilds timeline and seeks to correct position.
+const scheduleRef = doc(db, 'broadcast', 'schedule');
 
-// ─── CLOCK ────────────────────────────────────────────────────────────────────
-function updateClock() {
-  const now = new Date();
-  const h = String(now.getHours()).padStart(2,'0');
-  const m = String(now.getMinutes()).padStart(2,'0');
-  const s = String(now.getSeconds()).padStart(2,'0');
-  clockEl.textContent = `${h}:${m}:${s}`;
-  const days = ['SUN','MON','TUE','WED','THU','FRI','SAT'];
-  const months = ['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
-  dateEl.textContent = `${days[now.getDay()]} ${now.getDate()} ${months[now.getMonth()]} ${now.getFullYear()}`;
-}
-setInterval(updateClock, 1000);
-updateClock();
-
-// ─── SCHEDULE LOADING ─────────────────────────────────────────────────────────
-async function loadSchedule() {
-  try {
-    const resp = await fetch(SCHEDULE_URL + '?t=' + Date.now());
-    if (!resp.ok) throw new Error('not found');
-    const data = await resp.json();
-    schedule = buildTimeline(data);
-    if (schedule.length > 0) {
-      scheduleLoaded = true;
-      noSchedule.classList.remove('visible');
-      startPlayback();
-    }
-  } catch(e) {
-    console.warn('No schedule.json found. Showing placeholder.');
-    // keep no-schedule visible
-  }
-}
-
-// ─── TIMELINE BUILDER ─────────────────────────────────────────────────────────
-// Each block owns the time from its startTime until the next block's startTime.
-// Items are looped round-robin to fill that window — no fill entries needed.
-
-function buildTimeline(data) {
-  const blocks = (data.blocks || []).slice();
-  blocks.sort((a, b) => parseTime(a.startTime) - parseTime(b.startTime));
-
-  const DAY = 86400;
-  const timeline = [];
-
-  for (let bi = 0; bi < blocks.length; bi++) {
-    const block = blocks[bi];
-    const items = block.items || [];
-    if (!items.length) continue;
-
-    const blockStart = parseTime(block.startTime);
-    const blockEnd = bi + 1 < blocks.length
-      ? parseTime(blocks[bi + 1].startTime)
-      : DAY;
-
-    let cursor = blockStart;
-    let idx = 0;
-    const MAX_ITEMS = 500;
-
-    while (cursor < blockEnd && idx < MAX_ITEMS) {
-      const item = items[idx % items.length];
-      const dur = item.duration || 300;
-      const end = Math.min(cursor + dur, blockEnd);
-      timeline.push({
-        ...item,
-        genre: block.genre,
-        blockName: block.name,
-        startSec: cursor,
-        endSec: end
-      });
-      cursor = end;
-      idx++;
-    }
-  }
-
-  timeline.sort((a, b) => a.startSec - b.startSec);
-  return timeline;
-}
-
-function parseTime(t) {
-  if (!t) return 0;
-  if (typeof t === 'number') return t;
-  const [h, m] = t.split(':').map(Number);
-  return h * 3600 + (m || 0) * 60;
-}
-
-function secondsFromMidnight() {
-  const now = new Date();
-  return now.getHours() * 3600 + now.getMinutes() * 60 + now.getSeconds();
-}
-
-// ─── PLAYBACK ENGINE ──────────────────────────────────────────────────────────
-function startPlayback() {
-  if (tickInterval) clearInterval(tickInterval);
-  syncToCurrentTime();
-  tickInterval = setInterval(tick, 2000);
-}
-
-function syncToCurrentTime() {
-  const now = secondsFromMidnight();
-  const idx = findCurrentItem(now);
-  if (idx === -1) {
-    showError('NO CONTENT SCHEDULED FOR THIS TIME');
-    return;
-  }
-  if (idx !== currentIndex) {
-    loadItem(idx, now);
-  }
-}
-
-function tick() {
-  if (!scheduleLoaded) return;
-  const now = secondsFromMidnight();
-  const item = schedule[currentIndex];
-  if (item && now >= item.endSec) {
-    // time to advance
-    const next = findCurrentItem(now);
-    if (next !== currentIndex) {
-      doChannelChange(() => loadItem(next, now));
-    }
-  }
-  updateHUD();
-}
-
-function findCurrentItem(nowSec) {
-  // Find item that should be playing right now
-  for (let i = 0; i < schedule.length; i++) {
-    if (nowSec >= schedule[i].startSec && nowSec < schedule[i].endSec) return i;
-  }
-  // If we're past the last item, loop back (for 24hr looping)
-  if (schedule.length > 0 && nowSec >= schedule[schedule.length-1].endSec) return 0;
-  if (schedule.length > 0 && nowSec < schedule[0].startSec) return schedule.length - 1;
-  return 0;
-}
-
-// Cache of resolved URLs so we don't re-fetch metadata each time
-const urlCache = {};
-
-async function resolveStreamUrl(item) {
-  // 1. Direct URL always wins
-  if (item.url) return item.url;
-
-  // 2. identifier + explicit filename
-  if (item.identifier && item.filename) {
-    return `https://archive.org/download/${item.identifier}/${encodeURIComponent(item.filename)}`;
-  }
-
-  // 3. Look up best video file from Archive.org metadata API
-  if (item.identifier) {
-    if (urlCache[item.identifier]) return urlCache[item.identifier];
-    try {
-      const metaUrl = `https://archive.org/metadata/${item.identifier}`;
-      const resp = await fetch(metaUrl);
-      const meta = await resp.json();
-      const files = meta.files || [];
-
-      // Prefer: mp4 > ogv > avi — and prefer smaller/_512kb versions
-      const priority = [/_512kb\.mp4$/i, /\.mp4$/i, /_512kb\.ogv$/i, /\.ogv$/i, /\.avi$/i, /\.mov$/i];
-      let picked = null;
-      for (const pattern of priority) {
-        picked = files.find(f => pattern.test(f.name) && f.source !== 'original' || pattern.test(f.name));
-        if (picked) break;
-      }
-      // Fallback: any video file
-      if (!picked) picked = files.find(f => /\.(mp4|ogv|avi|mov|mkv|webm)$/i.test(f.name));
-
-      if (picked) {
-        const resolved = `https://archive.org/download/${item.identifier}/${encodeURIComponent(picked.name)}`;
-        urlCache[item.identifier] = resolved;
-        console.log(`Resolved ${item.identifier} → ${picked.name}`);
-        return resolved;
-      }
-    } catch(e) {
-      console.warn(`Metadata lookup failed for ${item.identifier}:`, e);
-    }
-  }
-  return '';
-}
-
-async function loadItem(idx, nowSec) {
-  currentIndex = idx;
-  const item = schedule[idx];
-  if (!item) return;
-
-  staticEl.classList.add('active');
-  player.classList.remove('loaded');
-  updateHUD();
-
-  // Resolve the actual stream URL (may do a metadata API call)
-  const streamUrl = await resolveStreamUrl(item);
-
-  if (!streamUrl) {
-    showError(`NO PLAYABLE FILE FOUND — SKIPPING "${item.title || item.identifier}"`);
-    setTimeout(() => {
-      currentIndex = (currentIndex + 1) % schedule.length;
-      loadItem(currentIndex, secondsFromMidnight());
-    }, 3000);
+onSnapshot(scheduleRef, (snap) => {
+  if (!snap.exists()) {
+    console.log('No Firestore schedule found — using fallback.');
+    BLOCKS   = FALLBACK_BLOCKS;
+    TIMELINE = buildTimeline(BLOCKS);
     return;
   }
 
-  setTimeout(() => {
-    player.src = streamUrl;
+  const data = snap.data();
+  if (!data.blocks || !Array.isArray(data.blocks)) return;
 
-    // Seek to correct position within the item
-    const offset = Math.max(0, nowSec - item.startSec);
-    if (offset > 5) {
-      player.addEventListener('loadedmetadata', function seekOnce() {
-        if (player.duration && offset < player.duration - 2) {
-          player.currentTime = offset;
-        }
-        player.removeEventListener('loadedmetadata', seekOnce);
-      });
-    }
+  const isFirstLoad = TIMELINE.length === 0;
+  BLOCKS   = data.blocks;
+  TIMELINE = buildTimeline(BLOCKS);
+  console.log(`Schedule loaded from Firestore: ${BLOCKS.length} blocks, ${TIMELINE.length} slots.`);
 
-    // Only call play() if user has already interacted
-    if (userHasInteracted) {
-      player.play().catch(e => console.warn('Play failed:', e));
-    }
-
-    player.oncanplay = () => {
-      staticEl.classList.remove('active');
-      player.classList.add('loaded');
-      errorState.classList.remove('visible');
-    };
-
-    player.onerror = () => {
-      staticEl.classList.remove('active');
-      console.warn('Player error on:', streamUrl);
-      showError('STREAM ERROR — SKIPPING...');
-      setTimeout(() => {
-        currentIndex = (currentIndex + 1) % schedule.length;
-        loadItem(currentIndex, secondsFromMidnight());
-      }, 3000);
-    };
-
-    updateHUD();
-  }, 400);
-}
-
-function updateHUD() {
-  const item = schedule[currentIndex];
-  if (!item) return;
-
-  const now = secondsFromMidnight();
-  const elapsed = now - item.startSec;
-  const total = item.endSec - item.startSec;
-  const pct = Math.max(0, Math.min(100, (elapsed / total) * 100));
-  progressBar.style.width = pct + '%';
-
-  nowTitle.textContent = item.title || item.identifier || 'UNKNOWN';
-  // Show STATION ID badge when evergreen is filling a gap
-  if (item.isEvergreen) {
-    genreTag.textContent = 'STATION ID';
-    genreTag.style.background = 'var(--amber-dim)';
-  } else {
-    genreTag.textContent = (item.blockName || item.genre || 'BROADCAST').toUpperCase();
-    genreTag.style.background = '';
+  // If player is already running, seek to correct live position with new schedule
+  if (!isFirstLoad && hasBooted) {
+    showToast('⟳ SCHEDULE UPDATED');
+    const now = utcSec();
+    const ni  = findSlot(now);
+    doCut(ni);
   }
+}, (err) => {
+  console.warn('Firestore error, using fallback schedule:', err.message);
+  BLOCKS   = FALLBACK_BLOCKS;
+  TIMELINE = buildTimeline(BLOCKS);
+});
 
-  // Up next
-  const nextIdx = (currentIndex + 1) % schedule.length;
-  const nextItem = schedule[nextIdx];
-  if (nextItem) {
-    nextTitle.textContent = nextItem.title || nextItem.identifier || '—';
-    const secLeft = item.endSec - now;
-    if (secLeft > 0) {
-      const mm = Math.floor(secLeft / 60);
-      const ss = String(secLeft % 60).padStart(2,'0');
-      timeRemaining.textContent = `in ${mm}:${ss}`;
+// Initialize with fallback until Firestore responds
+TIMELINE = buildTimeline(FALLBACK_BLOCKS);
+
+// ── TOAST ─────────────────────────────────────────────────────
+function showToast(msg) {
+  toastEl.textContent = msg;
+  toastEl.classList.add('show');
+  setTimeout(() => toastEl.classList.remove('show'), 3000);
+}
+
+// ── HUD FADE ─────────────────────────────────────────────────
+const HUD_TIMEOUT = 15000;
+let hudTimer = null;
+
+function showHUD(){
+  hudEl.classList.remove('hud-hidden');
+  hudEl.classList.add('hud-visible');
+  if(hudTimer) clearTimeout(hudTimer);
+  hudTimer=setTimeout(hideHUD,HUD_TIMEOUT);
+}
+function hideHUD(){
+  hudEl.classList.add('hud-hidden');
+  hudEl.classList.remove('hud-visible');
+}
+
+document.addEventListener('mousemove', showHUD);
+document.addEventListener('touchstart', showHUD);
+hudEl.addEventListener('mouseenter',()=>{if(hudTimer)clearTimeout(hudTimer)});
+hudEl.addEventListener('mouseleave',()=>{hudTimer=setTimeout(hideHUD,HUD_TIMEOUT)});
+showHUD();
+
+// ── VOLUME ───────────────────────────────────────────────────
+function updateVolIcon(v){
+  if(v===0)volIcon.textContent='🔇';
+  else if(v<40)volIcon.textContent='🔈';
+  else if(v<75)volIcon.textContent='🔉';
+  else volIcon.textContent='🔊';
+}
+volSlider.addEventListener('input',()=>{
+  const v=parseInt(volSlider.value);
+  player.volume=v/100;
+  volPct.textContent=v+'%';
+  updateVolIcon(v);
+  volSlider.style.setProperty('--vol-pct',v+'%');
+});
+volSlider.style.setProperty('--vol-pct','100%');
+
+// ── CLOCK ─────────────────────────────────────────────────────
+const DN=['SUN','MON','TUE','WED','THU','FRI','SAT'];
+const MN=['JAN','FEB','MAR','APR','MAY','JUN','JUL','AUG','SEP','OCT','NOV','DEC'];
+function tickClock(){
+  const d=new Date(),p=n=>String(n).padStart(2,'0');
+  clockEl.textContent=`${p(d.getHours())}:${p(d.getMinutes())}:${p(d.getSeconds())}`;
+  dateEl.textContent=`${DN[d.getDay()]} ${d.getDate()} ${MN[d.getMonth()]} ${d.getFullYear()}`;
+}
+setInterval(tickClock,1000);tickClock();
+
+// ── URL RESOLUTION ────────────────────────────────────────────
+async function resolveUrl(id){
+  if(metaCache[id])return metaCache[id];
+  try{
+    const r=await fetch(`https://archive.org/metadata/${id}`);
+    const meta=await r.json();
+    const files=meta.files||[];
+    const fns=[
+      f=>/\.ia\.mp4$/i.test(f.name),
+      f=>/\.mp4$/i.test(f.name)&&f.source==='derivative',
+      f=>/\.mp4$/i.test(f.name),
+      f=>/\.ogv$/i.test(f.name),
+    ];
+    let picked=null;
+    for(const fn of fns){picked=files.find(fn);if(picked)break}
+    if(picked){
+      const url=`https://archive.org/download/${id}/${encodeURIComponent(picked.name)}`;
+      metaCache[id]=url;return url;
     }
+  }catch(e){console.warn('metadata failed:',id,e.message)}
+  return null;
+}
+
+// ── PUBLISH DATE ──────────────────────────────────────────────
+async function fetchPublishDate(id){
+  if(dateCache[id]!==undefined)return dateCache[id];
+  dateCache[id]='';
+  try{
+    const r=await fetch(`https://archive.org/metadata/${id}`);
+    const meta=await r.json();
+    const raw=meta.metadata&&(meta.metadata.date||meta.metadata.publicdate||meta.metadata.addeddate);
+    if(raw){
+      const d=new Date(raw);
+      if(!isNaN(d)){
+        dateCache[id]=`${d.getUTCDate()} ${MN[d.getUTCMonth()]} ${d.getUTCFullYear()}`;
+      }else{dateCache[id]=raw.slice(0,10)}
+    }
+  }catch(e){dateCache[id]=''}
+  return dateCache[id];
+}
+
+// ── PLAYBACK ──────────────────────────────────────────────────
+async function playSlot(idx,seekLive){
+  if(idx<0||idx>=TIMELINE.length)return;
+  currentIdx=idx;
+  const slot=TIMELINE[idx];
+  const offset=seekLive?Math.max(0,utcSec()-slot.startSec):0;
+  updateHUD();
+  let url=metaCache[slot.id]||null;
+  if(!url){
+    url=slot.url;
+    resolveUrl(slot.id).then(confirmed=>{
+      if(confirmed&&confirmed!==player.src&&currentIdx===idx){
+        const t=player.currentTime;
+        player.src=confirmed;player.load();
+        player.currentTime=t;player.play().catch(()=>{});
+      }
+    });
   }
-}
-
-function doChannelChange(cb) {
-  flashEl.classList.add('flash');
-  staticEl.classList.add('active');
-  setTimeout(() => {
-    flashEl.classList.remove('flash');
-    cb();
-  }, 120);
-}
-
-function showError(msg) {
-  errorState.querySelector('p').textContent = msg;
-  errorState.classList.add('visible');
-}
-
-// ─── TUNE-IN PROMPT (shown immediately — Chrome blocks autoplay until interaction) ──
-let userHasInteracted = false;
-
-function showTuneInPrompt() {
-  if (userHasInteracted) return;
-  const overlay = document.createElement('div');
-  overlay.id = 'tunein-overlay';
-  overlay.style.cssText = `
-    position:fixed;inset:0;z-index:200;display:flex;flex-direction:column;
-    align-items:center;justify-content:center;cursor:pointer;
-    background:rgba(0,0,0,0.82);gap:24px;
-  `;
-  overlay.innerHTML = `
-    <div style="font-family:'Bebas Neue',cursive;font-size:clamp(36px,7vw,88px);
-      letter-spacing:0.1em;color:#ffb700;text-shadow:0 0 40px #ffb700,0 0 80px rgba(255,183,0,0.3);
-      text-align:center;line-height:1">
-      ▶ CLICK TO<br>TUNE IN
-    </div>
-    <div style="font-family:'IBM Plex Mono',monospace;font-size:11px;
-      letter-spacing:0.3em;color:#7a5800;text-align:center">
-      TVStation · 24/7 Broadcast
-    </div>`;
-  overlay.onclick = () => {
-    userHasInteracted = true;
-    overlay.remove();
-    player.play().catch(() => {});
+  if(player.src!==url){player.src=url;player.load()}
+  const doPlay=()=>{
+    if(offset>2){
+      const dur=player.duration;
+      const t=isFinite(dur)?Math.min(offset,dur-2):offset;
+      if(t>0)player.currentTime=t;
+    }
+    player.play().catch(async e=>{
+      const confirmed=await resolveUrl(slot.id);
+      if(confirmed&&currentIdx===idx){
+        player.src=confirmed;player.load();
+        player.currentTime=offset>2?offset:0;
+        player.play().catch(()=>{});
+      }else if(!confirmed){
+        console.warn('Skipping unplayable slot:',slot.title);
+        doCut((idx+1)%TIMELINE.length);
+      }
+    });
   };
-  document.body.appendChild(overlay);
+  if(player.readyState>=1)doPlay();
+  else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
 }
 
-// ─── INIT ─────────────────────────────────────────────────────────────────────
-// Show tune-in prompt immediately — Chrome requires a user gesture before
-// any audio/video can play, so we gate everything behind this click.
-showTuneInPrompt();
-loadSchedule();
+function doCut(nextIdx){
+  flashEl.classList.add('on');
+  setTimeout(()=>flashEl.classList.remove('on'),55);
+  player.pause();
+  showHUD();
+  playSlot(nextIdx,false);
+  const nn=TIMELINE[(nextIdx+1)%TIMELINE.length];
+  if(nn&&!metaCache[nn.id])resolveUrl(nn.id);
+}
 
-// Reload schedule every 30 minutes to pick up updates
-setInterval(loadSchedule, 30 * 60 * 1000);
+// ── TICK ──────────────────────────────────────────────────────
+function tick(){
+  updateHUD();
+  const now=utcSec();
+  const slot=TIMELINE[currentIdx];
+  if(!slot)return;
+  if(now>=slot.endSec){
+    const ni=findSlot(now);
+    if(ni!==currentIdx)doCut(ni);
+  }
+}
+
+// ── HUD UPDATE ────────────────────────────────────────────────
+function updateHUD(){
+  const slot=TIMELINE[currentIdx];
+  if(!slot)return;
+  const now=utcSec();
+  const pct=Math.max(0,Math.min(100,((now-slot.startSec)/(slot.endSec-slot.startSec))*100));
+  pfillEl.style.width=pct+'%';
+  nowTitleEl.textContent=slot.title;
+  genreEl.textContent=(slot.blockName||slot.genre||'BROADCAST').toUpperCase();
+  const cached=dateCache[slot.id];
+  if(cached){pubDateEl.textContent=cached}
+  else if(cached===undefined){
+    pubDateEl.textContent='';
+    fetchPublishDate(slot.id).then(d=>{
+      if(d&&TIMELINE[currentIdx]&&TIMELINE[currentIdx].id===slot.id)pubDateEl.textContent=d;
+    });
+  }
+  const next=TIMELINE[(currentIdx+1)%TIMELINE.length];
+  if(next){
+    nextTitleEl.textContent=next.title;
+    const s=Math.max(0,Math.round(slot.endSec-now));
+    tleftEl.textContent=`in ${Math.floor(s/60)}:${String(s%60).padStart(2,'0')}`;
+  }
+}
+
+// ── VIDEO EVENTS ──────────────────────────────────────────────
+player.addEventListener('ended',()=>{
+  const now=utcSec();
+  const ni=findSlot(now)===currentIdx?(currentIdx+1)%TIMELINE.length:findSlot(now);
+  doCut(ni);
+});
+player.addEventListener('error',()=>{
+  console.warn('player error — skipping');
+  setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
+});
+
+// ── TUNE IN ───────────────────────────────────────────────────
+window.tuneIn = function(){
+  tuneinEl.style.display='none';
+  hasBooted=true;
+  const now=utcSec();
+  const idx=findSlot(now);
+  playSlot(idx,true);
+  const next=TIMELINE[(idx+1)%TIMELINE.length];
+  if(next&&!metaCache[next.id])resolveUrl(next.id);
+  if(tickInterval)clearInterval(tickInterval);
+  tickInterval=setInterval(tick,500);
+};
 </script>
 </body>
 </html>
