@@ -1,9 +1,9 @@
- <!DOCTYPE html>
+<!DOCTYPE html>
 <html lang="en">
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Legacy — RFA 24/7</title>
+<title>Legacy | RFA</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -213,7 +213,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 <div id="hud">
   <div class="hud-top">
     <div>
-      <div class="sid">RFA | Legacy <span class="ssub">RFA · BROADCASTING 24/7</span></div>
+      <div class="sid">Legacy | RFA<span class="ssub">RFA · BROADCASTING 24/7</span></div>
       <div class="live-row"><div class="dot"></div>LIVE</div>
     </div>
     <div class="clk">
@@ -251,26 +251,28 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
   <div id="tunein-sub">TVStation &middot; RFA 24/7 Broadcast</div>
 </div>
 
-<!-- Firebase SDK -->
-<script type="module">
-import { initializeApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getFirestore, doc, onSnapshot } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js';
+<!-- Firebase compat CDN (synchronous globals, no ES module race condition) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+<script>
 
 // ─────────────────────────────────────────────────────────────
 //  🔧 PASTE YOUR FIREBASE CONFIG HERE
 //  Get this from: Firebase Console → Project Settings → Your Apps
 // ─────────────────────────────────────────────────────────────
-const firebaseConfig = {
+// ─────────────────────────────────────────────────────────────
+//  🔧 PASTE YOUR FIREBASE CONFIG HERE
+// ─────────────────────────────────────────────────────────────
+firebase.initializeApp({
   apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
   authDomain:        "rfa-legacy.firebaseapp.com",
   projectId:         "rfa-legacy",
   storageBucket:     "rfa-legacy.firebasestorage.app",
   messagingSenderId: "760753759019",
   appId:             "1:760753759019:web:0d94416e5c2d2c80631b6e"
-};
+});
 
-const app = initializeApp(firebaseConfig);
-const db  = getFirestore(app);
+var db = firebase.firestore();
 
 // ─────────────────────────────────────────────────────────────
 //  FALLBACK SCHEDULE (used if Firestore is unreachable)
@@ -279,7 +281,7 @@ const FALLBACK_BLOCKS = [
   {
     name:"普通話 — Mandarin Chinese", genre:"Mandarin Chinese", start:"00:00",
     items:[
-      {t:"An Introduction to Radio Free Asia",                 id:"youtube-AUvGxNHiJy0", dur:067},
+      {t:"Hong Kong's Face Readers Reshape the Future",        id:"youtube-MJVRwBrkzsg", dur:272},
       {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
       {t:"Chinese Police Quash Month-Long Land Protest",       id:"youtube-jMk4o81qxL0", dur:156},
       {t:"Will Senegal Fall Into a Belt and Road Debt Trap?",  id:"youtube-9w_JnNZtmm0", dur:445},
@@ -289,7 +291,6 @@ const FALLBACK_BLOCKS = [
   {
     name:"မြန်မာဘာသာ — Burmese", genre:"Burmese", start:"02:40",
     items:[
-      {t:"An Introduction to Radio Free Asia",                   id:"youtube-AUvGxNHiJy0", dur:067},
       {t:"Myanmar's Jasmine Garland Sellers Go Back to School",  id:"youtube-9Nma364RVCg", dur:183},
       {t:"Myanmar Insurance Industry Grows As Economy Opens",    id:"youtube-zbq6lEW9FNU", dur:214},
       {t:"Myanmar Faces Flooding Emergency",                     id:"youtube-tkNpWKazyX0", dur:193},
@@ -360,34 +361,29 @@ let dateCache   = {};
 let hasBooted   = false;
 
 // ── FIRESTORE LIVE SCHEDULE ───────────────────────────────────
-// Listens for real-time updates from admin panel.
-// When schedule changes, rebuilds timeline and seeks to correct position.
-const scheduleRef = doc(db, 'broadcast', 'schedule');
-
-onSnapshot(scheduleRef, (snap) => {
-  if (!snap.exists()) {
+db.collection('broadcast').doc('schedule').onSnapshot(function(snap) {
+  if (!snap.exists) {
     console.log('No Firestore schedule found — using fallback.');
     BLOCKS   = FALLBACK_BLOCKS;
     TIMELINE = buildTimeline(BLOCKS);
     return;
   }
 
-  const data = snap.data();
+  var data = snap.data();
   if (!data.blocks || !Array.isArray(data.blocks)) return;
 
-  const isFirstLoad = TIMELINE.length === 0;
+  var isFirstLoad = TIMELINE.length === 0;
   BLOCKS   = data.blocks;
   TIMELINE = buildTimeline(BLOCKS);
-  console.log(`Schedule loaded from Firestore: ${BLOCKS.length} blocks, ${TIMELINE.length} slots.`);
+  console.log('Schedule loaded from Firestore: ' + BLOCKS.length + ' blocks, ' + TIMELINE.length + ' slots.');
 
-  // If player is already running, seek to correct live position with new schedule
   if (!isFirstLoad && hasBooted) {
     showToast('⟳ SCHEDULE UPDATED');
-    const now = utcSec();
-    const ni  = findSlot(now);
+    var now = utcSec();
+    var ni  = findSlot(now);
     doCut(ni);
   }
-}, (err) => {
+}, function(err) {
   console.warn('Firestore error, using fallback schedule:', err.message);
   BLOCKS   = FALLBACK_BLOCKS;
   TIMELINE = buildTimeline(BLOCKS);
