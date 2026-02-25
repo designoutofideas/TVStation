@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
 <head>
@@ -5,813 +6,643 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>RFA Admin — Schedule Editor</title>
 <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&family=IBM+Plex+Sans:wght@300;400;500;600&display=swap" rel="stylesheet">
+
+<!-- React — global window.React / window.ReactDOM -->
+<script src="https://unpkg.com/react@18/umd/react.production.min.js"></script>
+<script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js"></script>
+
+<!-- Firebase compat (global window.firebase, fully synchronous) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-auth-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 :root{
-  --p:#61C230;--pd:#4a9624;--pg:rgba(97,194,48,.08);
-  --dim:#627568;--off:#F0F6F0;--wh:#FFFFFF;
-  --bg:#080e09;--s1:#0e1a10;--s2:#141f15;
-  --b:rgba(97,194,48,.14);--bh:rgba(97,194,48,.35);
-  --red:#ff4433;--redd:rgba(255,68,51,.12);--amb:#f5a623;
-  --mono:'IBM Plex Mono',monospace;--sans:'IBM Plex Sans',sans-serif;--disp:'Bebas Neue',cursive;
+  --p:#61C230; --pd:#4a9624; --pg:rgba(97,194,48,0.08);
+  --dim:#627568; --off:#F0F6F0; --wh:#FFFFFF;
+  --bg:#080e09; --s1:#0e1a10; --s2:#141f15;
+  --b:rgba(97,194,48,0.14); --bh:rgba(97,194,48,0.35);
+  --red:#ff4433; --redd:rgba(255,68,51,0.12); --amb:#f5a623;
+  --mono:'IBM Plex Mono',monospace; --sans:'IBM Plex Sans',sans-serif; --disp:'Bebas Neue',cursive;
 }
-html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font-family:var(--sans);font-size:14px}
+html,body,#root{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font-family:var(--sans);font-size:14px}
 ::-webkit-scrollbar{width:4px}::-webkit-scrollbar-track{background:transparent}::-webkit-scrollbar-thumb{background:var(--b);border-radius:2px}
 
-/* ── LOADING ── */
-#boot{display:flex;align-items:center;justify-content:center;height:100vh;gap:14px;flex-direction:column}
-.spin{width:20px;height:20px;border:2px solid rgba(97,194,48,.2);border-top-color:var(--p);border-radius:50%;animation:spn .7s linear infinite}
-@keyframes spn{to{transform:rotate(360deg)}}
-.boot-txt{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.3em;text-transform:uppercase}
+/* LOGIN */
+.lw{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;gap:32px;background:radial-gradient(ellipse at 50% 30%,rgba(97,194,48,.06) 0%,transparent 70%)}
+.ll{font-family:var(--disp);font-size:64px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 40px rgba(97,194,48,.4);line-height:1}
+.ls{font-family:var(--mono);font-size:9px;letter-spacing:.4em;color:var(--dim);text-transform:uppercase;margin-top:-20px}
+.lc{background:var(--s1);border:1px solid var(--b);padding:40px 48px;display:flex;flex-direction:column;align-items:center;gap:20px;min-width:360px}
+.lt{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
+.le{font-family:var(--mono);font-size:10px;color:var(--red);letter-spacing:.12em;text-align:center;background:var(--redd);border:1px solid rgba(255,68,51,.2);padding:8px 16px;width:100%}
+.bg{display:flex;align-items:center;gap:12px;background:var(--wh);color:#333;border:none;cursor:pointer;padding:12px 24px;font-family:var(--sans);font-size:14px;font-weight:500;width:100%;justify-content:center;transition:opacity .15s}
+.bg:hover{opacity:.9}.bg:disabled{opacity:.5;cursor:not-allowed}
+.bg svg{width:18px;height:18px;flex-shrink:0}
 
-/* ── LOGIN ── */
-#login{display:none;align-items:center;justify-content:center;min-height:100vh;flex-direction:column;gap:28px;background:radial-gradient(ellipse at 50% 30%,rgba(97,194,48,.06),transparent 70%)}
-.ll{font-family:var(--disp);font-size:60px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 40px rgba(97,194,48,.4);line-height:1}
-.lsub{font-family:var(--mono);font-size:9px;letter-spacing:.4em;color:var(--dim);text-transform:uppercase;margin-top:-18px}
-.lcard{background:var(--s1);border:1px solid var(--b);padding:40px 48px;display:flex;flex-direction:column;align-items:center;gap:20px;min-width:340px}
-.ltitle{font-family:var(--mono);font-size:10px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
-.lerr{font-family:var(--mono);font-size:10px;color:var(--red);background:var(--redd);border:1px solid rgba(255,68,51,.2);padding:8px 14px;width:100%;text-align:center;display:none}
-/* Google button container — GIS injects into this div */
-#g_btn{width:100%}
+/* APP */
+.app{display:flex;flex-direction:column;min-height:100vh}
 
-/* ── APP ── */
-#app{display:none;flex-direction:column;min-height:100vh}
-
-/* topbar */
+/* TOPBAR */
 .tb{display:flex;align-items:center;justify-content:space-between;padding:0 28px;height:56px;background:var(--s1);border-bottom:1px solid var(--b);position:sticky;top:0;z-index:50}
 .tbl{display:flex;align-items:center;gap:16px}
-.tlo{font-family:var(--disp);font-size:28px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 16px rgba(97,194,48,.4)}
+.tlo{font-family:var(--disp);font-size:28px;letter-spacing:.12em;color:var(--p);text-shadow:0 0 16px rgba(97,194,48,.4);line-height:1}
 .tla{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;border-left:1px solid var(--b);padding-left:16px}
 .tbr{display:flex;align-items:center;gap:12px}
-.spill{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;background:var(--s2);border:1px solid var(--b);padding:4px 10px}
-.spill.live{color:var(--p);border-color:rgba(97,194,48,.3)}
-.sdot{width:6px;height:6px;border-radius:50%;background:var(--dim)}
-.spill.live .sdot{background:var(--p);box-shadow:0 0 6px var(--p);animation:blk 1.4s infinite}
+.ub{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.1em}
+.ua{width:26px;height:26px;border-radius:50%;border:1px solid var(--b);object-fit:cover}
+.uap{width:26px;height:26px;border-radius:50%;background:var(--pd);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:10px;color:var(--wh)}
+.sp{display:flex;align-items:center;gap:6px;font-family:var(--mono);font-size:9px;letter-spacing:.2em;color:var(--dim);text-transform:uppercase;background:var(--s2);border:1px solid var(--b);padding:4px 10px}
+.sp.live{color:var(--p);border-color:rgba(97,194,48,.3)}
+.sd{width:6px;height:6px;border-radius:50%;background:var(--dim)}
+.sp.live .sd{background:var(--p);box-shadow:0 0 6px var(--p);animation:blk 1.4s infinite}
 @keyframes blk{0%,100%{opacity:1}50%{opacity:.2}}
-.ubadge{display:flex;align-items:center;gap:8px;font-family:var(--mono);font-size:10px;color:var(--dim)}
-.uav{width:26px;height:26px;border-radius:50%;border:1px solid var(--b);object-fit:cover}
-.uavp{width:26px;height:26px;border-radius:50%;background:var(--pd);display:flex;align-items:center;justify-content:center;font-family:var(--mono);font-size:11px;color:var(--wh);font-weight:600}
-.btn{display:inline-flex;align-items:center;gap:7px;padding:8px 16px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap;background:transparent}
-.btn-ghost{border-color:var(--b);color:var(--dim)}.btn-ghost:hover{border-color:var(--bh);color:var(--off)}
-.btn-ghost:disabled{opacity:.4;cursor:not-allowed}
-.btn-primary{background:var(--p);border-color:var(--p);color:#050d06;font-weight:600}
-.btn-primary:hover:not(:disabled){background:#74d63d;border-color:#74d63d}
-.btn-primary:disabled{opacity:.4;cursor:not-allowed}
-.btn-danger{border-color:rgba(255,68,51,.3);color:var(--red)}.btn-danger:hover{background:var(--redd)}
 
-/* main layout */
+/* MAIN */
 .main{display:flex;flex:1}
-.sb{width:270px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
-.sbsec{padding:18px 14px 10px}
-.sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:10px}
-.blist{display:flex;flex-direction:column;gap:2px}
-.bitem{display:flex;align-items:center;gap:9px;padding:9px 11px;cursor:pointer;border:1px solid transparent;transition:all .12s;border-radius:2px}
-.bitem:hover{background:var(--pg);border-color:var(--b)}
-.bitem.act{background:rgba(97,194,48,.1);border-color:rgba(97,194,48,.3)}
-.bdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
-.binfo{flex:1;min-width:0}
-.bname{font-size:12px;font-weight:500;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.bmeta{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:1px}
-.bcnt{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 6px;border-radius:2px;flex-shrink:0}
-.sb-addbtn{margin:0 14px 14px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:transparent;border:1px dashed rgba(97,194,48,.22);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;transition:all .12s}
-.sb-addbtn:hover{border-color:var(--p);color:var(--p)}
 
-/* editor */
-.ed{flex:1;padding:28px 30px;overflow-y:auto}
-.ed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:14px;opacity:.35}
-.ed-empty-icon{font-size:44px}
-.ed-empty-txt{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
-.ed-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:24px;gap:16px}
-.ed-title{font-family:var(--disp);font-size:34px;letter-spacing:.08em;line-height:1}
-.ed-meta{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.18em;margin-top:6px}
+/* SIDEBAR */
+.sb{width:280px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:56px;height:calc(100vh - 56px);overflow-y:auto}
+.sbs{padding:20px 16px 12px}
+.sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:12px}
+.bl{display:flex;flex-direction:column;gap:2px}
+.bi{display:flex;align-items:center;gap:10px;padding:9px 12px;cursor:pointer;border:1px solid transparent;transition:all .12s;border-radius:2px}
+.bi:hover{background:var(--pg);border-color:var(--b)}
+.bi.act{background:rgba(97,194,48,.1);border-color:rgba(97,194,48,.3)}
+.bdo{width:8px;height:8px;border-radius:50%;flex-shrink:0}
+.bin{flex:1;min-width:0}
+.bn{font-family:var(--sans);font-size:12px;font-weight:500;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.bm{font-family:var(--mono);font-size:9px;color:var(--dim);margin-top:1px}
+.bc{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 6px;border-radius:2px;flex-shrink:0}
+.sadd{margin:0 16px 16px;display:flex;align-items:center;justify-content:center;gap:8px;padding:10px;background:transparent;border:1px dashed rgba(97,194,48,.25);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;transition:all .12s}
+.sadd:hover{border-color:var(--p);color:var(--p)}
 
-/* fields */
-.fg{display:flex;gap:10px;margin-bottom:18px;flex-wrap:wrap}
-.fi{display:flex;flex-direction:column;gap:5px;flex:1;min-width:130px}
+/* EDITOR */
+.ed{flex:1;padding:28px 32px;overflow-y:auto}
+.ee{display:flex;flex-direction:column;align-items:center;justify-content:center;height:100%;gap:16px;opacity:.4}
+.eei{font-size:48px;line-height:1}
+.eet{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+.eh{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:28px;gap:20px}
+.etg{display:flex;flex-direction:column;gap:8px;flex:1}
+.et{font-family:var(--disp);font-size:36px;letter-spacing:.08em;line-height:1}
+.ea{display:flex;gap:8px;flex-shrink:0}
+.fg{display:flex;gap:12px;margin-bottom:20px;flex-wrap:wrap}
+.fi{display:flex;flex-direction:column;gap:6px;flex:1;min-width:140px}
 .fl{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
-.fi input,.fi select{background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:8px 11px;outline:none;width:100%;transition:border-color .15s}
+.fi input,.fi select{background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:8px 12px;outline:none;width:100%;transition:border-color .15s}
 .fi input:focus,.fi select:focus{border-color:var(--p)}
 .fi select option{background:var(--s2)}
-
-/* items */
-.ih{display:flex;align-items:center;justify-content:space-between;margin-bottom:10px}
+.ih{display:flex;align-items:center;justify-content:space-between;margin-bottom:12px}
 .il{font-family:var(--mono);font-size:8px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
-.ic{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 7px}
-.icols{display:grid;grid-template-columns:22px 1fr 190px 60px 30px;gap:6px;padding:3px 11px;margin-bottom:3px}
-.icolh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.22em}
-.irow{display:grid;grid-template-columns:22px 1fr 190px 60px 30px;gap:6px;align-items:center;padding:7px 11px;border:1px solid var(--b);margin-bottom:3px;background:var(--s2);transition:border-color .12s;cursor:default}
-.irow:hover{border-color:var(--bh)}
-.irow.drag-over{border-color:var(--p);border-style:dashed}
-.ihandle{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;cursor:grab;user-select:none}
-.irow input{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--off);font-family:var(--mono);font-size:12px;padding:2px 3px;outline:none;width:100%;transition:border-color .12s}
-.irow input:focus{border-bottom-color:var(--p)}
-.irow input::placeholder{color:rgba(98,117,104,.4)}
-.idur{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
-.idel{width:26px;height:26px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;cursor:pointer;color:var(--dim);font-size:13px;transition:all .12s}
-.idel:hover{color:var(--red);border-color:rgba(255,68,51,.3);background:var(--redd)}
-.add-item{display:flex;align-items:center;gap:8px;padding:9px 14px;margin-top:6px;background:transparent;border:1px dashed rgba(97,194,48,.18);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.18em;cursor:pointer;text-transform:uppercase;width:100%;transition:all .12s}
-.add-item:hover{border-color:var(--p);color:var(--p)}
+.ic{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 8px}
+.ir{display:grid;grid-template-columns:24px 1fr 200px 64px 32px;gap:6px;align-items:center;padding:8px 12px;border:1px solid var(--b);margin-bottom:4px;background:var(--s2);transition:border-color .12s}
+.ir:hover{border-color:var(--bh)}
+.in{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center;cursor:grab;user-select:none}
+.ir input{background:transparent;border:none;border-bottom:1px solid transparent;color:var(--off);font-family:var(--mono);font-size:12px;padding:2px 4px;outline:none;width:100%;transition:border-color .12s}
+.ir input:focus{border-bottom-color:var(--p)}
+.ir input::placeholder{color:rgba(98,117,104,.5)}
+.dd{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
+.bic{width:28px;height:28px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;cursor:pointer;color:var(--dim);font-size:14px;transition:all .12s;border-radius:2px}
+.bic:hover{color:var(--red);border-color:rgba(255,68,51,.3);background:var(--redd)}
+.aib{display:flex;align-items:center;gap:8px;padding:10px 16px;margin-top:8px;background:transparent;border:1px dashed rgba(97,194,48,.2);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;width:100%;transition:all .12s}
+.aib:hover{border-color:var(--p);color:var(--p)}
 
-/* note box */
-.note{margin-top:18px;padding:12px 14px;background:var(--s2);border:1px solid var(--b)}
-.noteh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.28em;margin-bottom:7px}
-.noteb{font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.7}
-.noteb code{color:var(--p)}
+/* BUTTONS */
+.btn{display:flex;align-items:center;gap:7px;padding:9px 18px;font-family:var(--mono);font-size:10px;letter-spacing:.2em;text-transform:uppercase;cursor:pointer;border:1px solid;transition:all .15s;white-space:nowrap}
+.bp{background:var(--p);border-color:var(--p);color:#050d06;font-weight:600}
+.bp:hover{background:#74d63d;border-color:#74d63d}
+.bp:disabled{opacity:.4;cursor:not-allowed}
+.bg2{background:transparent;border-color:var(--b);color:var(--dim)}
+.bg2:hover{border-color:var(--bh);color:var(--off)}
+.bg2:disabled{opacity:.4;cursor:not-allowed}
+.bdr{background:transparent;border-color:rgba(255,68,51,.3);color:var(--red)}
+.bdr:hover{background:var(--redd)}
 
-/* color swatches */
-.swg{display:flex;gap:7px;flex-wrap:wrap;margin-top:5px}
-.sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .12s}
+/* PUBLISH BAR */
+.pb{position:sticky;bottom:0;background:var(--s1);border-top:1px solid var(--b);padding:14px 32px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:40}
+.ps{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.15em}
+.ps.saved{color:var(--p)}.ps.unsaved{color:var(--amb)}
+.pa{display:flex;gap:10px}
+
+/* TOAST */
+.toast{position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.25em;padding:10px 24px;z-index:200;pointer-events:none;animation:tst .3s ease forwards}
+@keyframes tst{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+
+/* SPINNER */
+.spin{width:16px;height:16px;border:2px solid rgba(97,194,48,.2);border-top-color:var(--p);border-radius:50%;animation:spn .6s linear infinite;display:inline-block;flex-shrink:0}
+@keyframes spn{to{transform:rotate(360deg)}}
+
+/* MODAL */
+.mo{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.7);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center}
+.md{background:var(--s1);border:1px solid var(--b);padding:32px;min-width:380px;max-width:480px;width:100%}
+.mt{font-family:var(--disp);font-size:28px;letter-spacing:.08em;color:var(--p);margin-bottom:8px}
+.ms{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-bottom:24px}
+.ma{display:flex;gap:10px;margin-top:24px;justify-content:flex-end}
+.swg{display:flex;gap:8px;flex-wrap:wrap;margin-top:6px}
+.sw{width:24px;height:24px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .12s}
 .sw.sel{border-color:var(--wh)}
 
-/* publish bar */
-.pbar{position:sticky;bottom:0;background:var(--s1);border-top:1px solid var(--b);padding:13px 30px;display:flex;align-items:center;justify-content:space-between;gap:16px;z-index:40}
-.pstat{font-family:var(--mono);font-size:9px;letter-spacing:.15em}
-.pstat.saved{color:var(--p)}.pstat.unsaved{color:var(--amb)}
-.pnote{font-family:var(--mono);font-size:8px;color:var(--dim);margin-top:3px;letter-spacing:.12em}
-.pacts{display:flex;gap:10px}
+.ldw{display:flex;align-items:center;justify-content:center;height:100vh;gap:12px}
+.ldt{font-family:var(--mono);font-size:10px;color:var(--dim);letter-spacing:.3em;text-transform:uppercase}
 
-/* modal */
-.modal-bg{position:fixed;inset:0;z-index:100;background:rgba(0,0,0,.75);backdrop-filter:blur(4px);display:none;align-items:center;justify-content:center}
-.modal-bg.show{display:flex}
-.modal{background:var(--s1);border:1px solid var(--b);padding:30px;min-width:360px;max-width:460px;width:100%}
-.modal-title{font-family:var(--disp);font-size:26px;letter-spacing:.08em;color:var(--p);margin-bottom:6px}
-.modal-sub{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase;margin-bottom:22px}
-.modal-acts{display:flex;gap:10px;margin-top:22px;justify-content:flex-end}
-
-/* toast */
-.toast{position:fixed;bottom:76px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.22em;padding:10px 22px;z-index:200;pointer-events:none;display:none}
-.toast.show{display:block;animation:tst .3s ease forwards}
-@keyframes tst{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
+.note{margin-top:20px;padding:12px 16px;background:var(--s2);border:1px solid var(--b)}
+.noteh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.3em;margin-bottom:8px}
+.noteb{font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.7}
+.noteb code{color:var(--p)}
 </style>
 </head>
 <body>
-
-<!-- BOOT -->
-<div id="boot">
-  <div class="spin"></div>
-  <div class="boot-txt">Initialising…</div>
-</div>
-
-<!-- LOGIN -->
-<div id="login">
-  <div style="text-align:center">
-    <div class="ll">RFA</div>
-    <div class="lsub">Schedule Admin · Broadcast Control</div>
-  </div>
-  <div class="lcard">
-    <div class="ltitle">Team Sign-In Required</div>
-    <div class="lerr" id="lerr"></div>
-    <div id="g_btn"></div>
-  </div>
-</div>
-
-<!-- APP -->
-<div id="app">
-  <!-- Topbar -->
-  <div class="tb">
-    <div class="tbl">
-      <div class="tlo">RFA</div>
-      <div class="tla">Schedule Admin</div>
-    </div>
-    <div class="tbr">
-      <div class="spill" id="status-pill"><div class="sdot"></div><span id="status-txt">CONNECTING</span></div>
-      <div class="ubadge">
-        <div class="uavp" id="uavp">?</div>
-        <img class="uav" id="uav" style="display:none" alt="">
-        <span id="uemail" style="font-family:var(--mono);font-size:10px"></span>
-      </div>
-      <button class="btn btn-ghost" style="padding:6px 12px;font-size:9px" onclick="signOut()">Sign Out</button>
-    </div>
-  </div>
-
-  <div class="main">
-    <!-- Sidebar -->
-    <div class="sb">
-      <div class="sbsec">
-        <div class="sbh" id="sb-heading">Blocks — 0</div>
-        <div class="blist" id="blist"></div>
-      </div>
-      <button class="sb-addbtn" onclick="openAddModal()">+ New Block</button>
-    </div>
-
-    <!-- Editor -->
-    <div class="ed" id="editor">
-      <div class="ed-empty">
-        <div class="ed-empty-icon">📡</div>
-        <div class="ed-empty-txt">Select or create a block to edit</div>
-      </div>
-    </div>
-  </div>
-
-  <!-- Publish bar -->
-  <div class="pbar">
-    <div>
-      <div class="pstat saved" id="pstat">✓ IN SYNC WITH FIRESTORE</div>
-      <div class="pnote">Publishing pushes the schedule live instantly — no page reload needed on viewer.</div>
-    </div>
-    <div class="pacts">
-      <button class="btn btn-ghost" id="discard-btn" disabled onclick="discardChanges()">Discard</button>
-      <button class="btn btn-primary" id="publish-btn" disabled onclick="publishSchedule()">⬆ Publish to Live</button>
-    </div>
-  </div>
-</div>
-
-<!-- Add Block Modal -->
-<div class="modal-bg" id="add-modal">
-  <div class="modal" onclick="event.stopPropagation()">
-    <div class="modal-title">New Block</div>
-    <div class="modal-sub">Add a language / programming block</div>
-    <div class="fg" style="flex-direction:column;gap:12px">
-      <div class="fi">
-        <div class="fl">Block Name</div>
-        <input id="m-name" placeholder="e.g. 한국어 — Korean">
-      </div>
-      <div class="fg" style="margin-bottom:0">
-        <div class="fi">
-          <div class="fl">Genre / Language</div>
-          <input id="m-genre" placeholder="Korean">
-        </div>
-        <div class="fi" style="max-width:110px">
-          <div class="fl">UTC Start</div>
-          <input id="m-start" placeholder="HH:MM" value="00:00">
-        </div>
-      </div>
-      <div class="fi">
-        <div class="fl">Block Color</div>
-        <div class="swg" id="m-colors"></div>
-      </div>
-    </div>
-    <div class="modal-acts">
-      <button class="btn btn-ghost" onclick="closeAddModal()">Cancel</button>
-      <button class="btn btn-primary" onclick="submitNewBlock()">Add Block</button>
-    </div>
-  </div>
-</div>
-
-<!-- Toast -->
-<div class="toast" id="toast"></div>
+<div id="root"></div>
 
 <script>
 // ─────────────────────────────────────────────────────────────
-//  🔧  PASTE YOUR FIREBASE CONFIG VALUES BELOW
+//  🔧 PASTE YOUR FIREBASE CONFIG HERE (same as index.html)
 // ─────────────────────────────────────────────────────────────
-var API_KEY     = "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o";
-var PROJECT_ID  = "rfa-legacy";
-var CLIENT_ID   = "760753759019-s2f8tvintss5gtjtcmj2sdtd768hh601.apps.googleusercontent.com";  // from Google Cloud Console → Credentials
+firebase.initializeApp({
+  apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
+  authDomain:        "rfa-legacy.firebaseapp.com",
+  projectId:         "rfa-legacy",
+  storageBucket:     "rfa-legacy.firebasestorage.app",
+  messagingSenderId: "760753759019",
+  appId:             "1:760753759019:web:0d94416e5c2d2c80631b6e"
+  };
 
-// ─────────────────────────────────────────────────────────────
-//  🔒  ALLOWED TEAM EMAILS
-// ─────────────────────────────────────────────────────────────
-var ALLOWED_EMAILS = [
-  "hutchinsonj@rfa.org",
+  // ─────────────────────────────────────────────────────────────
+  //  🔒 ALLOWED TEAM EMAILS — add your team's Google accounts
+  // ─────────────────────────────────────────────────────────────
+  const ALLOWED_EMAILS = [
+    "hutchinsonj@rfa.org",
   "teammate@gmail.com"
 ];
 
-// ─────────────────────────────────────────────────────────────
-//  Firestore REST base URL
-// ─────────────────────────────────────────────────────────────
-var FS_BASE = "https://firestore.googleapis.com/v1/projects/" + PROJECT_ID + "/databases/(default)/documents";
+// ── Firebase handles ──────────────────────────────────────────
+var auth     = firebase.auth();
+var db       = firebase.firestore();
+var provider = new firebase.auth.GoogleAuthProvider();
 
-// ── State ─────────────────────────────────────────────────────
-var STATE = {
-  idToken:   null,
-  userEmail: null,
-  userPhoto: null,
-  userName:  null,
-  blocks:    [],
-  activeId:  null,
-  dirty:     false,
-  saving:    false,
-  pollTimer: null,
-  lastEtag:  null,
-  selectedColor: '#61C230'
-};
+// ── React shorthand ───────────────────────────────────────────
+var R   = React;
+var h   = R.createElement;
+var RD  = ReactDOM;
 
+var useState    = R.useState;
+var useEffect   = R.useEffect;
+var useRef      = R.useRef;
+
+// ── Constants ─────────────────────────────────────────────────
 var COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
 
 function uid() { return Math.random().toString(36).slice(2,9); }
-function fmtDur(s) { s=parseInt(s)||0; return Math.floor(s/60)+':'+(s%60<10?'0':'')+(s%60); }
 
-// ── UI helpers ────────────────────────────────────────────────
-function show(id)  { var el=document.getElementById(id); el.style.display='flex'; }
-function hide(id)  { document.getElementById(id).style.display='none'; }
-function setText(id,t){ document.getElementById(id).textContent=t; }
-
-var toastTimer;
-function showToast(msg) {
-  var t=document.getElementById('toast');
-  t.textContent=msg; t.classList.add('show');
-  clearTimeout(toastTimer);
-  toastTimer=setTimeout(function(){ t.classList.remove('show'); }, 3500);
+function fmtDur(sec) {
+  var s = parseInt(sec) || 0;
+  return Math.floor(s/60) + ':' + String(s%60).padStart(2,'0');
 }
 
-function setDirty(val) {
-  STATE.dirty=val;
-  var ps=document.getElementById('pstat');
-  var db=document.getElementById('discard-btn');
-  var pb=document.getElementById('publish-btn');
-  if(val) {
-    ps.textContent='● UNSAVED CHANGES'; ps.className='pstat unsaved';
-    db.disabled=false; pb.disabled=false;
-  } else {
-    db.disabled=true; pb.disabled=true;
-  }
+var DEFAULT_BLOCKS = [
+  { id:uid(), name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230',
+    items:[
+      { id:uid(), t:"Hong Kong's Face Readers Reshape the Future", archiveId:'youtube-MJVRwBrkzsg', dur:272 },
+      { id:uid(), t:"Hong Kong Protesters Disappointed With Talks", archiveId:'youtube-hlSlk-vcnRU', dur:203 },
+      { id:uid(), t:"Chinese Police Quash Month-Long Land Protest", archiveId:'youtube-jMk4o81qxL0', dur:156 },
+    ]
+  },
+  { id:uid(), name:'မြန်မာဘာသာ — Burmese', genre:'Burmese', start:'02:40', color:'#3bb0f5',
+    items:[
+      { id:uid(), t:"Myanmar's Jasmine Garland Sellers Go Back to School", archiveId:'youtube-9Nma364RVCg', dur:183 },
+      { id:uid(), t:"Myanmar Insurance Industry Grows As Economy Opens",   archiveId:'youtube-zbq6lEW9FNU', dur:214 },
+    ]
+  },
+];
+
+// ── Google logo SVG ───────────────────────────────────────────
+var GoogleSVG = h('svg', {viewBox:'0 0 48 48', style:{width:18,height:18,flexShrink:0}},
+  h('path',{fill:'#FFC107',d:'M43.611 20.083H42V20H24v8h11.303c-1.649 4.657-6.08 8-11.303 8-6.627 0-12-5.373-12-12s5.373-12 12-12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 12.955 4 4 12.955 4 24s8.955 20 20 20 20-8.955 20-20c0-1.341-.138-2.65-.389-3.917z'}),
+  h('path',{fill:'#FF3D00',d:'M6.306 14.691l6.571 4.819C14.655 15.108 18.961 12 24 12c3.059 0 5.842 1.154 7.961 3.039l5.657-5.657C34.046 6.053 29.268 4 24 4 16.318 4 9.656 8.337 6.306 14.691z'}),
+  h('path',{fill:'#4CAF50',d:'M24 44c5.166 0 9.86-1.977 13.409-5.192l-6.19-5.238A11.91 11.91 0 0 1 24 36c-5.202 0-9.619-3.317-11.283-7.946l-6.522 5.025C9.505 39.556 16.227 44 24 44z'}),
+  h('path',{fill:'#1976D2',d:'M43.611 20.083H42V20H24v8h11.303a12.04 12.04 0 0 1-4.087 5.571l.003-.002 6.19 5.238C36.971 39.205 44 34 44 24c0-1.341-.138-2.65-.389-3.917z'})
+);
+
+// ═════════════════════════════════════════════════════════════
+//  COMPONENTS  (React.createElement — no JSX, no Babel)
+// ═════════════════════════════════════════════════════════════
+
+function Toast(props) {
+  return h('div',{className:'toast'}, props.message);
 }
 
-function setStatus(mode) {
-  var pill=document.getElementById('status-pill');
-  var txt=document.getElementById('status-txt');
-  if(mode==='live'){ pill.className='spill live'; txt.textContent='FIRESTORE LIVE'; }
-  else if(mode==='error'){ pill.className='spill'; txt.textContent='OFFLINE'; }
-  else { pill.className='spill'; txt.textContent='CONNECTING'; }
+function Spinner() {
+  return h('div',{className:'spin'});
 }
 
-// ── Firestore REST ────────────────────────────────────────────
-function fsHeaders() {
-  return { 'Content-Type':'application/json', 'Authorization':'Bearer '+STATE.idToken };
-}
+// ── Login ─────────────────────────────────────────────────────
+function LoginScreen(props) {
+  var _e = useState('');   var error = _e[0]; var setError = _e[1];
+  var _l = useState(false);var loading= _l[0]; var setLoading=_l[1];
 
-// Convert Firestore document → plain JS object
-function fromFirestore(doc) {
-  if (!doc || !doc.fields) return null;
-  var f = doc.fields;
-  // blocks is an arrayValue of mapValues
-  var blocks = [];
-  if (f.blocks && f.blocks.arrayValue && f.blocks.arrayValue.values) {
-    blocks = f.blocks.arrayValue.values.map(function(bv) {
-      var bm = bv.mapValue.fields;
-      var items = [];
-      if (bm.items && bm.items.arrayValue && bm.items.arrayValue.values) {
-        items = bm.items.arrayValue.values.map(function(iv) {
-          var im = iv.mapValue.fields;
-          return {
-            id:        (im.id        && im.id.stringValue)        || uid(),
-            t:         (im.t         && im.t.stringValue)         || '',
-            archiveId: (im.archiveId && im.archiveId.stringValue) || '',
-            dur:       (im.dur       && parseInt(im.dur.integerValue||im.dur.doubleValue)) || 0
-          };
-        });
-      }
-      return {
-        id:    (bm.id    && bm.id.stringValue)    || uid(),
-        name:  (bm.name  && bm.name.stringValue)  || '',
-        genre: (bm.genre && bm.genre.stringValue) || '',
-        start: (bm.start && bm.start.stringValue) || '00:00',
-        color: (bm.color && bm.color.stringValue) || '#61C230',
-        items: items
-      };
-    });
-  }
-  return blocks;
-}
-
-// Convert plain JS blocks → Firestore document body
-function toFirestore(blocks, email) {
-  return {
-    fields: {
-      publishedBy: { stringValue: email },
-      blocks: {
-        arrayValue: {
-          values: blocks.map(function(b) {
-            return {
-              mapValue: {
-                fields: {
-                  id:    { stringValue: b.id    || '' },
-                  name:  { stringValue: b.name  || '' },
-                  genre: { stringValue: b.genre || '' },
-                  start: { stringValue: b.start || '00:00' },
-                  color: { stringValue: b.color || '#61C230' },
-                  items: {
-                    arrayValue: {
-                      values: (b.items||[]).map(function(it) {
-                        return {
-                          mapValue: {
-                            fields: {
-                              id:        { stringValue: it.id        || uid() },
-                              t:         { stringValue: it.t         || '' },
-                              archiveId: { stringValue: it.archiveId || '' },
-                              dur:       { integerValue: String(parseInt(it.dur)||0) }
-                            }
-                          }
-                        };
-                      })
-                    }
-                  }
-                }
-              }
-            };
-          })
-        }
-      }
-    }
-  };
-}
-
-// GET schedule from Firestore
-function loadSchedule() {
-  return fetch(FS_BASE + '/broadcast/schedule', { headers: fsHeaders() })
-    .then(function(r) {
-      if (r.status === 404) return null; // doesn't exist yet
-      if (!r.ok) throw new Error('HTTP ' + r.status);
-      return r.json();
-    })
-    .then(function(doc) {
-      setStatus('live');
-      if (!doc) {
-        // Seed with defaults
-        STATE.blocks = defaultBlocks();
-        STATE.activeId = STATE.blocks[0].id;
+  function handleSignIn() {
+    setLoading(true); setError('');
+    auth.signInWithPopup(provider).then(function(result) {
+      var email = result.user.email;
+      if (ALLOWED_EMAILS.indexOf(email) === -1) {
+        auth.signOut();
+        setError('Access denied — ' + email + ' is not on the approved list.');
+        setLoading(false);
         return;
       }
-      var loaded = fromFirestore(doc);
-      if (loaded && loaded.length > 0) {
-        STATE.blocks = loaded;
-        if (!STATE.activeId || !STATE.blocks.find(function(b){ return b.id===STATE.activeId; })) {
-          STATE.activeId = STATE.blocks[0].id;
-        }
+      props.onLogin(result.user);
+    }).catch(function(e) {
+      setError(e.message);
+      setLoading(false);
+    });
+  }
+
+  return h('div',{className:'lw'},
+    h('div',{style:{textAlign:'center'}},
+      h('div',{className:'ll'},'RFA'),
+      h('div',{className:'ls'},'Schedule Admin · Broadcast Control')
+    ),
+    h('div',{className:'lc'},
+      h('div',{className:'lt'},'Team Sign-In Required'),
+      error ? h('div',{className:'le'},error) : null,
+      h('button',{className:'bg', onClick:handleSignIn, disabled:loading},
+        loading ? h(Spinner) : GoogleSVG,
+        loading ? 'Signing in…' : 'Continue with Google'
+      )
+    )
+  );
+}
+
+// ── Add Block Modal ───────────────────────────────────────────
+function AddBlockModal(props) {
+  var _n=useState('');   var name=_n[0];  var setName=_n[1];
+  var _g=useState('');   var genre=_g[0]; var setGenre=_g[1];
+  var _s=useState('00:00'); var start=_s[0]; var setStart=_s[1];
+  var _c=useState(COLORS[0]); var color=_c[0]; var setColor=_c[1];
+
+  function submit() {
+    if (!name.trim()) return;
+    props.onAdd({id:uid(),name:name.trim(),genre:genre.trim()||name.trim(),start:start,color:color,items:[]});
+    props.onClose();
+  }
+
+  return h('div',{className:'mo', onClick:props.onClose},
+    h('div',{className:'md', onClick:function(e){e.stopPropagation()}},
+      h('div',{className:'mt'},'New Block'),
+      h('div',{className:'ms'},'Add a language / programming block'),
+      h('div',{className:'fi',style:{marginBottom:14}},
+        h('div',{className:'fl'},'Block Name'),
+        h('input',{value:name, onChange:function(e){setName(e.target.value)}, placeholder:'e.g. 한국어 — Korean', autoFocus:true})
+      ),
+      h('div',{className:'fg'},
+        h('div',{className:'fi'},
+          h('div',{className:'fl'},'Genre / Language'),
+          h('input',{value:genre, onChange:function(e){setGenre(e.target.value)}, placeholder:'Korean'})
+        ),
+        h('div',{className:'fi',style:{maxWidth:100}},
+          h('div',{className:'fl'},'UTC Start'),
+          h('input',{value:start, onChange:function(e){setStart(e.target.value)}, placeholder:'HH:MM'})
+        )
+      ),
+      h('div',{className:'fi',style:{marginTop:4}},
+        h('div',{className:'fl'},'Block Color'),
+        h('div',{className:'swg'},
+          COLORS.map(function(c){ return h('div',{key:c,className:'sw'+(color===c?' sel':''),style:{background:c},onClick:function(){setColor(c)}}); })
+        )
+      ),
+      h('div',{className:'ma'},
+        h('button',{className:'btn bg2', onClick:props.onClose},'Cancel'),
+        h('button',{className:'btn bp', onClick:submit, disabled:!name.trim()},'Add Block')
+      )
+    )
+  );
+}
+
+// ── Item Row ──────────────────────────────────────────────────
+function ItemRow(props) {
+  var item=props.item, i=props.index;
+  return h('div',{
+    className:'ir', draggable:true,
+    onDragStart:function(){props.onDragStart(i);},
+    onDragOver:function(e){e.preventDefault();},
+    onDrop:function(){props.onDrop(i);}
+  },
+    h('div',{className:'in',title:'Drag to reorder'},'⠿'),
+    h('input',{value:item.t, placeholder:'Video title', onChange:function(e){props.onUpdate(i,'t',e.target.value);}}),
+    h('input',{value:item.archiveId, placeholder:'Archive.org ID (e.g. youtube-AbCdEf)',
+      style:{fontFamily:'var(--mono)',fontSize:'11px',color:'var(--dim)'},
+      onChange:function(e){props.onUpdate(i,'archiveId',e.target.value);}}),
+    h('div',{className:'dd'},fmtDur(item.dur)),
+    h('button',{className:'bic',title:'Remove',onClick:function(){props.onDelete(i);}}, '✕')
+  );
+}
+
+// ── Block Editor ──────────────────────────────────────────────
+function BlockEditor(props) {
+  var block=props.block;
+  var _df=useState(null); var dragFrom=_df[0]; var setDragFrom=_df[1];
+
+  function upField(f,v){ props.onChange(Object.assign({},block,{[f]:v})); }
+  function upItem(i,f,v){
+    var items=block.items.map(function(it,j){ return j===i ? Object.assign({},it,{[f]:v}) : it; });
+    props.onChange(Object.assign({},block,{items:items}));
+  }
+  function addItem(){
+    props.onChange(Object.assign({},block,{items:block.items.concat([{id:uid(),t:'',archiveId:'',dur:0}])}));
+  }
+  function delItem(i){
+    props.onChange(Object.assign({},block,{items:block.items.filter(function(_,j){return j!==i;})}));
+  }
+  function handleDrop(i){
+    if(dragFrom===null||dragFrom===i) return;
+    var items=block.items.slice();
+    var moved=items.splice(dragFrom,1)[0];
+    items.splice(i,0,moved);
+    props.onChange(Object.assign({},block,{items:items}));
+    setDragFrom(null);
+  }
+
+  var totalDur=block.items.reduce(function(s,it){return s+(parseInt(it.dur)||0);},0);
+  var col=block.color||COLORS[0];
+
+  return h('div',null,
+    // Header
+    h('div',{className:'eh'},
+      h('div',{className:'etg'},
+        h('div',{className:'et',style:{color:col}}, block.name||'Untitled Block'),
+        h('span',{style:{fontFamily:'var(--mono)',fontSize:'9px',color:'var(--dim)',letterSpacing:'.2em'}},
+          'UTC '+block.start+' · '+block.items.length+' ITEMS · '+fmtDur(totalDur)+' TOTAL')
+      ),
+      h('div',{className:'ea'},
+        h('button',{className:'btn bdr',onClick:props.onDelete},'Delete Block')
+      )
+    ),
+    // Fields
+    h('div',{className:'fg'},
+      h('div',{className:'fi',style:{flex:2}},
+        h('div',{className:'fl'},'Block Name'),
+        h('input',{value:block.name,placeholder:'Language block name',onChange:function(e){upField('name',e.target.value);}})
+      ),
+      h('div',{className:'fi'},
+        h('div',{className:'fl'},'Genre Label'),
+        h('input',{value:block.genre,placeholder:'Language',onChange:function(e){upField('genre',e.target.value);}})
+      ),
+      h('div',{className:'fi',style:{maxWidth:120}},
+        h('div',{className:'fl'},'UTC Start'),
+        h('input',{value:block.start,placeholder:'HH:MM',onChange:function(e){upField('start',e.target.value);}})
+      ),
+      h('div',{className:'fi',style:{maxWidth:80}},
+        h('div',{className:'fl'},'Color'),
+        h('select',{value:col,style:{background:col+'22',borderColor:col},onChange:function(e){upField('color',e.target.value);}},
+          COLORS.map(function(c){return h('option',{key:c,value:c,style:{background:'var(--s2)'}},c);})
+        )
+      )
+    ),
+    // Items header
+    h('div',{className:'ih'},
+      h('div',{className:'il'},'Playlist Items'),
+      h('div',{className:'ic'},block.items.length+' items')
+    ),
+    // Column labels
+    h('div',{style:{display:'grid',gridTemplateColumns:'24px 1fr 200px 64px 32px',gap:6,padding:'4px 12px',marginBottom:4}},
+      h('div',null),
+      h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}},'TITLE'),
+      h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em'}},'ARCHIVE.ORG ID'),
+      h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',letterSpacing:'.25em',textAlign:'center'}},'DUR'),
+      h('div',null)
+    ),
+    // Item rows
+    block.items.map(function(item,i){
+      return h(ItemRow,{key:item.id,item:item,index:i,onUpdate:upItem,onDelete:delItem,onDragStart:setDragFrom,onDrop:handleDrop});
+    }),
+    h('button',{className:'aib',onClick:addItem},'+ Add Item'),
+    // Note
+    h('div',{className:'note'},
+      h('div',{className:'noteh'},'DURATION NOTE'),
+      h('div',{className:'noteb'},
+        'Duration is in seconds. Find it at ',
+        h('span',{style:{color:'var(--off)'}},'archive.org/metadata/<id>'),
+        ' under the file\'s ',h('code',null,'length'),' field. Items loop within each block\'s time window.'
+      )
+    )
+  );
+}
+
+// ── Main App ──────────────────────────────────────────────────
+function App() {
+  var _u=useState(null);      var user=_u[0];         var setUser=_u[1];
+  var _ac=useState(false);    var authChecked=_ac[0];  var setAuthChecked=_ac[1];
+  var _bl=useState([]);       var blocks=_bl[0];       var setBlocks=_bl[1];
+  var _ai=useState(null);     var activeId=_ai[0];     var setActiveId=_ai[1];
+  var _di=useState(false);    var isDirty=_di[0];      var setIsDirty=_di[1];
+  var _is=useState(false);    var isSaving=_is[0];     var setIsSaving=_is[1];
+  var _il=useState(true);     var isLoading=_il[0];    var setIsLoading=_il[1];
+  var _to=useState(null);     var toast=_to[0];        var setToast=_to[1];
+  var _ab=useState(false);    var showAdd=_ab[0];      var setShowAdd=_ab[1];
+  var _ls=useState('connecting'); var liveStatus=_ls[0]; var setLiveStatus=_ls[1];
+  var _sv=useState(null);     var lastSaved=_sv[0];    var setLastSaved=_sv[1];
+
+  var toastTimer  = useRef(null);
+  var fsUnsub     = useRef(null);
+
+  function showToast(msg) {
+    setToast(msg);
+    if(toastTimer.current) clearTimeout(toastTimer.current);
+    toastTimer.current = setTimeout(function(){setToast(null);}, 3500);
+  }
+
+  // Auth listener
+  useEffect(function(){
+    return auth.onAuthStateChanged(function(u){
+      if(u && ALLOWED_EMAILS.indexOf(u.email) !== -1) {
+        setUser(u);
+      } else {
+        setUser(null);
+        setIsLoading(false);
       }
-    })
-    .catch(function(e) {
-      console.error('loadSchedule error:', e);
-      setStatus('error');
+      setAuthChecked(true);
     });
-}
+  }, []);
 
-// PATCH / create schedule in Firestore
-function saveSchedule() {
-  var url = FS_BASE + '/broadcast/schedule';
-  return fetch(url, {
-    method: 'PATCH',
-    headers: fsHeaders(),
-    body: JSON.stringify(toFirestore(STATE.blocks, STATE.userEmail))
-  }).then(function(r) {
-    if (!r.ok) return r.text().then(function(t){ throw new Error(t); });
-    return r.json();
-  });
-}
+  // Firestore listener
+  useEffect(function(){
+    if(!user) return;
+    if(fsUnsub.current) fsUnsub.current();
 
-// Poll every 8s for live updates (simulates onSnapshot without SDK)
-function startPolling() {
-  if (STATE.pollTimer) clearInterval(STATE.pollTimer);
-  STATE.pollTimer = setInterval(function() {
-    if (STATE.dirty || STATE.saving) return; // don't clobber local edits
-    loadSchedule().then(function() {
-      renderSidebar();
-      renderEditor();
+    fsUnsub.current = db.collection('broadcast').doc('schedule')
+      .onSnapshot(function(snap){
+        setLiveStatus('live');
+        if(snap.exists) {
+          var data = snap.data();
+          if(data && Array.isArray(data.blocks)) {
+            var hydrated = data.blocks.map(function(b){
+              return Object.assign({},b,{
+                id: b.id||uid(),
+                items: (b.items||[]).map(function(it){ return Object.assign({},it,{id:it.id||uid()}); })
+              });
+            });
+            setBlocks(hydrated);
+            setActiveId(function(id){ return id || (hydrated[0]&&hydrated[0].id) || null; });
+          }
+        } else {
+          setBlocks(DEFAULT_BLOCKS);
+          setActiveId(DEFAULT_BLOCKS[0].id);
+        }
+        setIsLoading(false);
+        setIsDirty(false);
+      }, function(err){
+        console.error('Firestore error:', err);
+        setLiveStatus('error');
+        setIsLoading(false);
+      });
+
+    return function(){ if(fsUnsub.current) fsUnsub.current(); };
+  }, [user]);
+
+  function handleBlockChange(updated) {
+    setBlocks(function(prev){ return prev.map(function(b){ return b.id===updated.id ? updated : b; }); });
+    setIsDirty(true);
+  }
+  function handleAddBlock(block) {
+    setBlocks(function(prev){ return prev.concat([block]); });
+    setActiveId(block.id);
+    setIsDirty(true);
+  }
+  function handleDeleteBlock(id) {
+    var next = blocks.filter(function(b){ return b.id!==id; });
+    setBlocks(next);
+    setActiveId(next.length ? next[next.length-1].id : null);
+    setIsDirty(true);
+  }
+
+  function publishSchedule() {
+    setIsSaving(true);
+    var toSave = blocks.map(function(b){
+      return {
+        id:b.id, name:b.name, genre:b.genre, start:b.start, color:b.color||COLORS[0],
+        items:b.items.map(function(it){
+          return {id:it.id, t:it.t, archiveId:it.archiveId, dur:parseInt(it.dur)||0};
+        })
+      };
     });
-  }, 8000);
-}
+    db.collection('broadcast').doc('schedule').set({
+      blocks: toSave,
+      publishedAt: firebase.firestore.FieldValue.serverTimestamp(),
+      publishedBy: user.email
+    }).then(function(){
+      setIsDirty(false);
+      setLastSaved(new Date());
+      showToast('✓ SCHEDULE PUBLISHED — LIVE IN ~1 SECOND');
+      setIsSaving(false);
+    }).catch(function(e){
+      showToast('✗ PUBLISH FAILED: ' + e.message);
+      setIsSaving(false);
+    });
+  }
 
-// ── Default blocks ────────────────────────────────────────────
-function defaultBlocks() {
-  return [
-    { id:uid(), name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230',
-      items:[
-        {id:uid(),t:"Hong Kong's Face Readers Reshape the Future",archiveId:'youtube-MJVRwBrkzsg',dur:272},
-        {id:uid(),t:"Hong Kong Protesters Disappointed With Talks",archiveId:'youtube-hlSlk-vcnRU',dur:203},
-        {id:uid(),t:"Chinese Police Quash Month-Long Land Protest",archiveId:'youtube-jMk4o81qxL0',dur:156}
-      ]
-    },
-    { id:uid(), name:'မြန်မာဘာသာ — Burmese', genre:'Burmese', start:'02:40', color:'#3bb0f5',
-      items:[
-        {id:uid(),t:"Myanmar's Jasmine Garland Sellers Go Back to School",archiveId:'youtube-9Nma364RVCg',dur:183},
-        {id:uid(),t:"Myanmar Insurance Industry Grows As Economy Opens",archiveId:'youtube-zbq6lEW9FNU',dur:214}
-      ]
-    }
-  ];
-}
+  function handleSignOut() {
+    if(fsUnsub.current) fsUnsub.current();
+    auth.signOut();
+    setUser(null); setBlocks([]); setActiveId(null);
+  }
 
-// ── Render sidebar ────────────────────────────────────────────
-function renderSidebar() {
-  var sorted = STATE.blocks.slice().sort(function(a,b){
-    var av=a.start.split(':').map(Number), bv=b.start.split(':').map(Number);
+  // ── Render ───────────────────────────────────────────────
+  if (!authChecked) {
+    return h('div',{className:'ldw'}, h(Spinner), h('span',{className:'ldt'},'Initialising…'));
+  }
+  if (!user) return h(LoginScreen,{onLogin:setUser});
+
+  var activeBlock = blocks.find(function(b){ return b.id===activeId; });
+  var sorted = blocks.slice().sort(function(a,b){
+    var av=a.start.split(':').map(Number); var bv=b.start.split(':').map(Number);
     return (av[0]*60+av[1])-(bv[0]*60+bv[1]);
   });
-  setText('sb-heading', 'Blocks — '+STATE.blocks.length);
-  var list=document.getElementById('blist');
-  list.innerHTML='';
-  sorted.forEach(function(b) {
-    var el=document.createElement('div');
-    el.className='bitem'+(STATE.activeId===b.id?' act':'');
-    el.onclick=function(){ STATE.activeId=b.id; renderSidebar(); renderEditor(); };
-    el.innerHTML=[
-      '<div class="bdot" style="background:'+b.color+'"></div>',
-      '<div class="binfo"><div class="bname">'+escHtml(b.name)+'</div><div class="bmeta">UTC '+escHtml(b.start)+'</div></div>',
-      '<div class="bcnt">'+b.items.length+'</div>'
-    ].join('');
-    list.appendChild(el);
-  });
-}
 
-// ── Render editor ─────────────────────────────────────────────
-function renderEditor() {
-  var ed=document.getElementById('editor');
-  var block=STATE.blocks.find(function(b){ return b.id===STATE.activeId; });
-  if (!block) {
-    ed.innerHTML='<div class="ed-empty"><div class="ed-empty-icon">📡</div><div class="ed-empty-txt">Select or create a block to edit</div></div>';
-    return;
-  }
+  var statusLabel = liveStatus==='live' ? 'FIRESTORE LIVE' : liveStatus==='error' ? 'OFFLINE' : 'CONNECTING';
+  var saveLabel   = isDirty ? '● UNSAVED CHANGES' : lastSaved ? '✓ SAVED '+lastSaved.toLocaleTimeString() : '✓ IN SYNC WITH FIRESTORE';
 
-  var totalDur=block.items.reduce(function(s,it){ return s+(parseInt(it.dur)||0); },0);
-  var col=block.color||'#61C230';
+  return h('div',{className:'app'},
+    // Topbar
+    h('div',{className:'tb'},
+      h('div',{className:'tbl'},
+        h('div',{className:'tlo'},'RFA'),
+        h('div',{className:'tla'},'Schedule Admin')
+      ),
+      h('div',{className:'tbr'},
+        h('div',{className:'sp'+(liveStatus==='live'?' live':'')},
+          h('div',{className:'sd'}), statusLabel
+        ),
+        h('div',{className:'ub'},
+          user.photoURL
+            ? h('img',{className:'ua',src:user.photoURL,alt:''})
+            : h('div',{className:'uap'}, (user.email||'?')[0].toUpperCase()),
+          h('span',null,user.email)
+        ),
+        h('button',{className:'btn bg2',style:{padding:'6px 12px',fontSize:'9px'},onClick:handleSignOut},'Sign Out')
+      )
+    ),
 
-  var html=[
-    '<div class="ed-hdr">',
-    '  <div>',
-    '    <div class="ed-title" style="color:'+col+'">'+escHtml(block.name||'Untitled Block')+'</div>',
-    '    <div class="ed-meta">UTC '+escHtml(block.start)+' · '+block.items.length+' ITEMS · '+fmtDur(totalDur)+' TOTAL</div>',
-    '  </div>',
-    '  <button class="btn btn-danger" onclick="deleteBlock(\''+block.id+'\')">Delete Block</button>',
-    '</div>',
+    // Main
+    h('div',{className:'main'},
+      // Sidebar
+      h('div',{className:'sb'},
+        h('div',{className:'sbs'},
+          h('div',{className:'sbh'},'Blocks — '+blocks.length),
+          h('div',{className:'bl'},
+            sorted.map(function(b){
+              return h('div',{key:b.id,className:'bi'+(activeId===b.id?' act':''),onClick:function(){setActiveId(b.id);}},
+                h('div',{className:'bdo',style:{background:b.color||'#61C230'}}),
+                h('div',{className:'bin'},
+                  h('div',{className:'bn'},b.name),
+                  h('div',{className:'bm'},'UTC '+b.start)
+                ),
+                h('div',{className:'bc'},b.items.length)
+              );
+            })
+          )
+        ),
+        h('button',{className:'sadd',onClick:function(){setShowAdd(true);}}, '+ New Block')
+      ),
 
-    '<div class="fg">',
-    '  <div class="fi" style="flex:2"><div class="fl">Block Name</div>',
-    '    <input value="'+escAttr(block.name)+'" oninput="updateBlock(\''+block.id+'\',\'name\',this.value)" placeholder="Language block name"></div>',
-    '  <div class="fi"><div class="fl">Genre Label</div>',
-    '    <input value="'+escAttr(block.genre)+'" oninput="updateBlock(\''+block.id+'\',\'genre\',this.value)" placeholder="Language"></div>',
-    '  <div class="fi" style="max-width:120px"><div class="fl">UTC Start</div>',
-    '    <input value="'+escAttr(block.start)+'" oninput="updateBlock(\''+block.id+'\',\'start\',this.value)" placeholder="HH:MM"></div>',
-    '  <div class="fi" style="max-width:80px"><div class="fl">Color</div>',
-    '    <select onchange="updateBlock(\''+block.id+'\',\'color\',this.value)" style="background:'+col+'22;border-color:'+col+'">',
-    COLORS.map(function(c){ return '<option value="'+c+'"'+(c===col?' selected':'')+' style="background:var(--s2)">'+c+'</option>'; }).join(''),
-    '    </select></div>',
-    '</div>',
+      // Editor
+      h('div',{className:'ed'},
+        isLoading
+          ? h('div',{style:{display:'flex',alignItems:'center',justifyContent:'center',height:'100%',gap:12}},
+              h(Spinner),
+              h('span',{style:{fontFamily:'var(--mono)',fontSize:'10px',color:'var(--dim)',letterSpacing:'.2em'}},'LOADING FROM FIRESTORE…')
+            )
+          : activeBlock
+            ? h(BlockEditor,{key:activeBlock.id, block:activeBlock, onChange:handleBlockChange, onDelete:function(){handleDeleteBlock(activeBlock.id);}})
+            : h('div',{className:'ee'},
+                h('div',{className:'eei'},'📡'),
+                h('div',{className:'eet'},'Select or create a block to edit')
+              )
+      )
+    ),
 
-    '<div class="ih"><div class="il">Playlist Items</div><div class="ic">'+block.items.length+' items</div></div>',
-    '<div class="icols">',
-    '  <div></div>',
-    '  <div class="icolh">TITLE</div>',
-    '  <div class="icolh">ARCHIVE.ORG ID</div>',
-    '  <div class="icolh" style="text-align:center">DUR</div>',
-    '  <div></div>',
-    '</div>'
-  ];
+    // Publish bar
+    h('div',{className:'pb'},
+      h('div',null,
+        h('div',{className:'ps '+(isDirty?'unsaved':'saved')}, saveLabel),
+        h('div',{style:{fontFamily:'var(--mono)',fontSize:'8px',color:'var(--dim)',marginTop:4,letterSpacing:'.15em'}},
+          'Publishing pushes the schedule live instantly — no page reload needed on viewer.')
+      ),
+      h('div',{className:'pa'},
+        h('button',{className:'btn bg2',disabled:!isDirty,onClick:function(){setIsDirty(false);showToast('Changes discarded');}}, 'Discard'),
+        h('button',{className:'btn bp',disabled:isSaving||!isDirty,onClick:publishSchedule},
+          isSaving ? h(Spinner) : null,
+          isSaving ? ' Publishing…' : '⬆ Publish to Live'
+        )
+      )
+    ),
 
-  block.items.forEach(function(item,i) {
-    html.push(
-      '<div class="irow" draggable="true" id="irow-'+item.id+'"',
-      '  ondragstart="dragStart(event,\''+block.id+'\','+i+')"',
-      '  ondragover="dragOver(event,\''+block.id+'\','+i+')"',
-      '  ondrop="dragDrop(event,\''+block.id+'\','+i+')"',
-      '  ondragleave="dragLeave(event)">',
-      '  <div class="ihandle" title="Drag to reorder">⠿</div>',
-      '  <input value="'+escAttr(item.t)+'" placeholder="Video title" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'t\',this.value)">',
-      '  <input value="'+escAttr(item.archiveId)+'" placeholder="youtube-AbCdEf" style="font-size:11px;color:var(--dim)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'archiveId\',this.value)">',
-      '  <div class="idur">'+fmtDur(item.dur)+'</div>',
-      '  <button class="idel" onclick="deleteItem(\''+block.id+'\',\''+item.id+'\')" title="Remove">✕</button>',
-      '</div>'
-    );
-  });
-
-  html.push(
-    '<button class="add-item" onclick="addItem(\''+block.id+'\')">+ Add Item</button>',
-    '<div class="note">',
-    '  <div class="noteh">DURATION NOTE</div>',
-    '  <div class="noteb">Duration is in seconds. Find it at <span style="color:var(--off)">archive.org/metadata/&lt;id&gt;</span> under the file\'s <code>length</code> field. Items loop within each block\'s time window.</div>',
-    '</div>'
+    showAdd ? h(AddBlockModal,{onAdd:handleAddBlock,onClose:function(){setShowAdd(false);}}) : null,
+    toast   ? h(Toast,{message:toast}) : null
   );
-
-  ed.innerHTML=html.join('');
-}
-
-// ── Block / Item mutations ────────────────────────────────────
-function updateBlock(id, field, val) {
-  STATE.blocks=STATE.blocks.map(function(b){ return b.id===id ? Object.assign({},b,{[field]:val}) : b; });
-  setDirty(true);
-  renderSidebar();
-  // Only re-render title/meta parts to avoid losing focus
-  var b=STATE.blocks.find(function(x){ return x.id===id; });
-  if(b){
-    var t=document.querySelector('.ed-title');
-    if(t) t.textContent=b.name||'Untitled Block';
-    var m=document.querySelector('.ed-meta');
-    if(m) m.textContent='UTC '+b.start+' · '+b.items.length+' ITEMS';
-  }
-}
-
-function updateItem(blockId, itemId, field, val) {
-  STATE.blocks=STATE.blocks.map(function(b){
-    if(b.id!==blockId) return b;
-    return Object.assign({},b,{items:b.items.map(function(it){
-      return it.id===itemId ? Object.assign({},it,{[field]:val}) : it;
-    })});
-  });
-  setDirty(true);
-}
-
-function addItem(blockId) {
-  STATE.blocks=STATE.blocks.map(function(b){
-    if(b.id!==blockId) return b;
-    return Object.assign({},b,{items:b.items.concat([{id:uid(),t:'',archiveId:'',dur:0}])});
-  });
-  setDirty(true);
-  renderEditor();
-}
-
-function deleteItem(blockId, itemId) {
-  STATE.blocks=STATE.blocks.map(function(b){
-    if(b.id!==blockId) return b;
-    return Object.assign({},b,{items:b.items.filter(function(it){ return it.id!==itemId; })});
-  });
-  setDirty(true);
-  renderEditor();
-}
-
-function deleteBlock(id) {
-  if(!confirm('Delete this block? This cannot be undone.')) return;
-  STATE.blocks=STATE.blocks.filter(function(b){ return b.id!==id; });
-  STATE.activeId=STATE.blocks.length ? STATE.blocks[STATE.blocks.length-1].id : null;
-  setDirty(true);
-  renderSidebar();
-  renderEditor();
-}
-
-// ── Drag & drop ───────────────────────────────────────────────
-var _dragIdx=null;
-function dragStart(e,blockId,i){ _dragIdx=i; e.dataTransfer.effectAllowed='move'; }
-function dragOver(e,blockId,i){
-  e.preventDefault();
-  document.querySelectorAll('.irow').forEach(function(r){ r.classList.remove('drag-over'); });
-  var rows=document.querySelectorAll('.irow');
-  if(rows[i]) rows[i].classList.add('drag-over');
-}
-function dragLeave(e){ e.currentTarget.classList.remove('drag-over'); }
-function dragDrop(e,blockId,i){
-  e.preventDefault();
-  document.querySelectorAll('.irow').forEach(function(r){ r.classList.remove('drag-over'); });
-  if(_dragIdx===null||_dragIdx===i) return;
-  STATE.blocks=STATE.blocks.map(function(b){
-    if(b.id!==blockId) return b;
-    var items=b.items.slice();
-    var moved=items.splice(_dragIdx,1)[0];
-    items.splice(i,0,moved);
-    return Object.assign({},b,{items:items});
-  });
-  _dragIdx=null;
-  setDirty(true);
-  renderEditor();
-}
-
-// ── Publish ───────────────────────────────────────────────────
-function publishSchedule() {
-  if(STATE.saving) return;
-  STATE.saving=true;
-  document.getElementById('publish-btn').disabled=true;
-  document.getElementById('publish-btn').textContent='Publishing…';
-
-  saveSchedule().then(function(){
-    STATE.saving=false;
-    setDirty(false);
-    var ps=document.getElementById('pstat');
-    ps.textContent='✓ SAVED '+new Date().toLocaleTimeString();
-    ps.className='pstat saved';
-    document.getElementById('publish-btn').textContent='⬆ Publish to Live';
-    showToast('✓ SCHEDULE PUBLISHED — LIVE IN ~1 SECOND');
-  }).catch(function(e){
-    STATE.saving=false;
-    document.getElementById('publish-btn').disabled=false;
-    document.getElementById('publish-btn').textContent='⬆ Publish to Live';
-    showToast('✗ PUBLISH FAILED: '+e.message);
-  });
-}
-
-function discardChanges(){
-  loadSchedule().then(function(){ renderSidebar(); renderEditor(); setDirty(false); showToast('Changes discarded'); });
-}
-
-// ── Add block modal ───────────────────────────────────────────
-function openAddModal(){
-  STATE.selectedColor=COLORS[0];
-  document.getElementById('m-name').value='';
-  document.getElementById('m-genre').value='';
-  document.getElementById('m-start').value='00:00';
-  var sg=document.getElementById('m-colors');
-  sg.innerHTML='';
-  COLORS.forEach(function(c){
-    var s=document.createElement('div');
-    s.className='sw'+(c===STATE.selectedColor?' sel':'');
-    s.style.background=c;
-    s.onclick=function(){
-      STATE.selectedColor=c;
-      sg.querySelectorAll('.sw').forEach(function(x){ x.classList.remove('sel'); });
-      s.classList.add('sel');
-    };
-    sg.appendChild(s);
-  });
-  document.getElementById('add-modal').classList.add('show');
-  setTimeout(function(){ document.getElementById('m-name').focus(); },100);
-}
-function closeAddModal(){ document.getElementById('add-modal').classList.remove('show'); }
-function submitNewBlock(){
-  var name=document.getElementById('m-name').value.trim();
-  if(!name) return;
-  var genre=document.getElementById('m-genre').value.trim()||name;
-  var start=document.getElementById('m-start').value.trim()||'00:00';
-  var block={id:uid(),name:name,genre:genre,start:start,color:STATE.selectedColor,items:[]};
-  STATE.blocks=STATE.blocks.concat([block]);
-  STATE.activeId=block.id;
-  setDirty(true);
-  closeAddModal();
-  renderSidebar();
-  renderEditor();
-}
-
-// ── Sign-out ──────────────────────────────────────────────────
-function signOut(){
-  clearInterval(STATE.pollTimer);
-  STATE.idToken=null; STATE.userEmail=null;
-  hide('app'); show('login');
-  google.accounts.id.disableAutoSelect();
-}
-
-// ── Auth (Google Identity Services) ──────────────────────────
-function escHtml(s){ return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
-function escAttr(s){ return String(s).replace(/"/g,'&quot;'); }
-
-function onGoogleToken(response) {
-  // Decode JWT to get email/name/photo
-  var parts = response.credential.split('.');
-  var payload = JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
-  var email = payload.email;
-
-  if (ALLOWED_EMAILS.indexOf(email) === -1) {
-    var le=document.getElementById('lerr');
-    le.textContent='Access denied — '+email+' is not on the approved list.';
-    le.style.display='block';
-    return;
-  }
-
-  // Exchange the Google ID token for a Firebase ID token via REST
-  fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key='+API_KEY, {
-    method: 'POST',
-    headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({
-      postBody: 'id_token='+response.credential+'&providerId=google.com',
-      requestUri: window.location.href,
-      returnIdpCredential: true,
-      returnSecureToken: true
-    })
-  })
-  .then(function(r){ return r.json(); })
-  .then(function(data){
-    if(data.error){ throw new Error(data.error.message); }
-    STATE.idToken    = data.idToken;
-    STATE.userEmail  = email;
-    STATE.userPhoto  = payload.picture;
-    STATE.userName   = payload.name;
-
-    // Update UI
-    document.getElementById('uemail').textContent=email;
-    if(payload.picture){
-      document.getElementById('uav').src=payload.picture;
-      document.getElementById('uav').style.display='block';
-      document.getElementById('uavp').style.display='none';
-    } else {
-      document.getElementById('uavp').textContent=email[0].toUpperCase();
-    }
-
-    hide('login'); hide('boot');
-    show('app');
-
-    // Load schedule then start polling
-    loadSchedule().then(function(){
-      renderSidebar();
-      renderEditor();
-      startPolling();
-    });
-  })
-  .catch(function(e){
-    var le=document.getElementById('lerr');
-    le.textContent='Sign-in error: '+e.message;
-    le.style.display='block';
-  });
 }
 
 // ── Boot ──────────────────────────────────────────────────────
-// Load Google Identity Services script, then render the sign-in button
-(function boot(){
-  var script=document.createElement('script');
-  script.src='https://accounts.google.com/gsi/client';
-  script.onload=function(){
-    hide('boot');
-    show('login');
-
-    google.accounts.id.initialize({
-      client_id: CLIENT_ID,
-      callback:  onGoogleToken,
-      auto_select: false
-    });
-
-    google.accounts.id.renderButton(
-      document.getElementById('g_btn'),
-      { theme:'outline', size:'large', width:280, text:'continue_with' }
-    );
-  };
-  script.onerror=function(){
-    document.getElementById('boot').innerHTML='<div style="font-family:var(--mono);font-size:11px;color:var(--red);letter-spacing:.2em">FAILED TO LOAD GOOGLE AUTH — CHECK NETWORK</div>';
-  };
-  document.head.appendChild(script);
-})();
+ReactDOM.createRoot(document.getElementById('root')).render(h(App,null));
 </script>
 </body>
 </html>
