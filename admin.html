@@ -158,6 +158,12 @@ html,body,#root{width:100%;min-height:100vh;background:var(--bg);color:var(--off
 // ─────────────────────────────────────────────────────────────
 //  🔧 PASTE YOUR FIREBASE CONFIG HERE (same as index.html)
 // ─────────────────────────────────────────────────────────────
+// Import the functions you need from the SDKs you need
+import { initializeApp } from "firebase/app";
+// TODO: Add SDKs for Firebase products that you want to use
+// https://firebase.google.com/docs/web/setup#available-libraries
+
+// Your web app's Firebase configuration
 const firebaseConfig = {
   apiKey: "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
   authDomain: "rfa-legacy.firebaseapp.com",
@@ -166,8 +172,9 @@ const firebaseConfig = {
   messagingSenderId: "760753759019",
   appId: "1:760753759019:web:0d94416e5c2d2c80631b6e"
 };
+
 // Initialize Firebase
-  const app = initializeApp(firebaseConfig);
+const app = initializeApp(firebaseConfig);
   // ─────────────────────────────────────────────────────────────
   //  🔒 ALLOWED TEAM EMAILS — add your team's Google accounts
   // ─────────────────────────────────────────────────────────────
