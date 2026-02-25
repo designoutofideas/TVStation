@@ -797,49 +797,54 @@ function doSearch(){
   if(!q) return;
   document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div>';
 
-  // Use scrape API — this endpoint supports CORS unlike advancedsearch.php
-  // Filter to movies mediatype, search for the query term
-  var url='https://archive.org/services/search/v1/scrape'
+  // Archive.org blocks CORS on all search endpoints — route through corsproxy.io
+  // which adds the required Access-Control-Allow-Origin header
+  var archiveUrl='https://archive.org/advancedsearch.php'
     +'?q='+encodeURIComponent('('+q+') AND mediatype:movies')
-    +'&fields=identifier,title,year,subject'
-    +'&count=20';
+    +'&fl[]=identifier,title,year'
+    +'&rows=20&page=1&output=json';
 
-  fetch(url)
+  var proxied='https://corsproxy.io/?'+encodeURIComponent(archiveUrl);
+
+  fetch(proxied)
     .then(function(r){
       if(!r.ok) throw new Error('HTTP '+r.status);
       return r.json();
     })
     .then(function(data){
-      var items=(data.items)||[];
-      if(!items.length){
+      var docs=(data.response&&data.response.docs)||[];
+      if(!docs.length){
         document.getElementById('search-results').innerHTML='<div class="search-empty">No results found for "'+escH(q)+'" — try different keywords</div>';
         return;
       }
-      var html=items.map(function(item){
+      var html=docs.map(function(item){
         var thumb='https://archive.org/services/img/'+item.identifier;
         var title=item.title||item.identifier;
         var year=item.year||'';
-        // Escape for both HTML display and JS string in onclick
-        var safeId=item.identifier.replace(/'/g,'%27');
-        var safeTitle=String(title).replace(/'/g,'%27').replace(/"/g,'&quot;');
+        var safeId=item.identifier.replace(/\\/g,'').replace(/'/g,'&#39;');
+        var safeTitle=String(title).replace(/\\/g,'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
         return '<div class="sresult">'
           +'<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
           +'<div class="sresult-info">'
           +'<div class="sresult-title">'+escH(String(title))+'</div>'
           +'<div class="sresult-meta">'+escH(item.identifier)+(year?' · '+escH(String(year)):'')+'</div>'
           +'</div>'
-          +'<div class="sresult-add" onclick="addSearchResult(\''+safeId+'\',\''+safeTitle+'\')">+ Add</div>'
+          +'<div class="sresult-add" onclick="addSearchResult(this)" data-id="'+escH(item.identifier)+'" data-title="'+escH(String(title))+'">+ Add</div>'
           +'</div>';
       }).join('');
       document.getElementById('search-results').innerHTML=html;
     })
     .catch(function(e){
       console.error('Search error:',e);
-      document.getElementById('search-results').innerHTML='<div class="search-empty">Search failed: '+escH(e.message)+'</div>';
+      document.getElementById('search-results').innerHTML=
+        '<div class="search-empty">Search unavailable — paste an Archive.org ID directly above instead</div>';
     });
 }
 
-function addSearchResult(archiveId, title){
+function addSearchResult(el){
+  var archiveId=el.getAttribute('data-id');
+  var title=el.getAttribute('data-title');
+  el.textContent='Adding…';
   // Fetch duration in background then add
   fetch('https://archive.org/metadata/'+archiveId)
     .then(function(r){ return r.json(); })
@@ -851,11 +856,13 @@ function addSearchResult(archiveId, title){
         if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
       }
       addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:dur,airTime:''});
+      el.textContent='✓ Added';
       showToast('✓ Added: '+String(title).slice(0,50));
     })
     .catch(function(){
       addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:0,airTime:''});
-      showToast('✓ Added (duration unknown): '+String(title).slice(0,40));
+      el.textContent='✓ Added';
+      showToast('✓ Added (duration unknown)');
     });
 }
 
