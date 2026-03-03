@@ -102,6 +102,30 @@ a "Click to Tune In" overlay if autoplay is blocked.
 
 ---
 
+## Commit History PDF
+
+A GitHub Actions workflow is included that generates a PDF of the full commit
+history across all branches and uploads it as a downloadable artifact.
+
+### Running the workflow
+
+1. Go to **Actions** → **Generate Commit History PDF** in the GitHub repository.
+2. Click **Run workflow** → **Run workflow**.
+3. Wait for the run to complete (typically under 2 minutes).
+
+### Downloading the artifact
+
+1. Open the completed workflow run.
+2. Scroll down to the **Artifacts** section.
+3. Click **commit-history-pdf** to download the ZIP containing `commit-history.pdf`.
+
+The PDF contains one section per branch.  The `firestore` branch is always
+listed first, followed by all other branches in alphabetical order.  Each
+section lists commits in reverse chronological order with date, short SHA,
+author, and subject line.  The PDF is never committed to the repository.
+
+---
+
 ## Customization
 
 ### Change the station name
