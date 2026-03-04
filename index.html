@@ -587,6 +587,7 @@ async function playSlot(idx,seekLive){
   if(!url){
     url=slot.url;
     resolveUrl(slot.id).then(confirmed=>{
+      if(liveFeedActive) return; // live feed took over — don't touch schedule player
       if(confirmed&&confirmed!==player.src&&currentIdx===idx){
         const t=player.currentTime;
         player.src=confirmed;player.load();
@@ -596,6 +597,7 @@ async function playSlot(idx,seekLive){
   }
   if(player.src!==url){player.src=url;player.load()}
   const doPlay=()=>{
+    if(liveFeedActive) return; // live feed active — suppress schedule playback
     if(offset>2){
       const dur=player.duration;
       const t=isFinite(dur)?Math.min(offset,dur-2):offset;
@@ -666,11 +668,13 @@ function updateHUD(){
 
 // ── VIDEO EVENTS ──────────────────────────────────────────────
 player.addEventListener('ended',()=>{
+  if(liveFeedActive) return;
   const now=utcSec();
   const ni=findSlot(now)===currentIdx?(currentIdx+1)%TIMELINE.length:findSlot(now);
   doCut(ni);
 });
 player.addEventListener('error',()=>{
+  if(liveFeedActive) return;
   console.warn('player error — skipping');
   setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
 });
@@ -731,7 +735,11 @@ function activateLiveFeed(url, label) {
   clearLiveCountdown();
   flashEl.classList.add('on');
   setTimeout(()=>flashEl.classList.remove('on'), 80);
+  // Hard-silence the schedule player — pause + mute covers async race conditions
+  // where resolveUrl() callbacks fire player.play() after we've switched to live
   player.pause();
+  player.muted  = true;
+  player.volume = 0;
 
   var isHLS     = /\.m3u8/i.test(url);
   var isYouTube = /youtube\.com|youtu\.be/i.test(url);
@@ -826,6 +834,9 @@ function deactivateLiveFeed() {
     const origDoCut = window._rawDoCut || doCut;
     origDoCut(ni);
   }
+  // Restore schedule player audio
+  player.muted  = false;
+  player.volume = parseInt(document.getElementById('vol-slider').value) / 100;
   hideUnmuteBtn();
   showToast('⟳ RETURNING TO BROADCAST SCHEDULE');
 }
