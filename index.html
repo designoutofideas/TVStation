@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>LIVE — RFA 24/7</title>
+<title>Legacy — RFA 24/7</title>
 <style>
 @import url('https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Bebas+Neue&family=IBM+Plex+Mono:wght@300;400;600&display=swap');
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
@@ -670,8 +670,8 @@ let liveCurrentLabel  = null;
 db.collection('broadcast').doc('livefeed').onSnapshot(function(snap) {
   if (!snap.exists) { deactivateLiveFeed(); return; }
   var data = snap.data();
-  var schedStart = data.scheduledStart ? data.scheduledStart * 1000 : null;
-  var schedEnd   = data.scheduledEnd   ? data.scheduledEnd   * 1000 : null;
+  var schedStart = (data.scheduledStart && data.scheduledStart > 0) ? data.scheduledStart * 1000 : null;
+  var schedEnd   = (data.scheduledEnd   && data.scheduledEnd   > 0) ? data.scheduledEnd   * 1000 : null;
   var nowMs      = Date.now();
 
   if (!data.active && !schedStart) { deactivateLiveFeed(); clearLiveCountdown(); return; }
