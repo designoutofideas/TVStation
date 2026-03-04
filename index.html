@@ -27,6 +27,15 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
   background:#000;
   display:none;
 }
+#live-yt-container{
+  position:absolute;inset:0;
+}
+#live-yt-container iframe,
+#live-yt-player{
+  position:absolute;inset:0;
+  width:100%;height:100%;
+  border:none;
+}
 #live-iframe{
   width:100%;height:100%;border:none;display:none;
 }
@@ -280,11 +289,16 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 
 <!-- ── LIVE FEED LAYER (overlays schedule when active) ── -->
 <div id="live-layer">
-  <!-- YouTube Live / any iframe-embeddable stream -->
+  <!-- YouTube IFrame API target div (API creates the iframe here) -->
+  <div id="live-yt-container" style="width:100%;height:100%;display:none;">
+    <div id="live-yt-player"></div>
+  </div>
+  <!-- Generic iframe for non-YouTube embeds -->
   <iframe id="live-iframe"
     allow="autoplay; fullscreen; encrypted-media"
     allowfullscreen
-    referrerpolicy="no-referrer-when-downgrade">
+    referrerpolicy="no-referrer-when-downgrade"
+    style="display:none;width:100%;height:100%;border:none;">
   </iframe>
   <!-- HLS stream (OBS / local / direct .m3u8) -->
   <video id="live-hls" playsinline autoplay muted></video>
@@ -334,6 +348,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 
 <!-- HLS.js for OBS/direct .m3u8 streams (fallback for non-native HLS browsers) -->
 <script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
+<!-- YouTube IFrame API — gives programmatic control (mute/unmute, no mid-roll ads) -->
+<script src="https://www.youtube.com/iframe_api"></script>
 
 <!-- Firebase compat CDN (synchronous globals, no ES module race condition) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -728,6 +744,86 @@ db.collection('broadcast').doc('livefeed').onSnapshot(function(snap) {
   console.warn('Livefeed Firestore error:', err.message);
 });
 
+// ── YouTube IFrame API ────────────────────────────────────────────
+var ytPlayer        = null;
+var ytPlayerReady   = false;
+var ytPendingUrl    = null;
+var ytContainerEl   = document.getElementById('live-yt-container');
+
+// Called automatically by YouTube IFrame API once script loads
+window.onYouTubeIframeAPIReady = function() {
+  ytPlayer = new YT.Player('live-yt-player', {
+    width:  '100%',
+    height: '100%',
+    playerVars: {
+      autoplay:       1,
+      mute:           1,   // start muted → autoplay allowed → then unmute in onReady
+      controls:       0,
+      rel:            0,
+      modestbranding: 1,
+      playsinline:    1,
+      fs:             0,
+    },
+    events: {
+      onReady: function(e) {
+        ytPlayerReady = true;
+        if (ytPendingUrl) {
+          ytLoadAndPlay(ytPendingUrl);
+          ytPendingUrl = null;
+        }
+      },
+      onStateChange: function(e) {
+        // YT.PlayerState.PLAYING = 1 — unmute as soon as video starts playing
+        if (e.data === 1 && liveFeedActive) {
+          ytPlayer.unMute();
+          ytPlayer.setVolume(Math.round(
+            parseInt(document.getElementById('vol-slider').value)
+          ));
+          hideUnmuteBtn();
+        }
+      },
+      onError: function(e) {
+        console.warn('YT player error:', e.data);
+      }
+    }
+  });
+};
+
+function ytLoadAndPlay(videoId) {
+  if (!ytPlayer || !ytPlayerReady) { ytPendingUrl = videoId; return; }
+  ytPlayer.loadVideoById(videoId);
+  // onStateChange will unmute once PLAYING fires
+}
+
+function ytExtractId(url) {
+  var s = url.match(/youtu\.be\/([^?&\s]+)/);
+  if (s) return s[1];
+  var w = url.match(/[?&]v=([^&\s]+)/);
+  if (w) return w[1];
+  var l = url.match(/youtube\.com\/live\/([^?&\s]+)/);
+  if (l) return l[1];
+  return null;
+}
+
+function ytShow() {
+  ytContainerEl.style.display = 'block';
+  // Make the YT player iframe fill the container
+  var iframe = ytContainerEl.querySelector('iframe');
+  if (iframe) {
+    iframe.style.width  = '100%';
+    iframe.style.height = '100%';
+    iframe.style.position = 'absolute';
+    iframe.style.inset  = '0';
+  }
+}
+
+function ytHide() {
+  ytContainerEl.style.display = 'none';
+  if (ytPlayer && ytPlayerReady) {
+    try { ytPlayer.stopVideo(); ytPlayer.mute(); } catch(e) {}
+  }
+}
+
 // ── Activate live feed ────────────────────────────────────────────
 function activateLiveFeed(url, label) {
   if (!url) return;
@@ -735,8 +831,7 @@ function activateLiveFeed(url, label) {
   clearLiveCountdown();
   flashEl.classList.add('on');
   setTimeout(()=>flashEl.classList.remove('on'), 80);
-  // Hard-silence the schedule player — pause + mute covers async race conditions
-  // where resolveUrl() callbacks fire player.play() after we've switched to live
+  // Silence schedule player — mute + pause covers all async race conditions
   player.pause();
   player.muted  = true;
   player.volume = 0;
@@ -744,39 +839,67 @@ function activateLiveFeed(url, label) {
   var isHLS     = /\.m3u8/i.test(url);
   var isYouTube = /youtube\.com|youtu\.be/i.test(url);
 
-  liveLayerEl.style.display  = 'block';
-  liveIframeEl.style.display = 'none';
-  liveHlsEl.style.display    = 'none';
+  liveLayerEl.style.display   = 'block';
+  liveIframeEl.style.display  = 'none';
+  liveHlsEl.style.display     = 'none';
+  ytHide();
 
   if (isHLS) {
+    // ── HLS (OBS / local stream) ──────────────────────────────────
     liveHlsEl.style.display = 'block';
+    liveHlsEl.muted = true; // start muted for autoplay, unmute immediately after play starts
     if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
     if (typeof Hls !== 'undefined' && Hls.isSupported()) {
       hlsInstance = new Hls({ enableWorker:true, lowLatencyMode:true });
       hlsInstance.loadSource(url);
       hlsInstance.attachMedia(liveHlsEl);
-      hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=> liveHlsEl.play().catch(()=>{}));
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=> {
+        liveHlsEl.play().then(()=>{
+          // Unmute immediately — we already have a user gesture from tuneIn
+          liveHlsEl.muted  = false;
+          liveHlsEl.volume = parseInt(document.getElementById('vol-slider').value) / 100;
+          hideUnmuteBtn();
+        }).catch(()=>{
+          // No gesture yet — show unmute button
+          showUnmuteBtn();
+        });
+      });
       hlsInstance.on(Hls.Events.ERROR, (e,d)=>{
         if (d.fatal) setTimeout(()=>{ if(liveFeedActive) activateLiveFeed(url,label); }, 4000);
       });
     } else if (liveHlsEl.canPlayType('application/vnd.apple.mpegurl')) {
       liveHlsEl.src = url;
-      liveHlsEl.play().catch(()=>{});
+      liveHlsEl.play().then(()=>{
+        liveHlsEl.muted  = false;
+        liveHlsEl.volume = parseInt(document.getElementById('vol-slider').value) / 100;
+        hideUnmuteBtn();
+      }).catch(()=> showUnmuteBtn());
     }
+
   } else if (isYouTube) {
-    liveIframeEl.style.display = 'block';
-    var embed = toYouTubeEmbed(url);
-    if (liveIframeEl.src !== embed) liveIframeEl.src = embed;
+    // ── YouTube IFrame API ────────────────────────────────────────
+    var videoId = ytExtractId(url);
+    if (videoId) {
+      ytShow();
+      ytLoadAndPlay(videoId);
+      // onStateChange(PLAYING) will unmute — show btn as fallback in case it's slow
+      showUnmuteBtn();
+    } else {
+      // Fallback: plain iframe if ID extraction fails
+      liveIframeEl.style.display = 'block';
+      liveIframeEl.src = url;
+      showUnmuteBtn();
+    }
+
   } else {
+    // ── Generic iframe ────────────────────────────────────────────
     liveIframeEl.style.display = 'block';
     if (liveIframeEl.src !== url) liveIframeEl.src = url;
+    showUnmuteBtn();
   }
 
   updateHUDForLiveFeed(label);
   showToast('📡 LIVE FEED — ' + (label||'ON AIR').toUpperCase());
-
-  // Show unmute overlay — browser autoplay policy requires muted start
-  showUnmuteBtn();
 
   if (liveScheduledEnd) {
     const ms = liveScheduledEnd - Date.now();
@@ -786,29 +909,18 @@ function activateLiveFeed(url, label) {
 
 const unmuteBtnEl = document.getElementById('unmute-btn');
 
-function showUnmuteBtn() {
-  unmuteBtnEl.classList.add('show');
-}
-
-function hideUnmuteBtn() {
-  unmuteBtnEl.classList.remove('show');
-}
+function showUnmuteBtn() { unmuteBtnEl.classList.add('show'); }
+function hideUnmuteBtn() { unmuteBtnEl.classList.remove('show'); }
 
 function unmuteAll() {
-  // Unmute HLS video
+  // HLS
   liveHlsEl.muted  = false;
-  liveHlsEl.volume = player.volume; // match main player volume
-  // Unmute YouTube iframe via postMessage
-  if (liveIframeEl.style.display !== 'none' && liveIframeEl.contentWindow) {
+  liveHlsEl.volume = parseInt(document.getElementById('vol-slider').value) / 100;
+  // YouTube IFrame API
+  if (ytPlayer && ytPlayerReady) {
     try {
-      liveIframeEl.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
-        '*'
-      );
-      liveIframeEl.contentWindow.postMessage(
-        JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }),
-        '*'
-      );
+      ytPlayer.unMute();
+      ytPlayer.setVolume(parseInt(document.getElementById('vol-slider').value));
     } catch(e) {}
   }
   hideUnmuteBtn();
@@ -820,51 +932,27 @@ function deactivateLiveFeed() {
   liveFeedActive = false;
   flashEl.classList.add('on');
   setTimeout(()=>flashEl.classList.remove('on'), 80);
+  // Tear down all stream types
   if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
-  liveHlsEl.src  = '';
+  liveHlsEl.src    = '';
   liveIframeEl.src = '';
+  ytHide();
   liveLayerEl.style.display  = 'none';
   liveIframeEl.style.display = 'none';
   liveHlsEl.style.display    = 'none';
-  // Restore genre element to normal state (no outerHTML swap — keeps genreEl ref valid)
+  // Restore genre element
   genreEl.classList.remove('live-feed-badge');
   genreEl.innerHTML = '—';
-  if (hasBooted && TIMELINE.length > 0) {
-    const ni = findSlot(utcSec());
-    const origDoCut = window._rawDoCut || doCut;
-    origDoCut(ni);
-  }
   // Restore schedule player audio
   player.muted  = false;
   player.volume = parseInt(document.getElementById('vol-slider').value) / 100;
   hideUnmuteBtn();
+  // Snap back to correct UTC slot
+  if (hasBooted && TIMELINE.length > 0) {
+    const ni = findSlot(utcSec());
+    _rawDoCut(ni);
+  }
   showToast('⟳ RETURNING TO BROADCAST SCHEDULE');
-}
-
-// ── HUD for live feed ─────────────────────────────────────────────
-function updateHUDForLiveFeed(label) {
-  nowTitleEl.textContent  = label || 'LIVE BROADCAST';
-  nextTitleEl.textContent = '— ON AIR —';
-  tleftEl.textContent     = '';
-  pubDateEl.textContent   = '';
-  pfillEl.style.width     = '100%';
-  genreEl.textContent = 'LIVE FEED';
-  genreEl.classList.add('live-feed-badge');
-  genreEl.innerHTML = '<div class="dot"></div>LIVE FEED';
-}
-
-// ── YouTube URL → embed ───────────────────────────────────────────
-function toYouTubeEmbed(url) {
-  // mute=1 required for autoplay on most browsers/mobile
-  // rel=0 suppresses related videos, modestbranding=1 reduces YT branding
-  var params = '?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1';
-  var s = url.match(/youtu\.be\/([^?&\s]+)/);
-  if (s) return 'https://www.youtube-nocookie.com/embed/'+s[1]+params;
-  var w = url.match(/[?&]v=([^&\s]+)/);
-  if (w) return 'https://www.youtube-nocookie.com/embed/'+w[1]+params;
-  var l = url.match(/youtube\.com\/live\/([^?&\s]+)/);
-  if (l) return 'https://www.youtube-nocookie.com/embed/'+l[1]+params;
-  return url;
 }
 
 // ── Scheduled countdown ───────────────────────────────────────────
