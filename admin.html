@@ -1069,10 +1069,19 @@ function lfGoLive() {
   var url   = (document.getElementById('lf-url').value||'').trim();
   var label = (document.getElementById('lf-label').value||'').trim();
   if (!url) { showToast('⚠ Enter a stream URL first'); return; }
-
+  if (!STATE.idToken) { showToast('⚠ Not authenticated — please sign in again'); return; }
+  var btn = document.getElementById('lf-go-btn');
+  btn.disabled = true; btn.textContent = 'Activating…';
   writeLivefeed({ active: true, url: url, label: label, scheduledStart: null, scheduledEnd: null })
-    .then(function() { showToast('📡 LIVE FEED ACTIVATED — viewers switching now'); })
-    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+    .then(function() {
+      showToast('📡 LIVE FEED ACTIVATED — viewers switching now');
+      btn.textContent = '▶ GO LIVE NOW';
+    })
+    .catch(function(e) {
+      console.error('lfGoLive error:', e);
+      showToast('✗ Failed: ' + e.message);
+      btn.disabled = false; btn.textContent = '▶ GO LIVE NOW';
+    });
 }
 
 // Schedule a future live feed
@@ -1082,31 +1091,40 @@ function lfSchedule() {
   var start = parseUTC(document.getElementById('lf-start').value);
   var end   = parseUTC(document.getElementById('lf-end').value);
   if (!url) { showToast('⚠ Enter a stream URL first'); return; }
-  if (!start) { showToast('⚠ Invalid start time — use YYYY-MM-DD HH:MM'); return; }
+  if (!STATE.idToken) { showToast('⚠ Not authenticated — please sign in again'); return; }
+  if (!start) { showToast('⚠ Invalid start time — use format: 2026-03-10 14:00'); return; }
   if (start <= Date.now()) { showToast('⚠ Start time must be in the future (UTC)'); return; }
   if (end && end <= start) { showToast('⚠ End time must be after start time'); return; }
-
+  var btn = document.getElementById('lf-sched-btn');
+  btn.disabled = true; btn.textContent = 'Scheduling…';
   writeLivefeed({ active: false, url: url, label: label,
     scheduledStart: Math.floor(start/1000), scheduledEnd: end ? Math.floor(end/1000) : null })
     .then(function() {
       var ts = new Date(start).toUTCString().replace(' GMT','') + ' UTC';
       showToast('⏱ SCHEDULED — Live feed will start at ' + ts);
+      btn.textContent = '⏱ SCHEDULE';
     })
-    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+    .catch(function(e) {
+      console.error('lfSchedule error:', e);
+      showToast('✗ Failed: ' + e.message);
+      btn.disabled = false; btn.textContent = '⏱ SCHEDULE';
+    });
 }
 
 // End live feed — returns schedule
 function lfEndLive() {
+  if (!STATE.idToken) { showToast('⚠ Not authenticated — please sign in again'); return; }
   writeLivefeed({ active: false, url: '', label: '', scheduledStart: null, scheduledEnd: null })
     .then(function() { showToast('⟳ LIVE FEED ENDED — schedule resuming'); })
-    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+    .catch(function(e) { console.error('lfEndLive:', e); showToast('✗ Failed: ' + e.message); });
 }
 
 // Cancel a scheduled (not-yet-active) feed
 function lfCancelSchedule() {
+  if (!STATE.idToken) { showToast('⚠ Not authenticated — please sign in again'); return; }
   writeLivefeed({ active: false, url: '', label: '', scheduledStart: null, scheduledEnd: null })
     .then(function() { showToast('✕ SCHEDULED LIVE FEED CANCELLED'); })
-    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+    .catch(function(e) { console.error('lfCancelSchedule:', e); showToast('✗ Failed: ' + e.message); });
 }
 
 // Write to Firestore broadcast/livefeed via REST
@@ -1115,15 +1133,25 @@ function writeLivefeed(data) {
     active:         { booleanValue: !!data.active },
     url:            { stringValue:  data.url   || '' },
     label:          { stringValue:  data.label || '' },
-    scheduledStart: data.scheduledStart ? { integerValue: String(data.scheduledStart) } : { nullValue: null },
-    scheduledEnd:   data.scheduledEnd   ? { integerValue: String(data.scheduledEnd) }   : { nullValue: null },
+    scheduledStart: data.scheduledStart ? { integerValue: String(data.scheduledStart) } : { nullValue: 'NULL_VALUE' },
+    scheduledEnd:   data.scheduledEnd   ? { integerValue: String(data.scheduledEnd) }   : { nullValue: 'NULL_VALUE' },
     updatedBy:      { stringValue: STATE.userEmail || '' }
   };
-  return fetch(FS_BASE + '/broadcast/livefeed', {
+  // updateMask ensures PATCH creates the doc if it does not exist yet
+  var mask = 'updateMask.fieldPaths=active'
+    + '&updateMask.fieldPaths=url'
+    + '&updateMask.fieldPaths=label'
+    + '&updateMask.fieldPaths=scheduledStart'
+    + '&updateMask.fieldPaths=scheduledEnd'
+    + '&updateMask.fieldPaths=updatedBy';
+  return fetch(FS_BASE + '/broadcast/livefeed?' + mask, {
     method: 'PATCH', headers: fsHdr(),
     body: JSON.stringify({ fields: fields })
   }).then(function(r) {
-    if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
+    if (!r.ok) return r.text().then(function(t) {
+      console.error('writeLivefeed failed:', t);
+      throw new Error(t);
+    });
     return r.json();
   });
 }
