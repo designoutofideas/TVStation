@@ -21,6 +21,48 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 #screen{position:fixed;inset:0;background:#000}
 #player{width:100%;height:100%;object-fit:contain;display:block}
 
+/* ── LIVE FEED LAYER ── */
+#live-layer{
+  position:fixed;inset:0;z-index:80;
+  background:#000;
+  display:none;
+}
+#live-iframe{
+  width:100%;height:100%;border:none;display:none;
+}
+#live-hls{
+  width:100%;height:100%;object-fit:contain;display:none;
+}
+
+/* Live feed HUD badge — replaces genre tag */
+.live-feed-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  font-family:'IBM Plex Mono',monospace;
+  font-size:9px;font-weight:600;letter-spacing:.28em;
+  color:#fff;background:var(--red);
+  padding:3px 10px;margin-top:5px;
+  animation:live-pulse 2s ease-in-out infinite;
+}
+@keyframes live-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(255,59,31,0.6)}
+  50%{box-shadow:0 0 0 6px rgba(255,59,31,0)}
+}
+
+/* Scheduled live countdown toast */
+#live-countdown{
+  position:fixed;bottom:90px;left:50%;transform:translateX(-50%);
+  z-index:401;
+  background:rgba(255,59,31,0.12);
+  border:1px solid rgba(255,59,31,0.5);
+  backdrop-filter:blur(8px);
+  color:var(--red);
+  font-family:'IBM Plex Mono',monospace;font-size:10px;letter-spacing:.22em;
+  padding:10px 22px;
+  opacity:0;transition:opacity 0.3s;
+  pointer-events:none;white-space:nowrap;
+}
+#live-countdown.show{opacity:1}
+
 /* ── HUD ── */
 #hud{
   position:fixed;inset:0;z-index:90;
@@ -210,6 +252,18 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
   <video id="player" playsinline preload="auto"></video>
 </div>
 
+<!-- ── LIVE FEED LAYER (overlays schedule when active) ── -->
+<div id="live-layer">
+  <!-- YouTube Live / any iframe-embeddable stream -->
+  <iframe id="live-iframe"
+    allow="autoplay; fullscreen; encrypted-media"
+    allowfullscreen
+    referrerpolicy="no-referrer-when-downgrade">
+  </iframe>
+  <!-- HLS stream (OBS / local / direct .m3u8) -->
+  <video id="live-hls" playsinline autoplay muted></video>
+</div>
+
 <div id="hud">
   <div class="hud-top">
     <div>
@@ -244,12 +298,16 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 </div>
 
 <div id="reload-toast">⟳ SCHEDULE UPDATED</div>
+<div id="live-countdown">📡 LIVE FEED IN 00:00</div>
 <div id="flash"></div>
 
 <div id="tunein" onclick="tuneIn()">
   <div id="tunein-label">&#9654; CLICK TO<br>TUNE IN</div>
   <div id="tunein-sub">Legacy &middot; RFA 24/7 Broadcast</div>
 </div>
+
+<!-- HLS.js for OBS/direct .m3u8 streams (fallback for non-native HLS browsers) -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/hls.js/1.5.7/hls.min.js"></script>
 
 <!-- Firebase compat CDN (synchronous globals, no ES module race condition) -->
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
@@ -591,7 +649,179 @@ player.addEventListener('error',()=>{
   setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
 });
 
-// ── TUNE IN ───────────────────────────────────────────────────
+// ═══════════════════════════════════════════════════════════════════
+//  LIVE FEED ENGINE
+// ═══════════════════════════════════════════════════════════════════
+
+const liveLayerEl     = document.getElementById('live-layer');
+const liveIframeEl    = document.getElementById('live-iframe');
+const liveHlsEl       = document.getElementById('live-hls');
+const liveCountdownEl = document.getElementById('live-countdown');
+
+let liveFeedActive    = false;
+let liveScheduledAt   = null;
+let liveScheduledEnd  = null;
+let liveCountdownTimer= null;
+let hlsInstance       = null;
+let liveCurrentUrl    = null;
+let liveCurrentLabel  = null;
+
+// ── Firestore live-feed listener ──────────────────────────────────
+db.collection('broadcast').doc('livefeed').onSnapshot(function(snap) {
+  if (!snap.exists) { deactivateLiveFeed(); return; }
+  var data = snap.data();
+  var schedStart = data.scheduledStart ? data.scheduledStart * 1000 : null;
+  var schedEnd   = data.scheduledEnd   ? data.scheduledEnd   * 1000 : null;
+  var nowMs      = Date.now();
+
+  if (!data.active && !schedStart) { deactivateLiveFeed(); clearLiveCountdown(); return; }
+
+  if (schedStart && schedStart > nowMs) {
+    liveScheduledAt  = schedStart;
+    liveScheduledEnd = schedEnd;
+    liveCurrentUrl   = data.url   || '';
+    liveCurrentLabel = data.label || 'LIVE FEED';
+    startLiveCountdown();
+    return;
+  }
+  if (schedEnd && schedEnd <= nowMs) { deactivateLiveFeed(); clearLiveCountdown(); return; }
+
+  if (data.active || (schedStart && schedStart <= nowMs)) {
+    liveCurrentUrl   = data.url   || '';
+    liveCurrentLabel = data.label || 'LIVE FEED';
+    liveScheduledEnd = schedEnd;
+    activateLiveFeed(liveCurrentUrl, liveCurrentLabel);
+  } else {
+    deactivateLiveFeed();
+  }
+}, function(err) {
+  console.warn('Livefeed Firestore error:', err.message);
+});
+
+// ── Activate live feed ────────────────────────────────────────────
+function activateLiveFeed(url, label) {
+  if (!url) return;
+  liveFeedActive = true;
+  clearLiveCountdown();
+  flashEl.classList.add('on');
+  setTimeout(()=>flashEl.classList.remove('on'), 80);
+  player.pause();
+
+  var isHLS     = /\.m3u8/i.test(url);
+  var isYouTube = /youtube\.com|youtu\.be/i.test(url);
+
+  liveLayerEl.style.display  = 'block';
+  liveIframeEl.style.display = 'none';
+  liveHlsEl.style.display    = 'none';
+
+  if (isHLS) {
+    liveHlsEl.style.display = 'block';
+    if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+    if (typeof Hls !== 'undefined' && Hls.isSupported()) {
+      hlsInstance = new Hls({ enableWorker:true, lowLatencyMode:true });
+      hlsInstance.loadSource(url);
+      hlsInstance.attachMedia(liveHlsEl);
+      hlsInstance.on(Hls.Events.MANIFEST_PARSED, ()=> liveHlsEl.play().catch(()=>{}));
+      hlsInstance.on(Hls.Events.ERROR, (e,d)=>{
+        if (d.fatal) setTimeout(()=>{ if(liveFeedActive) activateLiveFeed(url,label); }, 4000);
+      });
+    } else if (liveHlsEl.canPlayType('application/vnd.apple.mpegurl')) {
+      liveHlsEl.src = url;
+      liveHlsEl.play().catch(()=>{});
+    }
+  } else if (isYouTube) {
+    liveIframeEl.style.display = 'block';
+    var embed = toYouTubeEmbed(url);
+    if (liveIframeEl.src !== embed) liveIframeEl.src = embed;
+  } else {
+    liveIframeEl.style.display = 'block';
+    if (liveIframeEl.src !== url) liveIframeEl.src = url;
+  }
+
+  updateHUDForLiveFeed(label);
+  showToast('📡 LIVE FEED — ' + (label||'ON AIR').toUpperCase());
+
+  if (liveScheduledEnd) {
+    const ms = liveScheduledEnd - Date.now();
+    if (ms > 0) setTimeout(()=>{ if(liveFeedActive) deactivateLiveFeed(); }, ms);
+  }
+}
+
+// ── Deactivate — snap back to UTC schedule ────────────────────────
+function deactivateLiveFeed() {
+  if (!liveFeedActive && liveLayerEl.style.display === 'none') return;
+  liveFeedActive = false;
+  flashEl.classList.add('on');
+  setTimeout(()=>flashEl.classList.remove('on'), 80);
+  if (hlsInstance) { hlsInstance.destroy(); hlsInstance = null; }
+  liveHlsEl.src  = '';
+  liveIframeEl.src = '';
+  liveLayerEl.style.display  = 'none';
+  liveIframeEl.style.display = 'none';
+  liveHlsEl.style.display    = 'none';
+  // Restore genre el if it was replaced with badge
+  const el = document.getElementById('genre');
+  if (el && el.classList.contains('live-feed-badge')) {
+    el.outerHTML = '<div id="genre">—</div>';
+  }
+  if (hasBooted && TIMELINE.length > 0) {
+    const ni = findSlot(utcSec());
+    const origDoCut = window._rawDoCut || doCut;
+    origDoCut(ni);
+  }
+  showToast('⟳ RETURNING TO BROADCAST SCHEDULE');
+}
+
+// ── HUD for live feed ─────────────────────────────────────────────
+function updateHUDForLiveFeed(label) {
+  nowTitleEl.textContent  = label || 'LIVE BROADCAST';
+  nextTitleEl.textContent = '— ON AIR —';
+  tleftEl.textContent     = '';
+  pubDateEl.textContent   = '';
+  pfillEl.style.width     = '100%';
+  const el = document.getElementById('genre');
+  if (el) el.outerHTML = '<div id="genre" class="live-feed-badge"><div class="dot"></div>LIVE FEED</div>';
+}
+
+// ── YouTube URL → embed ───────────────────────────────────────────
+function toYouTubeEmbed(url) {
+  var s = url.match(/youtu\.be\/([^?&\s]+)/);
+  if (s) return 'https://www.youtube-nocookie.com/embed/'+s[1]+'?autoplay=1';
+  var w = url.match(/[?&]v=([^&\s]+)/);
+  if (w) return 'https://www.youtube-nocookie.com/embed/'+w[1]+'?autoplay=1';
+  var l = url.match(/youtube\.com\/live\/([^?&\s]+)/);
+  if (l) return 'https://www.youtube-nocookie.com/embed/'+l[1]+'?autoplay=1';
+  return url;
+}
+
+// ── Scheduled countdown ───────────────────────────────────────────
+function startLiveCountdown() {
+  clearLiveCountdown();
+  liveCountdownTimer = setInterval(()=>{
+    const diff = liveScheduledAt - Date.now();
+    if (diff <= 0) { clearLiveCountdown(); activateLiveFeed(liveCurrentUrl, liveCurrentLabel); return; }
+    const t = Math.floor(diff/1000);
+    const h = Math.floor(t/3600), m = Math.floor((t%3600)/60), s = t%60;
+    const ts = h > 0 ? `${h}:${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}` : `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    liveCountdownEl.textContent = `📡 LIVE FEED IN ${ts}${liveCurrentLabel ? ' — '+liveCurrentLabel.toUpperCase() : ''}`;
+    liveCountdownEl.classList.add('show');
+  }, 500);
+}
+function clearLiveCountdown() {
+  if (liveCountdownTimer) { clearInterval(liveCountdownTimer); liveCountdownTimer = null; }
+  liveCountdownEl.classList.remove('show');
+}
+
+// ── Guard tick, doCut, updateHUD when live ────────────────────────
+const _rawTick = tick;
+window._rawDoCut = doCut;
+tick = function() { if (!liveFeedActive) _rawTick(); };
+const _rawDoCut = doCut;
+doCut = function(i) { if (!liveFeedActive) _rawDoCut(i); };
+const _rawUpdateHUD = updateHUD;
+updateHUD = function() { if (!liveFeedActive) _rawUpdateHUD(); };
+
+// ── TUNE IN ───────────────────────────────────────────────────────
 window.tuneIn = function(){
   tuneinEl.style.display='none';
   hasBooted=true;
