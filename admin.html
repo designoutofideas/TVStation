@@ -1056,10 +1056,15 @@ function parseUTC(str) {
 
 function lfDirty() {
   _lfDirtyFlag = true;
-  var url = (document.getElementById('lf-url').value||'').trim();
-  document.getElementById('lf-go-btn').disabled     = !url;
-  document.getElementById('lf-sched-btn').disabled  = !url || !document.getElementById('lf-start').value.trim();
-  document.getElementById('lf-end-btn').disabled    = !LF_STATE.active;
+  lfUpdateButtons();
+}
+
+function lfUpdateButtons() {
+  var url   = (document.getElementById('lf-url').value||'').trim();
+  var start = (document.getElementById('lf-start').value||'').trim();
+  document.getElementById('lf-go-btn').disabled          = !url;
+  document.getElementById('lf-sched-btn').disabled       = !url || !start;
+  document.getElementById('lf-end-btn').disabled         = !LF_STATE.active;
   document.getElementById('lf-cancel-sched-btn').disabled = !LF_STATE.scheduled;
 }
 
@@ -1201,10 +1206,7 @@ function renderLFStatus(data) {
     badge.textContent = 'SCHEDULE RUNNING';
   }
 
-  document.getElementById('lf-go-btn').disabled         = !(document.getElementById('lf-url').value.trim());
-  document.getElementById('lf-end-btn').disabled        = !LF_STATE.active;
-  document.getElementById('lf-cancel-sched-btn').disabled = !LF_STATE.scheduled;
-  document.getElementById('lf-sched-btn').disabled      = !(document.getElementById('lf-url').value.trim() && document.getElementById('lf-start').value.trim());
+  lfUpdateButtons();
 }
 
 function fmtUTCInput(d) {
