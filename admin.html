@@ -164,8 +164,34 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .sw{width:22px;height:22px;border-radius:50%;border:2px solid transparent;cursor:pointer;transition:border-color .12s}
 .sw.sel{border-color:var(--wh)}
 
-/* TOAST */
-.toast{position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.22em;padding:10px 20px;z-index:300;pointer-events:none;display:none;white-space:nowrap}
+/* LIVE FEED PANEL */
+.lf-panel{padding:18px 22px;border-bottom:1px solid var(--b);background:var(--s2);}
+.lf-header{display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;}
+.lf-title{font-family:var(--disp);font-size:20px;letter-spacing:.1em;color:var(--red);}
+.lf-status{display:flex;align-items:center;gap:7px;font-family:var(--mono);font-size:9px;letter-spacing:.22em;text-transform:uppercase;}
+.lf-dot{width:8px;height:8px;border-radius:50%;background:var(--dim);flex-shrink:0;}
+.lf-dot.live{background:var(--red);box-shadow:0 0 8px var(--red);animation:blk 1.2s infinite;}
+.lf-dot.sched{background:var(--amb);box-shadow:0 0 8px var(--amb);animation:blk 1.8s infinite;}
+.lf-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;margin-bottom:10px;}
+.lf-fi{display:flex;flex-direction:column;gap:5px;}
+.lf-fi input{background:var(--bg);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:12px;padding:7px 10px;outline:none;transition:border-color .15s;width:100%;}
+.lf-fi input:focus{border-color:var(--red);}
+.lf-fi input.url-input{min-width:340px;}
+.lf-actions{display:flex;gap:8px;margin-top:4px;}
+.btn-live{background:var(--red);border-color:var(--red);color:#fff;font-weight:600;}
+.btn-live:hover:not(:disabled){background:#ff5544;border-color:#ff5544;}
+.btn-live:disabled{opacity:.4;cursor:not-allowed;}
+.btn-end{border-color:rgba(255,68,51,.35);color:var(--red);}
+.btn-end:hover:not(:disabled){background:var(--redd);}
+.btn-end:disabled{opacity:.35;cursor:not-allowed;}
+.lf-hint{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.12em;margin-top:6px;}
+.lf-hint b{color:var(--off);}
+.lf-divider{border:none;border-top:1px solid var(--b);margin:12px 0;}
+.lf-sched-row{display:flex;gap:10px;flex-wrap:wrap;align-items:flex-end;}
+.lf-badge-live{display:inline-flex;align-items:center;gap:5px;background:rgba(255,68,51,.15);border:1px solid rgba(255,68,51,.5);color:var(--red);font-family:var(--mono);font-size:9px;letter-spacing:.2em;padding:3px 10px;}
+.lf-badge-sched{display:inline-flex;align-items:center;gap:5px;background:rgba(245,166,35,.1);border:1px solid rgba(245,166,35,.4);color:var(--amb);font-family:var(--mono);font-size:9px;letter-spacing:.2em;padding:3px 10px;}
+.lf-badge-off{display:inline-flex;align-items:center;gap:5px;background:var(--s2);border:1px solid var(--b);color:var(--dim);font-family:var(--mono);font-size:9px;letter-spacing:.2em;padding:3px 10px;}
+position:fixed;bottom:72px;left:50%;transform:translateX(-50%);background:var(--s1);border:1px solid var(--p);color:var(--p);font-family:var(--mono);font-size:10px;letter-spacing:.22em;padding:10px 20px;z-index:300;pointer-events:none;display:none;white-space:nowrap}
 .toast.show{display:block;animation:tst .3s ease forwards}
 @keyframes tst{from{opacity:0;transform:translateX(-50%) translateY(8px)}to{opacity:1;transform:translateX(-50%) translateY(0)}}
 </style>
@@ -209,6 +235,57 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
         <span id="uemail" style="font-family:var(--mono);font-size:10px;color:var(--dim)"></span>
       </div>
       <button class="btn btn-ghost btn-sm" onclick="signOut()">Sign Out</button>
+    </div>
+  </div>
+
+  <!-- LIVE FEED CONTROL PANEL -->
+  <div class="lf-panel" id="lf-panel">
+    <div class="lf-header">
+      <div style="display:flex;align-items:center;gap:12px;">
+        <div class="lf-title">📡 LIVE FEED</div>
+        <div class="lf-status"><div class="lf-dot" id="lf-dot"></div><span id="lf-status-txt">STANDBY</span></div>
+        <div id="lf-badge" class="lf-badge-off">SCHEDULE RUNNING</div>
+      </div>
+      <button class="btn btn-ghost btn-sm" onclick="toggleLFPanel()" id="lf-toggle-btn" style="font-size:9px;letter-spacing:.15em;">▲ COLLAPSE</button>
+    </div>
+    <div id="lf-body">
+      <!-- Real-time / Instant GO LIVE -->
+      <div class="lf-row">
+        <div class="lf-fi" style="flex:1">
+          <div class="fl">Stream URL <span style="color:var(--dim);font-weight:300">(YouTube Live, .m3u8, embed URL)</span></div>
+          <input class="url-input" id="lf-url" placeholder="https://www.youtube.com/watch?v=…  or  http://localhost:8080/live.m3u8" oninput="lfDirty()">
+        </div>
+        <div class="lf-fi" style="min-width:180px;">
+          <div class="fl">On-Screen Label</div>
+          <input id="lf-label" placeholder="e.g. BREAKING: Press Conference" oninput="lfDirty()">
+        </div>
+      </div>
+      <div class="lf-actions">
+        <button class="btn btn-live btn-sm" id="lf-go-btn" onclick="lfGoLive()" disabled>▶ GO LIVE NOW</button>
+        <button class="btn btn-end btn-sm" id="lf-end-btn" onclick="lfEndLive()" disabled>■ END LIVE FEED</button>
+      </div>
+
+      <hr class="lf-divider">
+
+      <!-- Scheduled broadcast -->
+      <div class="fl" style="margin-bottom:8px;letter-spacing:.28em;">SCHEDULE FOR LATER <span style="color:var(--dim);font-weight:300">— Optional: set a future UTC start/end time</span></div>
+      <div class="lf-sched-row">
+        <div class="lf-fi">
+          <div class="fl">UTC Start (YYYY-MM-DD HH:MM)</div>
+          <input id="lf-start" placeholder="2026-03-10 14:00" style="width:210px;" oninput="lfDirty()">
+        </div>
+        <div class="lf-fi">
+          <div class="fl">UTC End <span style="color:var(--dim)">(optional — auto-returns to schedule)</span></div>
+          <input id="lf-end" placeholder="2026-03-10 15:30" style="width:210px;" oninput="lfDirty()">
+        </div>
+        <button class="btn btn-ghost btn-sm" id="lf-sched-btn" onclick="lfSchedule()" style="margin-bottom:1px;" disabled>⏱ SCHEDULE</button>
+        <button class="btn btn-end btn-sm" id="lf-cancel-sched-btn" onclick="lfCancelSchedule()" style="margin-bottom:1px;" disabled>✕ CANCEL SCHEDULE</button>
+      </div>
+      <div class="lf-hint">
+        <b>YouTube Live:</b> paste the watch URL or live URL — converted to embed automatically. &nbsp;|&nbsp;
+        <b>OBS:</b> set Output → Custom RTMP, or use an HLS server plugin and paste the <b>.m3u8</b> URL. &nbsp;|&nbsp;
+        <b>Auto-return:</b> when the live feed ends the broadcast schedule resumes at the correct UTC slot seamlessly.
+      </div>
     </div>
   </div>
 
@@ -307,6 +384,10 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 <!-- TOAST -->
 <div class="toast" id="toast"></div>
 
+<!-- Firebase compat (for live feed real-time listener) -->
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
+
 <script>
 // ─────────────────────────────────────────────────────────────
 //  🔧 PASTE YOUR FIREBASE CONFIG VALUES HERE
@@ -314,6 +395,19 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 var API_KEY    = "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o";
 var PROJECT_ID = "rfa-legacy";
 var CLIENT_ID  = "760753759019-s2f8tvintss5gtjtcmj2sdtd768hh601.apps.googleusercontent.com";
+
+// ─────────────────────────────────────────────────────────────
+//  Firebase init (for live feed real-time listener)
+// ─────────────────────────────────────────────────────────────
+firebase.initializeApp({
+  apiKey:            API_KEY,
+  authDomain:        "rfa-legacy.firebaseapp.com",
+  projectId:         PROJECT_ID,
+  storageBucket:     "rfa-legacy.firebasestorage.app",
+  messagingSenderId: "760753759019",
+  appId:             "1:760753759019:web:0d94416e5c2d2c80631b6e"
+});
+var _db = firebase.firestore();
 
 // ─────────────────────────────────────────────────────────────
 //  🔒 ALLOWED TEAM EMAILS
@@ -939,10 +1033,166 @@ function submitNewBlock(){
 }
 
 // ─────────────────────────────────────────────────────────────
+//  LIVE FEED CONTROL
+// ─────────────────────────────────────────────────────────────
+var LF_STATE = { active: false, scheduled: false, url: '', label: '', startEpoch: null, endEpoch: null };
+var _lfPanelOpen = true;
+var _lfDirtyFlag = false;
+var _lfUnsub = null;
+
+// Parse "YYYY-MM-DD HH:MM" as UTC epoch ms
+function parseUTC(str) {
+  str = (str||'').trim();
+  if (!str) return null;
+  var m = str.match(/^(\d{4})-(\d{2})-(\d{2})\s+(\d{2}):(\d{2})$/);
+  if (!m) return null;
+  return Date.UTC(+m[1],+m[2]-1,+m[3],+m[4],+m[5]);
+}
+
+function lfDirty() {
+  _lfDirtyFlag = true;
+  var url = (document.getElementById('lf-url').value||'').trim();
+  document.getElementById('lf-go-btn').disabled     = !url;
+  document.getElementById('lf-sched-btn').disabled  = !url || !document.getElementById('lf-start').value.trim();
+  document.getElementById('lf-end-btn').disabled    = !LF_STATE.active;
+  document.getElementById('lf-cancel-sched-btn').disabled = !LF_STATE.scheduled;
+}
+
+function toggleLFPanel() {
+  _lfPanelOpen = !_lfPanelOpen;
+  document.getElementById('lf-body').style.display = _lfPanelOpen ? '' : 'none';
+  document.getElementById('lf-toggle-btn').textContent = _lfPanelOpen ? '▲ COLLAPSE' : '▼ EXPAND';
+}
+
+// Start live feed immediately (real-time)
+function lfGoLive() {
+  var url   = (document.getElementById('lf-url').value||'').trim();
+  var label = (document.getElementById('lf-label').value||'').trim();
+  if (!url) { showToast('⚠ Enter a stream URL first'); return; }
+
+  writeLivefeed({ active: true, url: url, label: label, scheduledStart: null, scheduledEnd: null })
+    .then(function() { showToast('📡 LIVE FEED ACTIVATED — viewers switching now'); })
+    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+}
+
+// Schedule a future live feed
+function lfSchedule() {
+  var url   = (document.getElementById('lf-url').value||'').trim();
+  var label = (document.getElementById('lf-label').value||'').trim();
+  var start = parseUTC(document.getElementById('lf-start').value);
+  var end   = parseUTC(document.getElementById('lf-end').value);
+  if (!url) { showToast('⚠ Enter a stream URL first'); return; }
+  if (!start) { showToast('⚠ Invalid start time — use YYYY-MM-DD HH:MM'); return; }
+  if (start <= Date.now()) { showToast('⚠ Start time must be in the future (UTC)'); return; }
+  if (end && end <= start) { showToast('⚠ End time must be after start time'); return; }
+
+  writeLivefeed({ active: false, url: url, label: label,
+    scheduledStart: Math.floor(start/1000), scheduledEnd: end ? Math.floor(end/1000) : null })
+    .then(function() {
+      var ts = new Date(start).toUTCString().replace(' GMT','') + ' UTC';
+      showToast('⏱ SCHEDULED — Live feed will start at ' + ts);
+    })
+    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+}
+
+// End live feed — returns schedule
+function lfEndLive() {
+  writeLivefeed({ active: false, url: '', label: '', scheduledStart: null, scheduledEnd: null })
+    .then(function() { showToast('⟳ LIVE FEED ENDED — schedule resuming'); })
+    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+}
+
+// Cancel a scheduled (not-yet-active) feed
+function lfCancelSchedule() {
+  writeLivefeed({ active: false, url: '', label: '', scheduledStart: null, scheduledEnd: null })
+    .then(function() { showToast('✕ SCHEDULED LIVE FEED CANCELLED'); })
+    .catch(function(e) { showToast('✗ Error: ' + e.message); });
+}
+
+// Write to Firestore broadcast/livefeed via REST
+function writeLivefeed(data) {
+  var fields = {
+    active:         { booleanValue: !!data.active },
+    url:            { stringValue:  data.url   || '' },
+    label:          { stringValue:  data.label || '' },
+    scheduledStart: data.scheduledStart ? { integerValue: String(data.scheduledStart) } : { nullValue: null },
+    scheduledEnd:   data.scheduledEnd   ? { integerValue: String(data.scheduledEnd) }   : { nullValue: null },
+    updatedBy:      { stringValue: STATE.userEmail || '' }
+  };
+  return fetch(FS_BASE + '/broadcast/livefeed', {
+    method: 'PATCH', headers: fsHdr(),
+    body: JSON.stringify({ fields: fields })
+  }).then(function(r) {
+    if (!r.ok) return r.text().then(function(t) { throw new Error(t); });
+    return r.json();
+  });
+}
+
+// Subscribe to live feed status via Firestore compat SDK (real-time)
+function startLFListener() {
+  if (_lfUnsub) _lfUnsub();
+  _lfUnsub = _db.collection('broadcast').doc('livefeed').onSnapshot(function(snap) {
+    if (!snap.exists) { renderLFStatus({ active: false }); return; }
+    renderLFStatus(snap.data());
+  });
+}
+
+function renderLFStatus(data) {
+  var nowMs = Date.now();
+  var schedStart = data.scheduledStart ? data.scheduledStart * 1000 : null;
+  var schedEnd   = data.scheduledEnd   ? data.scheduledEnd   * 1000 : null;
+
+  var dot    = document.getElementById('lf-dot');
+  var stxt   = document.getElementById('lf-status-txt');
+  var badge  = document.getElementById('lf-badge');
+
+  // Populate fields from Firestore
+  if (data.url) document.getElementById('lf-url').value   = data.url;
+  if (data.label) document.getElementById('lf-label').value = data.label;
+
+  if (data.active) {
+    LF_STATE.active = true; LF_STATE.scheduled = false;
+    dot.className = 'lf-dot live';
+    stxt.textContent = 'LIVE NOW';
+    badge.className = 'lf-badge-live';
+    badge.textContent = '● ON AIR';
+  } else if (schedStart && schedStart > nowMs) {
+    LF_STATE.active = false; LF_STATE.scheduled = true;
+    dot.className = 'lf-dot sched';
+    var sDate = new Date(schedStart);
+    stxt.textContent = 'SCHED ' + sDate.toUTCString().slice(5,22) + ' UTC';
+    badge.className = 'lf-badge-sched';
+    badge.textContent = '⏱ SCHEDULED';
+    document.getElementById('lf-start').value = fmtUTCInput(sDate);
+    if (schedEnd) document.getElementById('lf-end').value = fmtUTCInput(new Date(schedEnd));
+  } else {
+    LF_STATE.active = false; LF_STATE.scheduled = false;
+    dot.className = 'lf-dot';
+    stxt.textContent = 'STANDBY';
+    badge.className = 'lf-badge-off';
+    badge.textContent = 'SCHEDULE RUNNING';
+  }
+
+  document.getElementById('lf-go-btn').disabled         = !(document.getElementById('lf-url').value.trim());
+  document.getElementById('lf-end-btn').disabled        = !LF_STATE.active;
+  document.getElementById('lf-cancel-sched-btn').disabled = !LF_STATE.scheduled;
+  document.getElementById('lf-sched-btn').disabled      = !(document.getElementById('lf-url').value.trim() && document.getElementById('lf-start').value.trim());
+}
+
+function fmtUTCInput(d) {
+  return d.getUTCFullYear() + '-'
+    + String(d.getUTCMonth()+1).padStart(2,'0') + '-'
+    + String(d.getUTCDate()).padStart(2,'0') + ' '
+    + String(d.getUTCHours()).padStart(2,'0') + ':'
+    + String(d.getUTCMinutes()).padStart(2,'0');
+}
+
+// ─────────────────────────────────────────────────────────────
 //  SIGN OUT
 // ─────────────────────────────────────────────────────────────
 function signOut(){
   clearInterval(STATE.pollTimer);
+  if (_lfUnsub) { _lfUnsub(); _lfUnsub = null; }
   STATE.idToken=null; STATE.userEmail=null;
   hide('app'); show('login');
   google.accounts.id.disableAutoSelect();
@@ -981,7 +1231,7 @@ function onGoogleToken(response){
     hide('login'); hide('boot'); show('app');
 
     loadSchedule().then(function(){
-      renderSidebar(); renderEditor(); startPolling();
+      renderSidebar(); renderEditor(); startPolling(); startLFListener();
     });
   }).catch(function(e){
     var le=document.getElementById('lerr');
