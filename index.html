@@ -898,13 +898,41 @@ function activateLiveFeed(url, label) {
     showUnmuteBtn();
   }
 
-  updateHUDForLiveFeed(label);
+  updateHUDForLiveFeed(label, url);
   showToast('📡 LIVE FEED — ' + (label||'ON AIR').toUpperCase());
 
   if (liveScheduledEnd) {
     const ms = liveScheduledEnd - Date.now();
     if (ms > 0) setTimeout(()=>{ if(liveFeedActive) deactivateLiveFeed(); }, ms);
   }
+}
+
+// ── HUD for live feed ─────────────────────────────────────────────
+function updateHUDForLiveFeed(label, url) {
+  // Use provided label, or fetch title from YouTube oEmbed, or fallback
+  var displayLabel = (label && label.trim()) ? label.trim() : null;
+
+  if (displayLabel) {
+    nowTitleEl.textContent = displayLabel;
+  } else if (url && /youtube\.com|youtu\.be/i.test(url)) {
+    // Fetch real stream title from YouTube oEmbed (no API key needed)
+    nowTitleEl.textContent = 'LIVE BROADCAST';
+    fetch('https://www.youtube.com/oembed?url=' + encodeURIComponent(url) + '&format=json')
+      .then(function(r){ return r.json(); })
+      .then(function(d){
+        if (d.title && liveFeedActive) nowTitleEl.textContent = d.title;
+      })
+      .catch(function(){});
+  } else {
+    nowTitleEl.textContent = 'LIVE BROADCAST';
+  }
+
+  nextTitleEl.textContent = '— ON AIR —';
+  tleftEl.textContent     = '';
+  pubDateEl.textContent   = '';
+  pfillEl.style.width     = '100%';
+  genreEl.classList.add('live-feed-badge');
+  genreEl.innerHTML = '<div class="dot"></div>LIVE FEED';
 }
 
 const unmuteBtnEl = document.getElementById('unmute-btn');
