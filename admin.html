@@ -1132,18 +1132,28 @@ function lfCancelSchedule() {
     .catch(function(e) { console.error('lfCancelSchedule:', e); showToast('✗ ' + e.message, true); });
 }
 
-// Write to Firestore broadcast/livefeed via compat SDK (handles auth automatically)
+// Write to Firestore broadcast/livefeed — mirrors saveSchedule() exactly
 function writeLivefeed(data) {
-  var payload = {
-    active:         !!data.active,
-    url:            data.url   || '',
-    label:          data.label || '',
-    scheduledStart: data.scheduledStart || null,
-    scheduledEnd:   data.scheduledEnd   || null,
-    updatedBy:      STATE.userEmail     || ''
+  var fields = {
+    active:         { booleanValue:  !!data.active },
+    url:            { stringValue:   data.url   || '' },
+    label:          { stringValue:   data.label || '' },
+    scheduledStart: { integerValue:  String(parseInt(data.scheduledStart) || 0) },
+    scheduledEnd:   { integerValue:  String(parseInt(data.scheduledEnd)   || 0) },
+    updatedBy:      { stringValue:   STATE.userEmail || '' }
   };
-  console.log('writeLivefeed payload:', payload);
-  return _db.collection('broadcast').doc('livefeed').set(payload);
+  console.log('writeLivefeed ->', JSON.stringify(fields));
+  return fetch(FS_BASE + '/broadcast/livefeed', {
+    method: 'PATCH',
+    headers: fsHdr(),
+    body: JSON.stringify({ fields: fields })
+  }).then(function(r) {
+    if (!r.ok) return r.text().then(function(t) {
+      console.error('writeLivefeed HTTP error:', r.status, t);
+      throw new Error('HTTP ' + r.status + ': ' + t.slice(0, 200));
+    });
+    return r.json();
+  });
 }
 
 // Subscribe to live feed status via Firestore compat SDK (real-time)
@@ -1157,8 +1167,8 @@ function startLFListener() {
 
 function renderLFStatus(data) {
   var nowMs = Date.now();
-  var schedStart = data.scheduledStart ? data.scheduledStart * 1000 : null;
-  var schedEnd   = data.scheduledEnd   ? data.scheduledEnd   * 1000 : null;
+  var schedStart = (data.scheduledStart && data.scheduledStart > 0) ? data.scheduledStart * 1000 : null;
+  var schedEnd   = (data.scheduledEnd   && data.scheduledEnd   > 0) ? data.scheduledEnd   * 1000 : null;
 
   var dot    = document.getElementById('lf-dot');
   var stxt   = document.getElementById('lf-status-txt');
