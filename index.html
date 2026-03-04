@@ -63,6 +63,27 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 }
 #live-countdown.show{opacity:1}
 
+/* ── UNMUTE OVERLAY ── */
+#unmute-btn{
+  position:fixed;bottom:100px;left:50%;transform:translateX(-50%);
+  z-index:200;
+  display:none;
+  align-items:center;gap:9px;
+  background:rgba(4,12,6,0.88);
+  border:1px solid rgba(97,194,48,0.5);
+  backdrop-filter:blur(8px);
+  color:var(--primary);
+  font-family:'IBM Plex Mono',monospace;font-size:11px;letter-spacing:.22em;
+  padding:12px 24px;cursor:pointer;
+  text-transform:uppercase;
+  animation:unmute-pulse 2s ease-in-out infinite;
+}
+#unmute-btn.show{display:flex;}
+@keyframes unmute-pulse{
+  0%,100%{box-shadow:0 0 0 0 rgba(97,194,48,0.4);}
+  50%{box-shadow:0 0 0 8px rgba(97,194,48,0);}
+}
+
 /* ── HUD ── */
 #hud{
   position:fixed;inset:0;z-index:90;
@@ -250,6 +271,11 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 
 <div id="screen">
   <video id="player" playsinline preload="auto"></video>
+</div>
+
+<!-- ── UNMUTE BUTTON (shown when autoplay starts muted) ── -->
+<div id="unmute-btn" onclick="unmuteAll()">
+  <span style="font-size:16px">🔊</span> TAP TO UNMUTE
 </div>
 
 <!-- ── LIVE FEED LAYER (overlays schedule when active) ── -->
@@ -741,10 +767,43 @@ function activateLiveFeed(url, label) {
   updateHUDForLiveFeed(label);
   showToast('📡 LIVE FEED — ' + (label||'ON AIR').toUpperCase());
 
+  // Show unmute overlay — browser autoplay policy requires muted start
+  showUnmuteBtn();
+
   if (liveScheduledEnd) {
     const ms = liveScheduledEnd - Date.now();
     if (ms > 0) setTimeout(()=>{ if(liveFeedActive) deactivateLiveFeed(); }, ms);
   }
+}
+
+const unmuteBtnEl = document.getElementById('unmute-btn');
+
+function showUnmuteBtn() {
+  unmuteBtnEl.classList.add('show');
+}
+
+function hideUnmuteBtn() {
+  unmuteBtnEl.classList.remove('show');
+}
+
+function unmuteAll() {
+  // Unmute HLS video
+  liveHlsEl.muted  = false;
+  liveHlsEl.volume = player.volume; // match main player volume
+  // Unmute YouTube iframe via postMessage
+  if (liveIframeEl.style.display !== 'none' && liveIframeEl.contentWindow) {
+    try {
+      liveIframeEl.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'unMute', args: [] }),
+        '*'
+      );
+      liveIframeEl.contentWindow.postMessage(
+        JSON.stringify({ event: 'command', func: 'setVolume', args: [100] }),
+        '*'
+      );
+    } catch(e) {}
+  }
+  hideUnmuteBtn();
 }
 
 // ── Deactivate — snap back to UTC schedule ────────────────────────
@@ -759,16 +818,15 @@ function deactivateLiveFeed() {
   liveLayerEl.style.display  = 'none';
   liveIframeEl.style.display = 'none';
   liveHlsEl.style.display    = 'none';
-  // Restore genre el if it was replaced with badge
-  const el = document.getElementById('genre');
-  if (el && el.classList.contains('live-feed-badge')) {
-    el.outerHTML = '<div id="genre">—</div>';
-  }
+  // Restore genre element to normal state (no outerHTML swap — keeps genreEl ref valid)
+  genreEl.classList.remove('live-feed-badge');
+  genreEl.innerHTML = '—';
   if (hasBooted && TIMELINE.length > 0) {
     const ni = findSlot(utcSec());
     const origDoCut = window._rawDoCut || doCut;
     origDoCut(ni);
   }
+  hideUnmuteBtn();
   showToast('⟳ RETURNING TO BROADCAST SCHEDULE');
 }
 
@@ -779,18 +837,22 @@ function updateHUDForLiveFeed(label) {
   tleftEl.textContent     = '';
   pubDateEl.textContent   = '';
   pfillEl.style.width     = '100%';
-  const el = document.getElementById('genre');
-  if (el) el.outerHTML = '<div id="genre" class="live-feed-badge"><div class="dot"></div>LIVE FEED</div>';
+  genreEl.textContent = 'LIVE FEED';
+  genreEl.classList.add('live-feed-badge');
+  genreEl.innerHTML = '<div class="dot"></div>LIVE FEED';
 }
 
 // ── YouTube URL → embed ───────────────────────────────────────────
 function toYouTubeEmbed(url) {
+  // mute=1 required for autoplay on most browsers/mobile
+  // rel=0 suppresses related videos, modestbranding=1 reduces YT branding
+  var params = '?autoplay=1&mute=1&rel=0&modestbranding=1&playsinline=1';
   var s = url.match(/youtu\.be\/([^?&\s]+)/);
-  if (s) return 'https://www.youtube-nocookie.com/embed/'+s[1]+'?autoplay=1';
+  if (s) return 'https://www.youtube-nocookie.com/embed/'+s[1]+params;
   var w = url.match(/[?&]v=([^&\s]+)/);
-  if (w) return 'https://www.youtube-nocookie.com/embed/'+w[1]+'?autoplay=1';
+  if (w) return 'https://www.youtube-nocookie.com/embed/'+w[1]+params;
   var l = url.match(/youtube\.com\/live\/([^?&\s]+)/);
-  if (l) return 'https://www.youtube-nocookie.com/embed/'+l[1]+'?autoplay=1';
+  if (l) return 'https://www.youtube-nocookie.com/embed/'+l[1]+params;
   return url;
 }
 
@@ -819,12 +881,20 @@ tick = function() { if (!liveFeedActive) _rawTick(); };
 const _rawDoCut = doCut;
 doCut = function(i) { if (!liveFeedActive) _rawDoCut(i); };
 const _rawUpdateHUD = updateHUD;
-updateHUD = function() { if (!liveFeedActive) _rawUpdateHUD(); };
+updateHUD = function() {
+  if (liveFeedActive) return;
+  // Ensure genre el is clean before updating
+  genreEl.classList.remove('live-feed-badge');
+  _rawUpdateHUD();
+};
 
 // ── TUNE IN ───────────────────────────────────────────────────────
 window.tuneIn = function(){
   tuneinEl.style.display='none';
   hasBooted=true;
+  // If live feed is already active when user clicks tune-in, unmute it immediately
+  // since we now have a user gesture
+  if (liveFeedActive) { unmuteAll(); }
   const now=utcSec();
   const idx=findSlot(now);
   playSlot(idx,true);
