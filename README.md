@@ -9,6 +9,27 @@ tvstation/
 └── README.md
 ```
 
+## Running Locally
+
+The player fetches `schedule.json` at runtime, so the files must be served
+over HTTP — opening `index.html` directly from the filesystem (`file://`)
+will not work in most browsers.
+
+**Python 3** (no install needed on macOS / Linux / Windows with Python):
+```bash
+cd /path/to/tvstation
+python3 -m http.server 8080
+```
+Then open <http://localhost:8080> for the TV and <http://localhost:8080/admin.html> for the admin panel.
+
+**Node.js** (if you have Node installed):
+```bash
+npx serve .
+```
+Then open the URL printed in the terminal (usually <http://localhost:3000>).
+
+---
+
 ## Quick Start
 
 1. Drop all files onto your web server / hosting at `TVStation.mydomain.org`
