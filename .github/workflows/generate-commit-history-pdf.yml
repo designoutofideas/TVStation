@@ -1,0 +1,107 @@
+name: Generate Commit History PDF
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+
+jobs:
+  generate-pdf:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Checkout full history
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install pandoc and TeX Live
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y pandoc texlive-latex-base texlive-fonts-recommended
+
+      - name: Generate Markdown commit history
+        run: |
+          REPO="${{ github.repository }}"
+          TIMESTAMP=$(date -u '+%Y-%m-%d %H:%M:%S UTC')
+          OUTPUT="commit-history.md"
+
+          # Fetch all remote branches
+          git fetch --all --prune
+
+          # Collect all unique branch names (strip remote prefix, deduplicate)
+          ALL_BRANCHES=$(git branch -r \
+            | grep -v ' -> ' \
+            | sed 's|origin/||' \
+            | sort -u)
+
+          # Build ordered list: firestore first, then remaining sorted alphabetically
+          PRIORITY="firestore"
+          OTHER_BRANCHES=$(echo "$ALL_BRANCHES" | grep -v "^${PRIORITY}$" | sort)
+
+          {
+            echo "---"
+            echo "title: \"Commit History — ${REPO}\""
+            echo "date: \"${TIMESTAMP}\""
+            echo "---"
+            echo ""
+            echo "# Commit History — ${REPO}"
+            echo ""
+            echo "**Generated:** ${TIMESTAMP}"
+            echo ""
+            echo "**Includes all branches.**"
+            echo ""
+
+            write_branch_section() {
+              local branch="$1"
+              echo "## Branch: \`${branch}\`"
+              echo ""
+              echo "| Date | SHA | Author | Subject |"
+              echo "|------|-----|--------|---------|"
+              # Commits for this branch, reverse chronological, de-duplicated by SHA
+              git log "origin/${branch}" \
+                --format="%ci|%h|%an|%s" \
+                --date=short \
+                | sort -t'|' -k2,2 -u \
+                | sort -t'|' -k1,1 -r \
+                | while IFS='|' read -r date sha author subject; do
+                    date_short="${date%% *}"
+                    # Escape pipe characters in subject/author to avoid breaking the table
+                    author_escaped="${author//|/\\|}"
+                    subject_escaped="${subject//|/\\|}"
+                    echo "| ${date_short} | \`${sha}\` | ${author_escaped} | ${subject_escaped} |"
+                  done
+              echo ""
+            }
+
+            # Priority branch first
+            if echo "$ALL_BRANCHES" | grep -q "^${PRIORITY}$"; then
+              write_branch_section "$PRIORITY"
+            fi
+
+            # All other branches alphabetically
+            while IFS= read -r branch; do
+              [ -z "$branch" ] && continue
+              write_branch_section "$branch"
+            done <<< "$OTHER_BRANCHES"
+
+          } > "$OUTPUT"
+
+      - name: Convert Markdown to PDF
+        run: |
+          pandoc commit-history.md \
+            --from markdown \
+            --to pdf \
+            --output commit-history.pdf \
+            --variable geometry:margin=1in \
+            --variable fontsize=10pt \
+            --variable papersize=a4
+
+      - name: Upload PDF artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: commit-history-pdf
+          path: commit-history.pdf

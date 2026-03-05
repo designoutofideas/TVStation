@@ -9,6 +9,27 @@ tvstation/
 └── README.md
 ```
 
+## Running Locally
+
+The player fetches `schedule.json` at runtime, so the files must be served
+over HTTP — opening `index.html` directly from the filesystem (`file://`)
+will not work in most browsers.
+
+**Python 3** (no install needed on macOS / Linux / Windows with Python):
+```bash
+cd /path/to/tvstation
+python3 -m http.server 8080
+```
+Then open <http://localhost:8080> for the TV and <http://localhost:8080/admin.html> for the admin panel.
+
+**Node.js** (if you have Node installed):
+```bash
+npx serve .
+```
+Then open the URL printed in the terminal (usually <http://localhost:3000>).
+
+---
+
 ## Quick Start
 
 1. Drop all files onto your web server / hosting at `TVStation.mydomain.org`
@@ -99,6 +120,30 @@ a "Click to Tune In" overlay if autoplay is blocked.
 - **Duration picker** — set h/m/s for each item
 - **Import/Export** — full schedule.json round-trip
 - **Running total** — see how many hours you have scheduled
+
+---
+
+## Commit History PDF
+
+A GitHub Actions workflow is included that generates a PDF of the full commit
+history across all branches and uploads it as a downloadable artifact.
+
+### Running the workflow
+
+1. Go to **Actions** → **Generate Commit History PDF** in the GitHub repository.
+2. Click **Run workflow** → **Run workflow**.
+3. Wait for the run to complete (typically under 2 minutes).
+
+### Downloading the artifact
+
+1. Open the completed workflow run.
+2. Scroll down to the **Artifacts** section.
+3. Click **commit-history-pdf** to download the ZIP containing `commit-history.pdf`.
+
+The PDF contains one section per branch.  The `firestore` branch is always
+listed first, followed by all other branches in alphabetical order.  Each
+section lists commits in reverse chronological order with date, short SHA,
+author, and subject line.  The PDF is never committed to the repository.
 
 ---
 
