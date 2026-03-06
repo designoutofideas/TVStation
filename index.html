@@ -310,7 +310,38 @@ let TIMELINE = [];
 
 function toSec(hhmm){const[h,m]=hhmm.split(':').map(Number);return h*3600+m*60}
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
-function utcSec(){const d=new Date();return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000}
+
+// ── NTP-CALIBRATED UTC CLOCK ──────────────────────────────────
+// Each machine's system clock can be offset from true UTC by
+// ±50–500ms depending on when it last synced with NTP. We correct
+// this by comparing local Date.now() against a trusted server's
+// Date header, giving every client the same true UTC reference.
+let clockOffset = 0; // ms — local clock error vs true UTC
+
+async function calibrateClockOffset(){
+  try{
+    const t0 = Date.now();
+    const r  = await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
+    const t1 = Date.now();
+    const serverMs = new Date(r.headers.get('Date')).getTime();
+    if(!isNaN(serverMs)){
+      // Server time + half round-trip ≈ true UTC at moment of response
+      clockOffset = serverMs + Math.round((t1 - t0) / 2) - t1;
+      console.log(`[clock] offset=${clockOffset}ms`);
+    }
+  }catch(e){
+    console.warn('[clock] calibration failed, using local clock:',e.message);
+    clockOffset = 0;
+  }
+}
+
+// Use trueUtcMs() everywhere instead of Date.now()
+function trueUtcMs(){ return Date.now() + clockOffset; }
+function utcSec(){
+  const ms = trueUtcMs();
+  const d  = new Date(ms);
+  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
+}
 
 function buildTimeline(blocks){
   const sorted=blocks.slice().sort((a,b)=>toSec(a.start)-toSec(b.start));
@@ -364,6 +395,12 @@ let tickInterval = null;
 let metaCache   = {};
 let dateCache   = {};
 let hasBooted   = false;
+
+// ── CLOCK CALIBRATION ────────────────────────────────────────
+// Calibrate immediately, then every 5 minutes to stay locked
+// to true UTC for the duration of the session.
+calibrateClockOffset();
+setInterval(calibrateClockOffset, 5 * 60 * 1000);
 
 // ── FIRESTORE LIVE SCHEDULE ───────────────────────────────────
 db.collection('broadcast').doc('schedule').onSnapshot(function(snap) {
@@ -507,7 +544,7 @@ function cancelSync(){
 function precisePlay(seekTo, targetUtcMs, idx){
   function loop(){
     if(currentIdx !== idx) return; // slot changed — abort
-    if(Date.now() >= targetUtcMs){
+    if(Date.now() + clockOffset >= targetUtcMs){
       player.currentTime = seekTo; // final position confirm
       player.play().catch(async e=>{
         const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
@@ -564,7 +601,7 @@ function startDriftCorrection(idx){
   // Phase-lock interval start to the next *.000 UTC second boundary.
   // All clients begin their drift checks on the same Frame 1, so the
   // 2-second recompute cycle is synchronized across every machine.
-  const msUntilNextSecond = 1000 - (Date.now() % 1000);
+  const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
   setTimeout(()=>{
     if(currentIdx !== idx) return;
     driftCheck();
@@ -604,7 +641,7 @@ async function playSlot(idx,seekLive){
       // Target: top of the next whole UTC second.
       // precisePlay() spins rAF until Date.now() hits this exact millisecond,
       // so play() fires simultaneously on all clients regardless of seek time.
-      const targetUtcMs = Math.ceil(Date.now() / 1000) * 1000;
+      const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
       precisePlay(seekTo, targetUtcMs, idx);
       return;
     }
