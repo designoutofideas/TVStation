@@ -546,12 +546,17 @@ function startDriftCorrection(idx){
     const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
-    if(Math.abs(drift) > 0.05){
-      // Always hard-snap to Frame 1 of the UTC-correct second.
-      // No nudging — every client corrects to the identical target
-      // simultaneously, so they converge rather than drift independently.
-      console.log(`[sync] snap drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+    if(Math.abs(drift) > 2){
+      // Large drift — hard snap to Frame 1 of the UTC-correct second
+      console.log(`[sync] hard snap drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
+      player.playbackRate = 1.0;
+    } else if(Math.abs(drift) > 0.05){
+      // Small drift — nudge ±0.2% to glide silently back to Frame 1.
+      // All clients converge to the same target without jarring jumps.
+      player.playbackRate = drift > 0 ? 0.998 : 1.002;
+    } else {
+      // Within 50ms — locked on Frame 1, restore normal rate
       player.playbackRate = 1.0;
     }
   }
