@@ -514,12 +514,30 @@ async function playSlot(idx,seekLive){
   const doPlay=()=>{
     if(offset>2){
       const dur=player.duration;
-      // Floor to the nearest whole second — every whole UTC second begins on
-      // a frame boundary (Frame 1), so this is the sync point regardless of
-      // the file's frame rate. All clients compute the same integer offset
-      // from UTC and seek to the same frame without any frame-rate metadata.
+      // Floor to whole second — every whole UTC second is a frame boundary.
       const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
-      if(seekTo>0)player.currentTime=seekTo;
+      player.currentTime=seekTo;
+      player.pause(); // hold while the browser decodes to the keyframe
+
+      // Schedule play() at the top of the next whole UTC second.
+      // Every client independently computes the same target millisecond,
+      // so play() fires simultaneously regardless of individual seek latency.
+      const msUntilNextSecond = 1000 - (Date.now() % 1000);
+      setTimeout(()=>{
+        player.currentTime=seekTo; // re-confirm position after seek has settled
+        player.play().catch(async e=>{
+          const confirmed=await resolveUrl(slot.id);
+          if(confirmed&&currentIdx===idx){
+            player.src=confirmed;player.load();
+            player.currentTime=seekTo;
+            player.play().catch(()=>{});
+          }else if(!confirmed){
+            console.warn('Skipping unplayable slot:',slot.title);
+            doCut((idx+1)%TIMELINE.length);
+          }
+        });
+      }, msUntilNextSecond);
+      return; // play() is called inside setTimeout above
     }
     player.play().catch(async e=>{
       const confirmed=await resolveUrl(slot.id);
