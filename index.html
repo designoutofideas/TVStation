@@ -531,30 +531,57 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// On tune-in: seekTo computed from trueUtcMs() — NTP-calibrated
-// true UTC, identical on every client. Math.floor lands on Frame 1
-// of that second. seekThenPlay() sets currentTime and waits for the
-// 'seeked' event — the browser confirming it has decoded to the exact
-// keyframe — then calls play(). Same file + same seekTo = same keyframe
-// on every client, so playback starts from the identical frame.
+// Three-layer frame sync:
+//
+// 1. NTP-calibrated UTC — trueUtcMs() corrects each client's local
+//    clock against Archive.org's server time, so every client shares
+//    the same true UTC reference regardless of system clock accuracy.
+//
+// 2. Anticipatory seek compensation — each client measures its own
+//    seek-to-decoded latency on every file load and pre-compensates
+//    seekTo on the next load, so the browser arrives at the UTC-correct
+//    frame at the moment 'seeked' fires rather than behind it.
+//
+// 3. Ongoing drift correction — a ±0.5% playbackRate nudge checks
+//    every UTC second (phase-locked across all clients) and silently
+//    corrects any divergence without seeking or interrupting playback.
 
-const ONE_FRAME   = 1/30; // ~33ms — minimum correctable drift unit
-let driftInterval = null;
+const ONE_FRAME      = 1/30;  // ~33ms minimum correctable drift
+let driftInterval    = null;
+let lastSeekLatencyMs = 0;    // self-measured seek latency from last file load
 
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
 }
 
-// seekThenPlay: defined below in sync engine
-// seekThenPlay: sets currentTime, waits for the 'seeked' event
-// confirming the browser has decoded to the exact keyframe, then
-// plays immediately. Because all clients seek to the same UTC-derived
-// integer second in the same file, they all land on the same keyframe
-// and play from the identical position — without any coordination.
-function seekThenPlay(seekTo, idx){
+// seekThenPlay: measures this client's seek decode latency, pre-compensates
+// seekTo by the previously measured latency so the browser arrives at the
+// UTC-correct frame exactly when 'seeked' fires, then plays immediately.
+function seekThenPlay(rawSeekTo, idx){
+  const slot = TIMELINE[idx];
+  if(!slot) return;
+  const dur = player.duration;
+
+  // Pre-compensate: add last measured latency so we arrive on time.
+  // Clamped to file duration. On first load lastSeekLatencyMs=0 (no penalty).
+  const compensationSec = lastSeekLatencyMs / 1000;
+  const seekTo = Math.min(
+    Math.floor(rawSeekTo + compensationSec),
+    isFinite(dur) ? dur - 2 : rawSeekTo
+  );
+
+  const seekStart = trueUtcMs();
+
   function onSeeked(){
     if(currentIdx !== idx) return;
+
+    // Measure actual latency — store for next file load pre-compensation.
+    // Rolling average with the previous measurement for stability.
+    const measured = trueUtcMs() - seekStart;
+    lastSeekLatencyMs = Math.round((lastSeekLatencyMs + measured) / 2);
+    console.log(`[sync] seekLatency=${measured}ms avg=${lastSeekLatencyMs}ms seekTo=${seekTo}s`);
+
     player.play().catch(async e=>{
       const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
       if(confirmed && currentIdx===idx){
@@ -568,13 +595,15 @@ function seekThenPlay(seekTo, idx){
     });
     startDriftCorrection(idx);
   }
+
   player.addEventListener('seeked', onSeeked, {once:true});
   player.currentTime = seekTo;
 }
 
 // Phase-locked drift correction: checks every UTC second.
 // ±0.5% playbackRate nudge — invisible to viewer, no seeking.
-// All clients check at the same UTC second simultaneously.
+// Phase-locked to the next whole UTC second so all clients
+// run their checks at the same moment simultaneously.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
@@ -615,13 +644,12 @@ async function playSlot(idx,seekLive){
   if(player.src!==url){player.src=url;player.load()}
   const doPlay=()=>{
     if(offset>2){
+      // rawSeekTo: UTC-correct Frame 1 of the current second.
+      // seekThenPlay pre-compensates for this client's measured decode
+      // latency so it arrives at the correct frame when 'seeked' fires.
       const dur=player.duration;
-      // seekTo: UTC-correct whole second = Frame 1 of that second.
-      // Identical on every client. Browser snaps to the nearest keyframe
-      // before this position — same keyframe on every client since it's
-      // the same file. 'seeked' fires when decode is complete, then play().
-      const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
-      seekThenPlay(seekTo, idx);
+      const rawSeekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
+      seekThenPlay(rawSeekTo, idx);
       return;
     }
     player.play().catch(async e=>{
