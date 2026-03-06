@@ -533,17 +533,17 @@ function precisePlay(seekTo, targetUtcMs, idx){
 // hard-seek for large drift.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
-  driftInterval = setInterval(()=>{
+
+  function driftCheck(){
     if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
-    // targetFrame1: Frame 1 of the UTC-correct second.
-    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
-    // that is identical on every client on Earth. Snapping here means
-    // every drift correction lands all clients on the same frame.
+    // targetFrame1: Frame 1 of the UTC-correct second — HH:MM:SS.000.
+    // Identical on every client on Earth. Every correction lands all
+    // clients on the same frame.
     const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
+    const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
     if(Math.abs(drift) > 2){
@@ -558,7 +558,17 @@ function startDriftCorrection(idx){
       // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
-  }, 2000);
+  }
+
+  // Phase-lock interval start to the next *.000 UTC second boundary.
+  // All clients begin their drift checks on the same Frame 1, so the
+  // 2-second recompute cycle is synchronized across every machine.
+  const msUntilNextSecond = 1000 - (Date.now() % 1000);
+  setTimeout(()=>{
+    if(currentIdx !== idx) return; // slot changed while waiting — abort
+    driftCheck(); // immediate check on the boundary
+    driftInterval = setInterval(driftCheck, 2000);
+  }, msUntilNextSecond);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
