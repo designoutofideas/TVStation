@@ -257,7 +257,7 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
         </div>
         <div class="fi" style="max-width:110px">
           <div class="fl">Block UTC Start</div>
-          <input id="m-start" placeholder="HH:MM" value="00:00">
+          <input id="m-start" placeholder="HH:MM:SS.mmm" value="00:00:00.000">
         </div>
       </div>
       <div class="fi">
@@ -336,15 +336,15 @@ var FS_BASE = "https://firestore.googleapis.com/v1/projects/"+PROJECT_ID+"/datab
 //  All 9 RFA language blocks (default seed)
 // ─────────────────────────────────────────────────────────────
 var LANG_BLOCKS = [
-  { name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00', color:'#61C230' },
-  { name:'廣東話 — Cantonese',        genre:'Cantonese',        start:'02:40', color:'#3bb0f5' },
-  { name:'မြန်မာဘာသာ — Burmese',      genre:'Burmese',          start:'05:20', color:'#f5a623' },
-  { name:'ខ្មែរ — Khmer',             genre:'Khmer',            start:'08:00', color:'#e040fb' },
-  { name:'한국어 — Korean',            genre:'Korean',           start:'10:40', color:'#ff6b6b' },
-  { name:'ພາສາລາວ — Lao',             genre:'Lao',              start:'13:20', color:'#00e5cc' },
-  { name:'བོད་སྐད་ — Tibetan',         genre:'Tibetan',          start:'16:00', color:'#ffd600' },
-  { name:'ئۇيغۇرچە — Uyghur',         genre:'Uyghur',           start:'18:40', color:'#ff7043' },
-  { name:'Tiếng Việt — Vietnamese',   genre:'Vietnamese',       start:'21:20', color:'#69f0ae' },
+  { name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00:00.000', color:'#61C230' },
+  { name:'廣東話 — Cantonese',        genre:'Cantonese',        start:'02:40:00.000', color:'#3bb0f5' },
+  { name:'မြန်မာဘာသာ — Burmese',      genre:'Burmese',          start:'05:20:00.000', color:'#f5a623' },
+  { name:'ខ្មែរ — Khmer',             genre:'Khmer',            start:'08:00:00.000', color:'#e040fb' },
+  { name:'한국어 — Korean',            genre:'Korean',           start:'10:40:00.000', color:'#ff6b6b' },
+  { name:'ພາສາລາວ — Lao',             genre:'Lao',              start:'13:20:00.000', color:'#00e5cc' },
+  { name:'བོད་སྐད་ — Tibetan',         genre:'Tibetan',          start:'16:00:00.000', color:'#ffd600' },
+  { name:'ئۇيغۇرچە — Uyghur',         genre:'Uyghur',           start:'18:40:00.000', color:'#ff7043' },
+  { name:'Tiếng Việt — Vietnamese',   genre:'Vietnamese',       start:'21:20:00.000', color:'#69f0ae' },
 ];
 
 var COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
@@ -516,8 +516,7 @@ function startPolling(){
 // ─────────────────────────────────────────────────────────────
 function renderSidebar(){
   var sorted=STATE.blocks.slice().sort(function(a,b){
-    var av=a.start.split(':').map(Number), bv=b.start.split(':').map(Number);
-    return (av[0]*60+av[1])-(bv[0]*60+bv[1]);
+    return timeToSec(a.start) - timeToSec(b.start);
   });
   setText('sb-heading','Blocks — '+STATE.blocks.length);
   var list=document.getElementById('blist');
@@ -575,7 +574,7 @@ function renderEditor(){
     '<div class="fi"><div class="fl">Genre Label</div>',
     '<input value="'+escA(block.genre)+'" oninput="updateBlock(\''+block.id+'\',\'genre\',this.value)" placeholder="Language"></div>',
     '<div class="fi" style="max-width:110px"><div class="fl">Block UTC Start</div>',
-    '<input value="'+escA(block.start)+'" oninput="updateBlock(\''+block.id+'\',\'start\',this.value)" placeholder="HH:MM"></div>',
+    '<input value="'+escA(block.start)+'" oninput="updateBlock(\''+block.id+'\',\'start\',this.value)" placeholder="HH:MM:SS.mmm"></div>',
     '<div class="fi" style="max-width:80px"><div class="fl">Color</div>',
     '<select onchange="updateBlock(\''+block.id+'\',\'color\',this.value)" style="background:'+col+'22;border-color:'+col+'">',
     COLORS.map(function(c){ return '<option value="'+c+'"'+(c===col?' selected':'')+' style="background:var(--s2)">'+c+'</option>'; }).join(''),
@@ -644,15 +643,17 @@ function renderEditor(){
 // ─────────────────────────────────────────────────────────────
 function timeToSec(t){
   if(!t) return 0;
-  var parts=t.split(':').map(Number);
-  if(parts.length===3) return parts[0]*3600+parts[1]*60+parts[2];
-  if(parts.length===2) return parts[0]*3600+parts[1]*60;
-  return 0;
+  // Supports HH:MM, HH:MM:SS, and HH:MM:SS.mmm
+  var dotParts = t.split('.'), ms = parseFloat('0.'+(dotParts[1]||'0'));
+  var parts = dotParts[0].split(':').map(Number);
+  var h=parts[0]||0, m=parts[1]||0, s=parts[2]||0;
+  return h*3600 + m*60 + s + ms;
 }
 function secToTime(s){
   s=Math.max(0,s)%86400;
-  var h=Math.floor(s/3600), m=Math.floor((s%3600)/60), sec=s%60;
-  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec;
+  var h=Math.floor(s/3600), m=Math.floor((s%3600)/60);
+  var sec=Math.floor(s%60), ms=Math.round((s%1)*1000);
+  return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec+'.'+(ms<100?(ms<10?'00':'0'):'')+ms;
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -932,7 +933,7 @@ function closeAddModal(){ document.getElementById('add-modal').classList.remove(
 function submitNewBlock(){
   var name=document.getElementById('m-name').value.trim();
   if(!name) return;
-  var block={id:uid(),name:name,genre:document.getElementById('m-genre').value.trim()||name,start:document.getElementById('m-start').value.trim()||'00:00',color:STATE.selectedColor,items:[]};
+  var block={id:uid(),name:name,genre:document.getElementById('m-genre').value.trim()||name,start:document.getElementById('m-start').value.trim()||'00:00:00.000',color:STATE.selectedColor,items:[]};
   STATE.blocks=STATE.blocks.concat([block]);
   STATE.activeId=block.id;
   setDirty(true); closeAddModal(); renderSidebar(); renderEditor();
