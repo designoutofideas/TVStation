@@ -554,7 +554,7 @@ function startDriftCorrection(idx){
     } else if(Math.abs(drift) > 0.05){
       // Small drift — nudge ±0.2% to glide silently back to Frame 1.
       // All clients converge to the same target without jarring jumps.
-      player.playbackRate = drift > 0 ? 0.998 : 1.002;
+      player.playbackRate = drift > 0 ? 0.983 : 1.017;
     } else {
       // Within 50ms — locked on Frame 1, restore normal rate
       player.playbackRate = 1.0;
@@ -566,9 +566,9 @@ function startDriftCorrection(idx){
   // 2-second recompute cycle is synchronized across every machine.
   const msUntilNextSecond = 1000 - (Date.now() % 1000);
   setTimeout(()=>{
-    if(currentIdx !== idx) return; // slot changed while waiting — abort
-    driftCheck(); // immediate check on the boundary
-    driftInterval = setInterval(driftCheck, 2000);
+    if(currentIdx !== idx) return;
+    driftCheck();
+    driftInterval = setInterval(driftCheck, 1000);
   }, msUntilNextSecond);
 }
 
