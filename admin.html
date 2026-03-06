@@ -62,14 +62,45 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .btn-sm{padding:4px 10px;font-size:9px}
 
 /* MAIN LAYOUT */
-.main{display:flex;flex:1}
-.sb{width:260px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto}
+.main{display:flex;flex:1;overflow:hidden}
+.sb{width:220px;flex-shrink:0;background:var(--s1);border-right:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:54px;height:calc(100vh - 54px);overflow-y:auto}
+.ed-wrap{flex:1;display:flex;flex-direction:column;overflow:hidden;min-width:0}
+.ed{flex:1;padding:24px 28px 100px;overflow-y:auto}
+.ed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;gap:14px;opacity:.35}
+.ed-empty-icon{font-size:44px}.ed-empty-txt{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
+.ed-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:14px}
+.ed-title{font-family:var(--disp);font-size:32px;letter-spacing:.08em;line-height:1}
+.ed-meta{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.18em;margin-top:5px}
+
+/* NOW PLAYING BAR */
+.now-bar{background:var(--s2);border-bottom:1px solid var(--b);padding:8px 20px;display:flex;align-items:center;gap:12px;flex-shrink:0}
+.now-dot{width:7px;height:7px;border-radius:50%;background:var(--red);box-shadow:0 0 6px var(--red);animation:blk 1.4s infinite;flex-shrink:0}
+.now-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;flex-shrink:0}
+.now-title{font-family:var(--mono);font-size:11px;color:var(--p);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex:1}
+.now-block{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.15em;flex-shrink:0}
+.now-time{font-family:var(--mono);font-size:9px;color:var(--dim);flex-shrink:0;min-width:60px;text-align:right}
+
+/* PREVIEW PANEL */
+.preview{width:320px;flex-shrink:0;background:var(--s1);border-left:1px solid var(--b);display:flex;flex-direction:column;position:sticky;top:54px;height:calc(100vh - 54px)}
+.preview-hdr{padding:10px 14px;border-bottom:1px solid var(--b);display:flex;align-items:center;gap:8px;flex-shrink:0}
+.preview-hdr-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;flex:1}
+.preview-screen{position:relative;width:100%;padding-top:56.25%;background:#000;flex-shrink:0}
+.preview-screen iframe{position:absolute;inset:0;width:100%;height:100%;border:none}
+.preview-info{padding:12px 14px;flex:1;overflow-y:auto}
+.preview-info-lbl{font-family:var(--mono);font-size:8px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase;margin-bottom:8px}
+.preview-slot{padding:8px 10px;background:var(--s2);border:1px solid var(--b);margin-bottom:6px}
+.preview-slot.active{border-color:var(--p);background:rgba(97,194,48,.06)}
+.preview-slot-title{font-size:11px;font-weight:500;color:var(--off);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.preview-slot-meta{font-family:var(--mono);font-size:9px;color:var(--dim)}
+
+/* SIDEBAR ELEMENTS */
 .sbsec{padding:16px 13px 8px}
 .sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:9px}
 .blist{display:flex;flex-direction:column;gap:2px}
 .bitem{display:flex;align-items:center;gap:8px;padding:8px 10px;cursor:pointer;border:1px solid transparent;transition:all .12s;border-radius:2px}
 .bitem:hover{background:var(--pg);border-color:var(--b)}
 .bitem.act{background:rgba(97,194,48,.1);border-color:rgba(97,194,48,.3)}
+.bitem.now-playing-block{box-shadow:inset 2px 0 0 var(--red)}
 .bdot{width:8px;height:8px;border-radius:50%;flex-shrink:0}
 .binfo{flex:1;min-width:0}
 .bname{font-size:12px;font-weight:500;color:var(--off);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -77,14 +108,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .bcnt{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 5px;border-radius:2px;flex-shrink:0}
 .sb-addbtn{margin:0 13px 13px;display:flex;align-items:center;justify-content:center;gap:8px;padding:9px;background:transparent;border:1px dashed rgba(97,194,48,.22);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.2em;cursor:pointer;text-transform:uppercase;transition:all .12s}
 .sb-addbtn:hover{border-color:var(--p);color:var(--p)}
-
-/* EDITOR */
-.ed{flex:1;padding:24px 28px 100px;overflow-y:auto}
-.ed-empty{display:flex;flex-direction:column;align-items:center;justify-content:center;height:80vh;gap:14px;opacity:.35}
-.ed-empty-icon{font-size:44px}.ed-empty-txt{font-family:var(--mono);font-size:10px;letter-spacing:.3em;color:var(--dim);text-transform:uppercase}
-.ed-hdr{display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:20px;gap:14px}
-.ed-title{font-family:var(--disp);font-size:32px;letter-spacing:.08em;line-height:1}
-.ed-meta{font-family:var(--mono);font-size:9px;color:var(--dim);letter-spacing:.18em;margin-top:5px}
 
 /* FIELDS */
 .fg{display:flex;gap:10px;margin-bottom:16px;flex-wrap:wrap}
@@ -144,7 +167,9 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .search-bar{display:flex;gap:8px;margin-bottom:16px}
 .search-bar input{flex:1;background:var(--s2);border:1px solid var(--b);color:var(--off);font-family:var(--mono);font-size:13px;padding:9px 12px;outline:none;transition:border-color .15s}
 .search-bar input:focus{border-color:var(--p)}
-.search-results{display:flex;flex-direction:column;gap:6px;max-height:380px;overflow-y:auto}
+.search-results{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto}
+.search-sentinel{height:1px;flex-shrink:0}
+.sresult-dur{font-family:var(--mono);font-size:9px;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.2);padding:1px 6px;white-space:nowrap;flex-shrink:0}
 .sresult{display:flex;gap:12px;align-items:center;padding:10px 12px;background:var(--s2);border:1px solid var(--b);cursor:pointer;transition:all .12s}
 .sresult:hover{border-color:var(--p);background:var(--pg)}
 .sresult-thumb{width:80px;height:50px;object-fit:cover;flex-shrink:0;background:var(--bg)}
@@ -220,10 +245,39 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
       </div>
       <button class="sb-addbtn" onclick="openAddModal()">+ New Block</button>
     </div>
-    <div class="ed" id="editor">
-      <div class="ed-empty">
-        <div class="ed-empty-icon">📡</div>
-        <div class="ed-empty-txt">Select or create a block to edit</div>
+
+    <div class="ed-wrap">
+      <!-- Now Playing Bar -->
+      <div class="now-bar">
+        <div class="now-dot"></div>
+        <div class="now-lbl">On Air</div>
+        <div class="now-title" id="np-title">—</div>
+        <div class="now-block" id="np-block"></div>
+        <div class="now-time" id="np-time"></div>
+      </div>
+      <div class="ed" id="editor">
+        <div class="ed-empty">
+          <div class="ed-empty-icon">📡</div>
+          <div class="ed-empty-txt">Select or create a block to edit</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Preview Panel -->
+    <div class="preview">
+      <div class="preview-hdr">
+        <div class="preview-hdr-lbl">● Live Preview</div>
+      </div>
+      <div class="preview-screen">
+        <iframe id="preview-frame"
+          src="https://designoutofideas.github.io/TVStation/"
+          allow="autoplay; fullscreen"
+          sandbox="allow-scripts allow-same-origin allow-popups">
+        </iframe>
+      </div>
+      <div class="preview-info">
+        <div class="preview-info-lbl">Now &amp; Next</div>
+        <div id="preview-slots"></div>
       </div>
     </div>
   </div>
@@ -297,6 +351,7 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
     </div>
     <div id="search-results" class="search-results">
       <div class="search-empty">Enter a keyword above to search Archive.org</div>
+      <div class="search-sentinel" id="search-sentinel"></div>
     </div>
     <div class="modal-acts">
       <button class="btn btn-ghost" onclick="closeSearchModal()">Close</button>
@@ -515,18 +570,19 @@ function startPolling(){
 //  RENDER SIDEBAR
 // ─────────────────────────────────────────────────────────────
 function renderSidebar(){
-  var sorted=STATE.blocks.slice().sort(function(a,b){
-    return timeToSec(a.start) - timeToSec(b.start);
-  });
+  var nowIdx=getNowPlayingIdx();
+  var nowBlock=nowIdx!==-1?getNowPlayingBlock(nowIdx):null;
+  var sorted=STATE.blocks.slice().sort(function(a,b){ return timeToSec(a.start)-timeToSec(b.start); });
   setText('sb-heading','Blocks — '+STATE.blocks.length);
   var list=document.getElementById('blist');
   list.innerHTML='';
   sorted.forEach(function(b){
+    var isNow=nowBlock&&nowBlock.id===b.id;
     var el=document.createElement('div');
-    el.className='bitem'+(STATE.activeId===b.id?' act':'');
+    el.className='bitem'+(STATE.activeId===b.id?' act':'')+(isNow?' now-playing-block':'');
     el.onclick=function(){ STATE.activeId=b.id; renderSidebar(); renderEditor(); };
     el.innerHTML='<div class="bdot" style="background:'+b.color+'"></div>'
-      +'<div class="binfo"><div class="bname">'+escH(b.name)+'</div><div class="bmeta">UTC '+escH(b.start)+'</div></div>'
+      +'<div class="binfo"><div class="bname">'+escH(b.name)+'</div><div class="bmeta">UTC '+escH(b.start)+(isNow?' <span style="color:var(--red)">● ON AIR</span>':'')+'</div></div>'
       +'<div class="bcnt">'+b.items.length+'</div>';
     list.appendChild(el);
   });
@@ -643,11 +699,10 @@ function renderEditor(){
 // ─────────────────────────────────────────────────────────────
 function timeToSec(t){
   if(!t) return 0;
-  // Supports HH:MM, HH:MM:SS, and HH:MM:SS.mmm
-  var dotParts = t.split('.'), ms = parseFloat('0.'+(dotParts[1]||'0'));
-  var parts = dotParts[0].split(':').map(Number);
+  var dotParts=t.split('.'), ms=parseFloat('0.'+(dotParts[1]||'0'));
+  var parts=dotParts[0].split(':').map(Number);
   var h=parts[0]||0, m=parts[1]||0, s=parts[2]||0;
-  return h*3600 + m*60 + s + ms;
+  return h*3600+m*60+s+ms;
 }
 function secToTime(s){
   s=Math.max(0,s)%86400;
@@ -757,118 +812,138 @@ function dragDrop(e,blockId,i){
 // ─────────────────────────────────────────────────────────────
 //  ARCHIVE.ORG SEARCH MODAL
 // ─────────────────────────────────────────────────────────────
+// ─────────────────────────────────────────────────────────────
+//  SEARCH — infinite scroll + duration display
+// ─────────────────────────────────────────────────────────────
+var _searchPage=1, _searchQuery='', _searchLoading=false, _searchExhausted=false;
+var _searchObserver=null;
+
 function openSearchModal(blockId){
   STATE.searchTargetBlockId=blockId;
+  _searchPage=1; _searchQuery=''; _searchLoading=false; _searchExhausted=false;
   document.getElementById('search-query').value='';
   document.getElementById('paste-id').value='';
-  document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div>';
+  document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div><div class="search-sentinel" id="search-sentinel"></div>';
   document.getElementById('search-modal').classList.add('show');
   setTimeout(function(){ document.getElementById('paste-id').focus(); },120);
 }
-function closeSearchModal(){ document.getElementById('search-modal').classList.remove('show'); }
-
-function addFromPaste(){
-  var raw=document.getElementById('paste-id').value.trim();
-  if(!raw){ showToast('Please paste an Archive.org ID or URL'); return; }
-  // Extract ID from URL if needed
-  var id=raw;
-  var m=raw.match(/archive\.org\/details\/([^\/?#]+)/);
-  if(m) id=m[1];
-  id=id.replace(/\/$/, '');
-
-  // Fetch metadata to get title and duration
-  document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Looking up '+escH(id)+'…</div>';
-
-  fetch('https://archive.org/metadata/'+id)
-    .then(function(r){ return r.json(); })
-    .then(function(meta){
-      var title=(meta.metadata&&(meta.metadata.title||meta.metadata.subject))||id;
-      var dur=0;
-      if(meta.files){
-        var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
-               ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
-        if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
-      }
-      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:String(title),archiveId:id,dur:dur,airTime:''});
-      document.getElementById('paste-id').value='';
-      document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div>';
-      showToast('✓ Added: '+String(title).slice(0,50));
-    })
-    .catch(function(){ showToast('Could not find that Archive.org ID'); document.getElementById('search-results').innerHTML='<div class="search-empty">Could not find that ID — check it and try again</div>'; });
+function closeSearchModal(){
+  document.getElementById('search-modal').classList.remove('show');
+  if(_searchObserver){ _searchObserver.disconnect(); _searchObserver=null; }
 }
 
 function doSearch(){
   var q=document.getElementById('search-query').value.trim();
   if(!q) return;
-  document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div>';
+  _searchQuery=q; _searchPage=1; _searchLoading=false; _searchExhausted=false;
+  if(_searchObserver){ _searchObserver.disconnect(); _searchObserver=null; }
+  document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div><div class="search-sentinel" id="search-sentinel"></div>';
+  fetchSearchPage(true);
+}
 
-  // Archive.org blocks CORS on all search endpoints — route through corsproxy.io
-  // which adds the required Access-Control-Allow-Origin header
+function fetchSearchPage(replace){
+  if(_searchLoading||_searchExhausted) return;
+  _searchLoading=true;
+
   var archiveUrl='https://archive.org/advancedsearch.php'
-    +'?q='+encodeURIComponent('('+q+') AND mediatype:movies')
-    +'&fl[]=identifier,title,year'
-    +'&rows=20&page=1&output=json';
-
+    +'?q='+encodeURIComponent('('+_searchQuery+') AND mediatype:movies')
+    +'&fl[]=identifier,title,year,length'
+    +'&rows=20&page='+_searchPage+'&output=json';
   var proxied='https://corsproxy.io/?'+encodeURIComponent(archiveUrl);
 
   fetch(proxied)
-    .then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.json();
-    })
+    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
     .then(function(data){
+      _searchLoading=false;
       var docs=(data.response&&data.response.docs)||[];
-      if(!docs.length){
-        document.getElementById('search-results').innerHTML='<div class="search-empty">No results found for "'+escH(q)+'" — try different keywords</div>';
-        return;
+      var container=document.getElementById('search-results');
+      var sentinel=document.getElementById('search-sentinel');
+
+      if(!docs.length && replace){
+        container.innerHTML='<div class="search-empty">No results found for "'+escH(_searchQuery)+'"</div><div class="search-sentinel" id="search-sentinel"></div>';
+        _searchExhausted=true; return;
       }
-      var html=docs.map(function(item){
+      if(!docs.length){ _searchExhausted=true; return; }
+
+      if(replace){
+        // Clear all but sentinel
+        container.innerHTML='<div class="search-sentinel" id="search-sentinel"></div>';
+        sentinel=document.getElementById('search-sentinel');
+      }
+
+      docs.forEach(function(item){
         var thumb='https://archive.org/services/img/'+item.identifier;
         var title=item.title||item.identifier;
         var year=item.year||'';
-        var safeId=item.identifier.replace(/\\/g,'').replace(/'/g,'&#39;');
-        var safeTitle=String(title).replace(/\\/g,'').replace(/'/g,'&#39;').replace(/"/g,'&quot;');
-        return '<div class="sresult">'
-          +'<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
+        var durSec=item.length?Math.round(parseFloat(item.length)):0;
+        var durStr=durSec?fmtDur(durSec):'';
+        var safeId=escH(item.identifier);
+        var safeTitle=escH(String(title));
+        var el=document.createElement('div');
+        el.className='sresult';
+        el.innerHTML='<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
           +'<div class="sresult-info">'
-          +'<div class="sresult-title">'+escH(String(title))+'</div>'
-          +'<div class="sresult-meta">'+escH(item.identifier)+(year?' · '+escH(String(year)):'')+'</div>'
+          +'<div class="sresult-title">'+safeTitle+'</div>'
+          +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')+'</div>'
           +'</div>'
-          +'<div class="sresult-add" onclick="addSearchResult(this)" data-id="'+escH(item.identifier)+'" data-title="'+escH(String(title))+'">+ Add</div>'
-          +'</div>';
-      }).join('');
-      document.getElementById('search-results').innerHTML=html;
+          +(durStr?'<div class="sresult-dur">'+durStr+'</div>':'')
+          +'<div class="sresult-add" onclick="addSearchResult(this)" data-id="'+safeId+'" data-title="'+safeTitle+'" data-dur="'+durSec+'">+ Add</div>';
+        container.insertBefore(el, sentinel||null);
+      });
+
+      _searchPage++;
+
+      // Attach IntersectionObserver to sentinel for infinite scroll
+      if(!_searchObserver){
+        var newSentinel=document.getElementById('search-sentinel');
+        if(newSentinel){
+          _searchObserver=new IntersectionObserver(function(entries){
+            if(entries[0].isIntersecting) fetchSearchPage(false);
+          },{threshold:0.1});
+          _searchObserver.observe(newSentinel);
+        }
+      }
     })
     .catch(function(e){
+      _searchLoading=false;
       console.error('Search error:',e);
-      document.getElementById('search-results').innerHTML=
-        '<div class="search-empty">Search unavailable — paste an Archive.org ID directly above instead</div>';
+      if(replace) document.getElementById('search-results').innerHTML=
+        '<div class="search-empty">Search unavailable — paste an Archive.org ID directly above instead</div><div class="search-sentinel" id="search-sentinel"></div>';
     });
 }
 
 function addSearchResult(el){
   var archiveId=el.getAttribute('data-id');
   var title=el.getAttribute('data-title');
+  var durSec=parseInt(el.getAttribute('data-dur'))||0;
   el.textContent='Adding…';
-  // Fetch duration in background then add
-  fetch('https://archive.org/metadata/'+archiveId)
-    .then(function(r){ return r.json(); })
-    .then(function(meta){
-      var dur=0;
-      if(meta.files){
-        var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
-               ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
-        if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
-      }
-      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:dur,airTime:''});
-      el.textContent='✓ Added';
-      showToast('✓ Added: '+String(title).slice(0,50));
-    })
-    .catch(function(){
-      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:0,airTime:''});
-      el.textContent='✓ Added';
-      showToast('✓ Added (duration unknown)');
-    });
+
+  if(durSec){
+    // Duration already available from search results — add immediately
+    addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:durSec,airTime:''});
+    el.textContent='✓ Added';
+    showToast('✓ Added: '+String(title).slice(0,50));
+  } else {
+    // Fetch metadata for duration
+    fetch('https://archive.org/metadata/'+archiveId)
+      .then(function(r){ return r.json(); })
+      .then(function(meta){
+        var dur=0;
+        if(meta.files){
+          var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
+                 ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
+          if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
+        }
+        addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:dur,airTime:''});
+        el.textContent='✓ Added';
+        showToast('✓ Added: '+String(title).slice(0,50));
+      })
+      .catch(function(){
+        addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:0,airTime:''});
+        el.textContent='✓ Added';
+        showToast('✓ Added (duration unknown)');
+      });
+  }
 }
 
 function addVideoToBlock(blockId, item){
@@ -912,7 +987,7 @@ function openAddModal(){
   STATE.selectedColor=COLORS[0];
   document.getElementById('m-name').value='';
   document.getElementById('m-genre').value='';
-  document.getElementById('m-start').value='00:00';
+  document.getElementById('m-start').value='00:00:00.000';
   var sg=document.getElementById('m-colors');
   sg.innerHTML='';
   COLORS.forEach(function(c){
@@ -937,6 +1012,96 @@ function submitNewBlock(){
   STATE.blocks=STATE.blocks.concat([block]);
   STATE.activeId=block.id;
   setDirty(true); closeAddModal(); renderSidebar(); renderEditor();
+}
+
+// ─────────────────────────────────────────────────────────────
+//  NOW PLAYING ENGINE
+// ─────────────────────────────────────────────────────────────
+function utcSecAdmin(){
+  var d=new Date();
+  return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000;
+}
+
+function buildTimeline(){
+  var DAY=86400;
+  var sorted=STATE.blocks.slice().sort(function(a,b){ return timeToSec(a.start)-timeToSec(b.start); });
+  var tl=[];
+  sorted.forEach(function(block,bi){
+    if(!block.items||!block.items.length) return;
+    var bStart=timeToSec(block.start);
+    var bEnd=bi+1<sorted.length?timeToSec(sorted[bi+1].start):DAY;
+    if(bEnd<=bStart) return;
+    var cursor=bStart, i=0;
+    while(cursor<bEnd&&i<5000){
+      var item=block.items[i%block.items.length];
+      var dur=parseInt(item.dur)||0;
+      if(!item.archiveId||dur<=0){ i++; continue; }
+      var end=Math.min(cursor+dur,bEnd);
+      tl.push({title:item.t||item.archiveId,blockName:block.name,blockId:block.id,blockColor:block.color,startSec:cursor,endSec:end});
+      cursor=end; i++;
+    }
+  });
+  return tl;
+}
+
+function getNowPlayingIdx(){
+  if(!STATE.blocks.length) return -1;
+  var tl=buildTimeline();
+  var now=utcSecAdmin()%86400;
+  for(var i=0;i<tl.length;i++){
+    if(now>=tl[i].startSec&&now<tl[i].endSec) return i;
+  }
+  return -1;
+}
+
+function getNowPlayingBlock(tlIdx){
+  var tl=buildTimeline();
+  if(tlIdx<0||tlIdx>=tl.length) return null;
+  var slot=tl[tlIdx];
+  return STATE.blocks.find(function(b){ return b.id===slot.blockId; })||null;
+}
+
+function updateNowPlaying(){
+  if(!STATE.blocks.length) return;
+  var tl=buildTimeline();
+  var now=utcSecAdmin()%86400;
+  var idx=-1;
+  for(var i=0;i<tl.length;i++){
+    if(now>=tl[i].startSec&&now<tl[i].endSec){ idx=i; break; }
+  }
+
+  // Now bar
+  var npTitle=document.getElementById('np-title');
+  var npBlock=document.getElementById('np-block');
+  var npTime=document.getElementById('np-time');
+
+  if(idx===-1){
+    npTitle.textContent='—';
+    npBlock.textContent='';
+    npTime.textContent='';
+  } else {
+    var slot=tl[idx];
+    npTitle.textContent=slot.title;
+    npBlock.textContent=slot.blockName;
+    var remaining=Math.max(0,Math.round(slot.endSec-now));
+    npTime.textContent=Math.floor(remaining/60)+':'+(remaining%60<10?'0':'')+(remaining%60);
+  }
+
+  // Preview slots: now + next 3
+  var slotsEl=document.getElementById('preview-slots');
+  if(!slotsEl) return;
+  var start=Math.max(0,idx);
+  var html='';
+  for(var j=start;j<Math.min(start+4,tl.length);j++){
+    var s=tl[j];
+    var isActive=(j===idx);
+    var timeStr=secToTime(s.startSec).slice(0,8); // HH:MM:SS
+    html+='<div class="preview-slot'+(isActive?' active':'')+'">'
+      +'<div class="preview-slot-title">'+escH(s.title)+'</div>'
+      +'<div class="preview-slot-meta" style="color:'+(isActive?s.blockColor:'var(--dim)')+'">'+escH(s.blockName)+' · '+timeStr+'</div>'
+      +'</div>';
+  }
+  slotsEl.innerHTML=html||'<div style="font-family:var(--mono);font-size:9px;color:var(--dim)">No schedule loaded</div>';
 }
 
 // ─────────────────────────────────────────────────────────────
@@ -983,6 +1148,8 @@ function onGoogleToken(response){
 
     loadSchedule().then(function(){
       renderSidebar(); renderEditor(); startPolling();
+      setInterval(updateNowPlaying, 1000);
+      updateNowPlaying();
     });
   }).catch(function(e){
     var le=document.getElementById('lerr');
