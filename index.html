@@ -546,16 +546,12 @@ function startDriftCorrection(idx){
     const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
-    if(Math.abs(drift) > 2){
-      // More than 2s off — hard resync to Frame 1 of the correct second
-      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+    if(Math.abs(drift) > 0.05){
+      // Always hard-snap to Frame 1 of the UTC-correct second.
+      // No nudging — every client corrects to the identical target
+      // simultaneously, so they converge rather than drift independently.
+      console.log(`[sync] snap drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
-      player.playbackRate = 1.0;
-    } else if(Math.abs(drift) > 0.08){
-      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
-      player.playbackRate = drift > 0 ? 0.98 : 1.02;
-    } else {
-      // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
   }
