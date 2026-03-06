@@ -530,22 +530,27 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// driftInterval: handle for the continuous drift-correction loop
-let driftInterval = null;
+// Model: preload the file and seek to the correct position while
+// paused, then wait for a shared future UTC millisecond and fire
+// play() at that exact moment. All clients independently compute
+// the same target — no inter-client communication, no drift loops,
+// no playbackRate nudging. Just UTC arithmetic and a rAF spin-wait.
 
-// cancelSync: stops any in-flight rAF trigger and drift loop
+let rafHandle = null; // in-flight rAF loop handle
+
 function cancelSync(){
-  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
   player.playbackRate = 1.0;
 }
 
-// precisePlay: spins a rAF loop until Date.now() reaches targetUtcMs,
-// then fires play(). Far more accurate than setTimeout for sub-100ms timing.
-function precisePlay(seekTo, targetUtcMs, idx){
+// Spin rAF until trueUtcMs() reaches targetUtcMs, then play.
+// rAF is used instead of setTimeout for sub-16ms accuracy.
+function waitThenPlay(seekTo, targetUtcMs, idx){
   function loop(){
-    if(currentIdx !== idx) return; // slot changed — abort
-    if(Date.now() + clockOffset >= targetUtcMs){
-      player.currentTime = seekTo; // final position confirm
+    if(currentIdx !== idx){ rafHandle=null; return; } // slot changed — abort
+    if(trueUtcMs() >= targetUtcMs){
+      rafHandle = null;
+      player.currentTime = seekTo; // re-confirm position after preload
       player.play().catch(async e=>{
         const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
         if(confirmed && currentIdx===idx){
@@ -557,122 +562,84 @@ function precisePlay(seekTo, targetUtcMs, idx){
           doCut((idx+1)%TIMELINE.length);
         }
       });
-      startDriftCorrection(idx);
     } else {
-      requestAnimationFrame(loop);
+      rafHandle = requestAnimationFrame(loop);
     }
   }
-  requestAnimationFrame(loop);
-}
-
-// startDriftCorrection: every UTC second, compare player.currentTime
-// against where true UTC says we should be. Uses a proportional
-// controller — correction rate scales with drift magnitude, capped
-// at ±0.5% so audio pitch shift is imperceptible. Phase-locked to
-// the *.000 UTC second boundary so all clients check simultaneously.
-function startDriftCorrection(idx){
-  if(driftInterval){ clearInterval(driftInterval); }
-
-  function driftCheck(){
-    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
-    const slot = TIMELINE[idx];
-    if(!slot || player.paused || player.readyState < 2) return;
-
-    // targetFrame1: Frame 1 of the UTC-correct second — HH:MM:SS.000.
-    // Identical on every client on Earth via NTP-calibrated trueUtcMs().
-    const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos);
-    const drift        = player.currentTime - targetFrame1;
-
-    if(Math.abs(drift) > 2){
-      // Large drift (buffering stall, tab suspension etc) — hard snap
-      console.log(`[sync] hard snap drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
-      player.currentTime = targetFrame1;
-      player.playbackRate = 1.0;
-    } else if(Math.abs(drift) > 0.02){
-      // Proportional correction: rate scales with drift, capped at ±0.5%.
-      // Converges quickly for large drift, barely perceptible for small drift.
-      // At max rate (0.5%), 1s of drift corrects in ~3.3 minutes.
-      const correction = Math.min(Math.abs(drift) * 0.005, 0.005);
-      player.playbackRate = drift > 0 ? 1 - correction : 1 + correction;
-    } else {
-      // Within 20ms — locked, restore normal rate
-      player.playbackRate = 1.0;
-    }
-  }
-
-  // Phase-lock to the next *.000 UTC second boundary so all clients
-  // begin their correction cycles on the same frame simultaneously.
-  const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
-  setTimeout(()=>{
-    if(currentIdx !== idx) return;
-    driftCheck();
-    driftInterval = setInterval(driftCheck, 1000);
-  }, msUntilNextSecond);
+  rafHandle = requestAnimationFrame(loop);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
-async function playSlot(idx,seekLive){
-  if(idx<0||idx>=TIMELINE.length)return;
+async function playSlot(idx, seekLive){
+  if(idx<0||idx>=TIMELINE.length) return;
   cancelSync();
-  currentIdx=idx;
-  const slot=TIMELINE[idx];
-  const offset=seekLive?Math.max(0,utcSec()-slot.startSec):0;
+  currentIdx = idx;
+  const slot  = TIMELINE[idx];
   updateHUD();
-  let url=metaCache[slot.id]||null;
-  if(!url){
-    url=slot.url;
+
+  // Resolve the best available URL for this item
+  let url = metaCache[slot.id] || slot.url;
+  if(!metaCache[slot.id]){
     resolveUrl(slot.id).then(confirmed=>{
-      if(confirmed&&confirmed!==player.src&&currentIdx===idx){
-        const t=player.currentTime;
-        player.src=confirmed;player.load();
-        player.currentTime=t;player.play().catch(()=>{});
+      if(confirmed && confirmed!==player.src && currentIdx===idx){
+        const t = player.currentTime;
+        player.src=confirmed; player.load();
+        player.currentTime=t; player.play().catch(()=>{});
       }
     });
   }
-  if(player.src!==url){player.src=url;player.load()}
-  const doPlay=()=>{
-    if(offset>2){
-      const dur=player.duration;
-      // Floor to whole second — every whole UTC second is a frame boundary.
-      // All clients seek to the same integer position independent of seek latency.
-      const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
-      player.currentTime=seekTo;
+  if(player.src !== url){ player.src=url; player.load(); }
+
+  const doPlay = ()=>{
+    if(seekLive){
+      const now    = utcSec();
+      const dur    = player.duration;
+
+      // seekTo: Floor to the nearest whole UTC second — Frame 1.
+      // Identical on every client from the same true UTC reference.
+      const rawOffset = Math.max(0, now - slot.startSec);
+      const seekTo    = Math.floor(isFinite(dur) ? Math.min(rawOffset, dur-2) : rawOffset);
+
+      // targetUtcMs: a shared future UTC millisecond 3 seconds from now,
+      // rounded to a whole second so it lands on Frame 1.
+      // Every client computes the same value and fires play() together,
+      // regardless of how long their individual seek/decode took.
+      const targetUtcMs = (Math.floor(trueUtcMs() / 1000) + 3) * 1000;
+
+      // Preload: seek to correct position and hold paused while buffering.
+      // Also preload the next slot in the background.
+      player.currentTime = seekTo;
       player.pause();
 
-      // Target: top of the next whole UTC second.
-      // precisePlay() spins rAF until Date.now() hits this exact millisecond,
-      // so play() fires simultaneously on all clients regardless of seek time.
-      const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
-      precisePlay(seekTo, targetUtcMs, idx);
-      return;
+      const nextSlot = TIMELINE[(idx+1) % TIMELINE.length];
+      if(nextSlot && !metaCache[nextSlot.id]) resolveUrl(nextSlot.id);
+
+      waitThenPlay(seekTo, targetUtcMs, idx);
+    } else {
+      // Slot transition (doCut) — no seek, just preload next and play
+      // at the next whole UTC second so transitions stay on Frame 1.
+      const targetUtcMs = (Math.floor(trueUtcMs() / 1000) + 1) * 1000;
+      player.pause();
+      waitThenPlay(0, targetUtcMs, idx);
     }
-    player.play().catch(async e=>{
-      const confirmed=await resolveUrl(slot.id);
-      if(confirmed&&currentIdx===idx){
-        player.src=confirmed;player.load();
-        player.currentTime=offset>2?Math.floor(offset):0;
-        player.play().catch(()=>{});
-      }else if(!confirmed){
-        console.warn('Skipping unplayable slot:',slot.title);
-        doCut((idx+1)%TIMELINE.length);
-      }
-    });
-    if(seekLive) startDriftCorrection(idx);
   };
-  if(player.readyState>=1)doPlay();
-  else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
+
+  if(player.readyState >= 1) doPlay();
+  else player.addEventListener('loadedmetadata', function h(){
+    player.removeEventListener('loadedmetadata', h);
+    doPlay();
+  });
 }
 
 function doCut(nextIdx){
   cancelSync();
   flashEl.classList.add('on');
-  setTimeout(()=>flashEl.classList.remove('on'),55);
+  setTimeout(()=>flashEl.classList.remove('on'), 55);
   player.pause();
   showHUD();
-  playSlot(nextIdx,false);
-  const nn=TIMELINE[(nextIdx+1)%TIMELINE.length];
-  if(nn&&!metaCache[nn.id])resolveUrl(nn.id);
+  playSlot(nextIdx, false);
+  const nn = TIMELINE[(nextIdx+1) % TIMELINE.length];
+  if(nn && !metaCache[nn.id]) resolveUrl(nn.id);
 }
 
 // ── TICK ──────────────────────────────────────────────────────
