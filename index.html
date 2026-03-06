@@ -185,21 +185,6 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
   letter-spacing:.26em;color:var(--dim);text-align:center;
 }
 
-/* Schedule reload toast */
-#reload-toast{
-  position:fixed;top:80px;left:50%;transform:translateX(-50%);
-  z-index:400;
-  background:rgba(97,194,48,0.15);
-  border:1px solid rgba(97,194,48,0.4);
-  backdrop-filter:blur(8px);
-  color:var(--primary);
-  font-family:'IBM Plex Mono',monospace;font-size:9px;letter-spacing:.25em;
-  padding:8px 20px;
-  opacity:0;transition:opacity 0.3s;
-  pointer-events:none;
-}
-#reload-toast.show{opacity:1}
-
 #flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
 #flash.on{opacity:.35}
 </style>
@@ -243,7 +228,6 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
   </div>
 </div>
 
-<div id="reload-toast">⟳ SCHEDULE UPDATED</div>
 <div id="flash"></div>
 
 <div id="tunein" onclick="tuneIn()">
@@ -380,7 +364,6 @@ const volSlider   = document.getElementById('vol-slider');
 const volPct      = document.getElementById('vol-pct');
 const volIcon     = document.getElementById('vol-icon');
 const pubDateEl   = document.getElementById('pub-date');
-const toastEl     = document.getElementById('reload-toast');
 
 // ── STATE ────────────────────────────────────────────────────
 let currentIdx  = -1;
@@ -407,7 +390,6 @@ db.collection('broadcast').doc('schedule').onSnapshot(function(snap) {
   console.log('Schedule loaded from Firestore: ' + BLOCKS.length + ' blocks, ' + TIMELINE.length + ' slots.');
 
   if (!isFirstLoad && hasBooted) {
-    showToast('⟳ SCHEDULE UPDATED');
     var now = utcSec();
     var ni  = findSlot(now);
     doCut(ni);
@@ -420,13 +402,6 @@ db.collection('broadcast').doc('schedule').onSnapshot(function(snap) {
 
 // Initialize with fallback until Firestore responds
 TIMELINE = buildTimeline(FALLBACK_BLOCKS);
-
-// ── TOAST ─────────────────────────────────────────────────────
-function showToast(msg) {
-  toastEl.textContent = msg;
-  toastEl.classList.add('show');
-  setTimeout(() => toastEl.classList.remove('show'), 3000);
-}
 
 // ── HUD FADE ─────────────────────────────────────────────────
 const HUD_TIMEOUT = 15000;
