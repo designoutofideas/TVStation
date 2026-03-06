@@ -532,16 +532,39 @@ async function fetchPublishDate(id){
 // ── SYNC ENGINE ───────────────────────────────────────────────
 // Every client independently computes seekTo from true UTC.
 // Because UTC is universal, every client arrives at the same
-// integer second within the same file. The browser seeks to
-// that frame, confirms it is ready, then plays immediately.
-// No coordination, no countdown, no windows — the sync is
-// entirely in the UTC arithmetic.
+// integer second within the same file. A per-second frame-sync
+// loop then keeps every client locked to Frame 1 of the
+// UTC-correct second for the duration of playback.
 
-let rafHandle = null;
+const ONE_FRAME = 1 / 30; // ~33ms — minimum correctable drift unit
+
+let driftHandle = null;
 
 function cancelSync(){
-  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
+  if(driftHandle){ clearInterval(driftHandle); driftHandle=null; }
   player.playbackRate = 1.0;
+}
+
+// startFrameSync: checks drift every UTC second. If player.currentTime
+// has drifted more than one frame from the UTC-correct position, snaps
+// directly to Frame 1 of that second. Phase-locked to the next whole
+// UTC second so all clients run their checks at the same moment.
+function startFrameSync(idx){
+  if(driftHandle){ clearInterval(driftHandle); driftHandle=null; }
+  const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
+  setTimeout(()=>{
+    if(currentIdx !== idx) return;
+    driftHandle = setInterval(()=>{
+      if(currentIdx !== idx){ clearInterval(driftHandle); driftHandle=null; return; }
+      const slot = TIMELINE[idx];
+      if(!slot || player.paused || player.readyState < 2) return;
+      const targetFrame1 = Math.floor(Math.max(0, utcSec() - slot.startSec));
+      const drift        = player.currentTime - targetFrame1;
+      if(Math.abs(drift) > ONE_FRAME){
+        player.currentTime = targetFrame1;
+      }
+    }, 1000);
+  }, msUntilNextSecond);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -578,9 +601,6 @@ async function playSlot(idx, seekLive){
     const rawOffset = seekLive ? Math.max(0, now - slot.startSec) : 0;
     const seekTo    = Math.floor(isFinite(dur) ? Math.min(rawOffset, dur-2) : rawOffset);
 
-    // Seek to the correct frame and play immediately once ready.
-    // No waiting for other clients — UTC arithmetic guarantees
-    // every client is at the same frame independently.
     player.currentTime = seekTo;
     player.play().catch(async e=>{
       const confirmed = await resolveUrl(slot.id);
@@ -593,6 +613,9 @@ async function playSlot(idx, seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
+
+    // Start frame-sync drift compensation, phase-locked to UTC seconds
+    startFrameSync(idx);
   };
 
   if(player.readyState >= 1) doPlay();
