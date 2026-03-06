@@ -99,10 +99,10 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .il{font-family:var(--mono);font-size:8px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
 .ic{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 7px}
 
-/* grid: handle | air-time | title | archive-id | dur | del */
-.icols{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 28px;gap:5px;padding:3px 10px;margin-bottom:2px}
+/* grid: handle | air-time | title | archive-id | dur | fps | gop | del */
+.icols{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 52px 44px 28px;gap:5px;padding:3px 10px;margin-bottom:2px}
 .icolh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase}
-.irow{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 28px;gap:5px;align-items:center;padding:6px 10px;border:1px solid var(--b);margin-bottom:3px;background:var(--s2);transition:border-color .12s}
+.irow{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 52px 44px 28px;gap:5px;align-items:center;padding:6px 10px;border:1px solid var(--b);margin-bottom:3px;background:var(--s2);transition:border-color .12s}
 .irow:hover{border-color:var(--bh)}
 .irow.drag-over{border-color:var(--p);border-style:dashed}
 .ihandle{font-family:var(--mono);font-size:11px;color:var(--dim);text-align:center;cursor:grab;user-select:none}
@@ -422,7 +422,9 @@ function fromFirestore(doc){
             t:         (im.t         &&im.t.stringValue)          ||'',
             archiveId: (im.archiveId &&im.archiveId.stringValue)  ||'',
             dur:       parseInt(im.dur&&(im.dur.integerValue||im.dur.doubleValue))||0,
-            airTime:   (im.airTime   &&im.airTime.stringValue)    ||''
+            airTime:   (im.airTime   &&im.airTime.stringValue)    ||'',
+            frameRate: parseFloat(im.frameRate&&(im.frameRate.doubleValue||im.frameRate.integerValue))||0,
+            gopSize:   parseInt(im.gopSize&&(im.gopSize.integerValue||im.gopSize.doubleValue))||0
           };
         });
       }
@@ -456,7 +458,9 @@ function toFirestore(blocks, email){
               t:         {stringValue:it.t||''},
               archiveId: {stringValue:it.archiveId||''},
               dur:       {integerValue:String(parseInt(it.dur)||0)},
-              airTime:   {stringValue:it.airTime||''}
+              airTime:   {stringValue:it.airTime||''},
+              frameRate: {doubleValue:parseFloat(it.frameRate)||0},
+              gopSize:   {integerValue:String(parseInt(it.gopSize)||0)}
             }}};
           })}}
         }}};
@@ -593,6 +597,8 @@ function renderEditor(){
     '<div class="icolh">Title</div>',
     '<div class="icolh">Archive.org ID</div>',
     '<div class="icolh" style="text-align:center">Dur</div>',
+    '<div class="icolh" style="text-align:center">FPS</div>',
+    '<div class="icolh" style="text-align:center">GOP</div>',
     '<div></div>',
     '</div>'
   ];
@@ -617,6 +623,8 @@ function renderEditor(){
       '<input value="'+escA(item.t)+'" placeholder="Video title" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'t\',this.value)">',
       '<input value="'+escA(item.archiveId)+'" placeholder="youtube-AbCdEfGhIj" style="font-size:10px;color:var(--dim)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'archiveId\',this.value)">',
       '<div class="idur">'+fmtDur(item.dur)+'</div>',
+      '<input value="'+(item.frameRate||'')+'" placeholder="29.97" title="Frame rate (e.g. 29.97, 25, 24) — enables frame-sync" style="font-size:10px;text-align:center;color:var(--p)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'frameRate\',parseFloat(this.value)||0)">',
+      '<input value="'+(item.gopSize||'')+'" placeholder="30" title="GOP size in frames — usually matches fps (29.97→30, 25→25)" style="font-size:10px;text-align:center;color:var(--p)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'gopSize\',parseInt(this.value)||0)">',
       '<button class="idel" onclick="deleteItem(\''+block.id+'\',\''+item.id+'\')" title="Remove">✕</button>',
       '</div>'
     );
@@ -701,7 +709,7 @@ function renderAirTimes(blockId){
 function addBlankItem(blockId){
   STATE.blocks=STATE.blocks.map(function(b){
     if(b.id!==blockId) return b;
-    return Object.assign({},b,{items:b.items.concat([{id:uid(),t:'',archiveId:'',dur:0,airTime:''}])});
+    return Object.assign({},b,{items:b.items.concat([{id:uid(),t:'',archiveId:'',dur:0,airTime:'',frameRate:0,gopSize:0}])});
   });
   setDirty(true);
   renderEditor();
@@ -788,7 +796,7 @@ function addFromPaste(){
                ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
         if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
       }
-      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:String(title),archiveId:id,dur:dur,airTime:''});
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:String(title),archiveId:id,dur:dur,airTime:'',frameRate:0,gopSize:0});
       document.getElementById('paste-id').value='';
       document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div>';
       showToast('✓ Added: '+String(title).slice(0,50));
@@ -859,12 +867,12 @@ function addSearchResult(el){
                ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
         if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
       }
-      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:dur,airTime:''});
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:dur,airTime:'',frameRate:0,gopSize:0});
       el.textContent='✓ Added';
       showToast('✓ Added: '+String(title).slice(0,50));
     })
     .catch(function(){
-      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:0,airTime:''});
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:0,airTime:'',frameRate:0,gopSize:0});
       el.textContent='✓ Added';
       showToast('✓ Added (duration unknown)');
     });
