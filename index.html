@@ -531,81 +531,83 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// Three-layer frame sync:
+// Five-layer frame sync:
 //
-// 1. NTP-calibrated UTC — trueUtcMs() corrects each client's local
-//    clock against Archive.org's server time, so every client shares
-//    the same true UTC reference regardless of system clock accuracy.
-//
-// 2. Anticipatory seek compensation — each client measures its own
-//    seek-to-decoded latency on every file load and pre-compensates
-//    seekTo on the next load, so the browser arrives at the UTC-correct
-//    frame at the moment 'seeked' fires rather than behind it.
-//
-// 3. Ongoing drift correction — a ±0.5% playbackRate nudge checks
-//    every UTC second (phase-locked across all clients) and silently
-//    corrects any divergence without seeking or interrupting playback.
+// 1. NTP UTC      — trueUtcMs() corrects local clock via Archive.org
+// 2. UTC + Frame1 — seekTo = Math.floor(utcSec() - slot.startSec)
+// 3. Anticipatory — seekTo pre-advanced by this client's measured
+//                   seek latency so decode completes on time
+// 4. Shared start — all clients hold paused then fire play() at the
+//                   same absolute UTC millisecond (3s window)
+// 5. Drift lock   — ±3% aggressive until within one frame, then
+//                   ±0.5% maintenance, phase-locked to UTC seconds
 
-const ONE_FRAME      = 1/30;  // ~33ms minimum correctable drift
-let driftInterval    = null;
-let lastSeekLatencyMs = 0;    // self-measured seek latency from last file load
+const ONE_FRAME       = 1/30;   // ~33ms minimum correctable drift
+const PLAY_WINDOW_MS  = 3000;   // seconds ahead to schedule shared play()
+let driftInterval     = null;
+let rafHandle         = null;
+let lastSeekLatencyMs = 0;      // rolling average of this client's seek latency
 
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
   player.playbackRate = 1.0;
 }
 
-// seekThenPlay: measures this client's seek decode latency, pre-compensates
-// seekTo by the previously measured latency so the browser arrives at the
-// UTC-correct frame exactly when 'seeked' fires, then plays immediately.
-function seekThenPlay(rawSeekTo, idx){
-  const slot = TIMELINE[idx];
-  if(!slot) return;
-  const dur = player.duration;
+// waitThenPlay: spins rAF until trueUtcMs() hits targetUtcMs.
+// All clients computed the same targetUtcMs independently from UTC,
+// so play() fires simultaneously regardless of when each seeked.
+function waitThenPlay(seekTo, targetUtcMs, idx){
+  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
+  function loop(){
+    if(currentIdx !== idx){ rafHandle=null; return; }
+    if(trueUtcMs() >= targetUtcMs){
+      rafHandle = null;
+      player.currentTime = seekTo; // re-confirm after decode
+      player.play().catch(async e=>{
+        const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
+        if(confirmed && currentIdx===idx){
+          player.src=confirmed; player.load();
+          player.currentTime=seekTo;
+          player.play().catch(()=>{});
+        } else if(!confirmed){
+          console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
+          doCut((idx+1)%TIMELINE.length);
+        }
+      });
+      startDriftCorrection(idx);
+    } else {
+      rafHandle = requestAnimationFrame(loop);
+    }
+  }
+  rafHandle = requestAnimationFrame(loop);
+}
 
-  // Pre-compensate: add last measured latency so we arrive on time.
-  // Clamped to file duration. On first load lastSeekLatencyMs=0 (no penalty).
+// seekDecodeAndWait: seek to compensated position, measure decode
+// latency via 'seeked' event, then hand off to waitThenPlay.
+function seekDecodeAndWait(rawSeekTo, targetUtcMs, idx){
+  const dur = player.duration;
   const compensationSec = lastSeekLatencyMs / 1000;
   const seekTo = Math.min(
     Math.floor(rawSeekTo + compensationSec),
     isFinite(dur) ? dur - 2 : rawSeekTo
   );
-
   const seekStart = trueUtcMs();
-
   function onSeeked(){
     if(currentIdx !== idx) return;
-
-    // Measure actual latency — store for next file load pre-compensation.
-    // Rolling average with the previous measurement for stability.
     const measured = trueUtcMs() - seekStart;
     lastSeekLatencyMs = Math.round((lastSeekLatencyMs + measured) / 2);
-    console.log(`[sync] seekLatency=${measured}ms avg=${lastSeekLatencyMs}ms seekTo=${seekTo}s`);
-
-    player.play().catch(async e=>{
-      const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
-      if(confirmed && currentIdx===idx){
-        player.src=confirmed; player.load();
-        player.currentTime=seekTo;
-        player.addEventListener('seeked', onSeeked, {once:true});
-      } else if(!confirmed){
-        console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
-        doCut((idx+1)%TIMELINE.length);
-      }
-    });
-    startDriftCorrection(idx);
+    console.log(`[sync] seekLatency=${measured}ms avg=${lastSeekLatencyMs}ms seekTo=${seekTo}s target=${new Date(targetUtcMs).toISOString()}`);
+    waitThenPlay(seekTo, targetUtcMs, idx);
   }
-
   player.addEventListener('seeked', onSeeked, {once:true});
+  player.pause();
   player.currentTime = seekTo;
 }
 
-// Phase-locked drift correction: checks every UTC second.
-// Two-speed correction — aggressive ±3% to close the initial
-// tune-in gap fast (~5s for 1s drift), then drops to ±0.5%
-// maintenance once within one frame. No seeking, no interruption.
-// Phase-locked to the next whole UTC second so all clients
-// run their checks at the same moment simultaneously.
+// Two-speed drift correction phase-locked to UTC seconds.
+// ±3% aggressive until within one frame (~5s to close 1s gap),
+// then ±0.5% maintenance. All clients check simultaneously.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   let locked = false;
@@ -619,15 +621,12 @@ function startDriftCorrection(idx){
       const targetFrame1 = Math.floor(Math.max(0, utcSec() - slot.startSec));
       const drift        = player.currentTime - targetFrame1;
       if(Math.abs(drift) <= ONE_FRAME){
-        // Within one frame — locked, gentle maintenance rate
         locked = true;
         player.playbackRate = 1.0;
       } else if(!locked){
-        // Not yet locked — aggressive ±3% to close gap fast
-        player.playbackRate = drift > 0 ? 0.97 : 1.03;
+        player.playbackRate = drift > 0 ? 0.97 : 1.03; // aggressive initial lock
       } else {
-        // Was locked but drifted again — gentle ±0.5% to nudge back
-        player.playbackRate = drift > 0 ? 0.995 : 1.005;
+        player.playbackRate = drift > 0 ? 0.995 : 1.005; // gentle maintenance
       }
     }, 1000);
   }, msUntilNextSecond);
@@ -653,14 +652,19 @@ async function playSlot(idx,seekLive){
     });
   }
   if(player.src!==url){player.src=url;player.load()}
+
+  // Preload next slot in background
+  const nextSlot=TIMELINE[(idx+1)%TIMELINE.length];
+  if(nextSlot&&!metaCache[nextSlot.id])resolveUrl(nextSlot.id);
+
   const doPlay=()=>{
     if(offset>2){
-      // rawSeekTo: UTC-correct Frame 1 of the current second.
-      // seekThenPlay pre-compensates for this client's measured decode
-      // latency so it arrives at the correct frame when 'seeked' fires.
       const dur=player.duration;
       const rawSeekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
-      seekThenPlay(rawSeekTo, idx);
+      // Shared target: next whole UTC second at least PLAY_WINDOW_MS ahead.
+      // Every client computes the same value — play() fires simultaneously.
+      const targetUtcMs=(Math.floor((trueUtcMs()+PLAY_WINDOW_MS)/1000)+1)*1000;
+      seekDecodeAndWait(rawSeekTo, targetUtcMs, idx);
       return;
     }
     player.play().catch(async e=>{
