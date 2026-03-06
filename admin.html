@@ -93,6 +93,13 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .preview-slot-title{font-size:11px;font-weight:500;color:var(--off);margin-bottom:3px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .preview-slot-meta{font-family:var(--mono);font-size:9px;color:var(--dim)}
 
+/* PREVIEW TIMEBAR */
+.preview-timebar-wrap{padding:10px 14px 0;flex-shrink:0}
+.preview-timebar-labels{display:flex;justify-content:space-between;font-family:var(--mono);font-size:8px;color:var(--dim);margin-bottom:4px}
+.preview-timebar-labels span{letter-spacing:.08em}
+.preview-timebar-track{width:100%;height:3px;background:rgba(97,194,48,.1);position:relative}
+.preview-timebar-fill{height:100%;background:var(--p);box-shadow:0 0 6px rgba(97,194,48,.5);transition:width .9s linear;width:0%}
+
 /* SIDEBAR ELEMENTS */
 .sbsec{padding:16px 13px 8px}
 .sbh{font-family:var(--mono);font-size:8px;letter-spacing:.35em;color:var(--dim);text-transform:uppercase;margin-bottom:9px}
@@ -274,6 +281,17 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
           allow="autoplay; fullscreen"
           sandbox="allow-scripts allow-same-origin allow-popups">
         </iframe>
+      </div>
+      <!-- Timebar -->
+      <div class="preview-timebar-wrap">
+        <div class="preview-timebar-labels">
+          <span id="tb-elapsed">0:00</span>
+          <span id="tb-title" style="flex:1;text-align:center;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;padding:0 8px;color:var(--off)"></span>
+          <span id="tb-remaining">—</span>
+        </div>
+        <div class="preview-timebar-track">
+          <div class="preview-timebar-fill" id="tb-fill"></div>
+        </div>
       </div>
       <div class="preview-info">
         <div class="preview-info-lbl">Now &amp; Next</div>
@@ -884,9 +902,8 @@ function fetchSearchPage(replace){
         el.innerHTML='<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
           +'<div class="sresult-info">'
           +'<div class="sresult-title">'+safeTitle+'</div>'
-          +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')+'</div>'
+          +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')+(durStr?' · <span style="color:var(--p)">'+durStr+'</span>':'')+'</div>'
           +'</div>'
-          +(durStr?'<div class="sresult-dur">'+durStr+'</div>':'')
           +'<div class="sresult-add" onclick="addSearchResult(this)" data-id="'+safeId+'" data-title="'+safeTitle+'" data-dur="'+durSec+'">+ Add</div>';
         container.insertBefore(el, sentinel||null);
       });
@@ -1075,16 +1092,34 @@ function updateNowPlaying(){
   var npBlock=document.getElementById('np-block');
   var npTime=document.getElementById('np-time');
 
+  // Timebar elements
+  var tbFill=document.getElementById('tb-fill');
+  var tbElapsed=document.getElementById('tb-elapsed');
+  var tbRemaining=document.getElementById('tb-remaining');
+  var tbTitle=document.getElementById('tb-title');
+
   if(idx===-1){
     npTitle.textContent='—';
     npBlock.textContent='';
     npTime.textContent='';
+    if(tbFill){ tbFill.style.width='0%'; tbElapsed.textContent='0:00'; tbRemaining.textContent='—'; tbTitle.textContent=''; }
   } else {
     var slot=tl[idx];
+    var elapsed=Math.max(0,now-slot.startSec);
+    var total=Math.max(1,slot.endSec-slot.startSec);
+    var remaining=Math.max(0,Math.round(slot.endSec-now));
+    var pct=Math.min(100,(elapsed/total)*100);
+
     npTitle.textContent=slot.title;
     npBlock.textContent=slot.blockName;
-    var remaining=Math.max(0,Math.round(slot.endSec-now));
     npTime.textContent=Math.floor(remaining/60)+':'+(remaining%60<10?'0':'')+(remaining%60);
+
+    if(tbFill){
+      tbFill.style.width=pct.toFixed(1)+'%';
+      tbElapsed.textContent=Math.floor(elapsed/60)+':'+(Math.floor(elapsed)%60<10?'0':'')+Math.floor(elapsed)%60;
+      tbRemaining.textContent='-'+Math.floor(remaining/60)+':'+(remaining%60<10?'0':'')+remaining%60;
+      tbTitle.textContent=slot.title+' · '+fmtDur(Math.round(total));
+    }
   }
 
   // Preview slots: now + next 3
@@ -1095,10 +1130,10 @@ function updateNowPlaying(){
   for(var j=start;j<Math.min(start+4,tl.length);j++){
     var s=tl[j];
     var isActive=(j===idx);
-    var timeStr=secToTime(s.startSec).slice(0,8); // HH:MM:SS
+    var timeStr=secToTime(s.startSec).slice(0,8);
     html+='<div class="preview-slot'+(isActive?' active':'')+'">'
       +'<div class="preview-slot-title">'+escH(s.title)+'</div>'
-      +'<div class="preview-slot-meta" style="color:'+(isActive?s.blockColor:'var(--dim)')+'">'+escH(s.blockName)+' · '+timeStr+'</div>'
+      +'<div class="preview-slot-meta" style="color:'+(isActive?s.blockColor:'var(--dim)')+'\">'+escH(s.blockName)+' · '+timeStr+'</div>'
       +'</div>';
   }
   slotsEl.innerHTML=html||'<div style="font-family:var(--mono);font-size:9px;color:var(--dim)">No schedule loaded</div>';
