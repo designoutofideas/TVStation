@@ -530,96 +530,18 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// Model: preload the file and seek to the correct position while
-// paused, then wait for a shared future UTC millisecond and fire
-// play() at that exact moment. All clients independently compute
-// the same target — no inter-client communication, no drift loops,
-// no playbackRate nudging. Just UTC arithmetic and a rAF spin-wait.
-//
-// Additionally, a resync fires every 30 seconds on a shared UTC
-// boundary — silently re-seeking all clients to the correct frame
-// simultaneously, eliminating any accumulated error within one
-// 30-second window regardless of when each client tuned in.
+// Every client independently computes seekTo from true UTC.
+// Because UTC is universal, every client arrives at the same
+// integer second within the same file. The browser seeks to
+// that frame, confirms it is ready, then plays immediately.
+// No coordination, no countdown, no windows — the sync is
+// entirely in the UTC arithmetic.
 
-let rafHandle    = null; // in-flight rAF loop handle
-let resyncHandle = null; // periodic resync timer handle
-
-const RESYNC_INTERVAL_MS = 30000; // resync every 30 seconds
-const TUNE_WINDOW_MS     = 2000;  // shared play() boundary window
+let rafHandle = null;
 
 function cancelSync(){
   if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
-  if(resyncHandle){ clearTimeout(resyncHandle); resyncHandle=null; }
   player.playbackRate = 1.0;
-}
-
-// Spin rAF until trueUtcMs() reaches targetUtcMs, then play.
-// rAF is used instead of setTimeout for sub-16ms accuracy.
-function waitThenPlay(seekTo, targetUtcMs, idx){
-  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
-  function loop(){
-    if(currentIdx !== idx){ rafHandle=null; return; }
-    if(trueUtcMs() >= targetUtcMs){
-      rafHandle = null;
-      player.currentTime = seekTo;
-      player.play().catch(async e=>{
-        const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
-        if(confirmed && currentIdx===idx){
-          player.src=confirmed; player.load();
-          player.currentTime=seekTo;
-          player.play().catch(()=>{});
-        } else if(!confirmed){
-          console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
-          doCut((idx+1)%TIMELINE.length);
-        }
-      });
-    } else {
-      rafHandle = requestAnimationFrame(loop);
-    }
-  }
-  rafHandle = requestAnimationFrame(loop);
-}
-
-// doResync: silently re-seeks to the UTC-correct frame and fires
-// play() at the next shared TUNE_WINDOW_MS boundary. Identical
-// computation on every client — all machines snap to the same
-// frame at the same UTC millisecond simultaneously.
-function doResync(idx){
-  const slot = TIMELINE[idx];
-  if(!slot || !hasBooted || player.readyState < 2) return;
-
-  const now       = utcSec();
-  const dur       = player.duration;
-  const rawOffset = Math.max(0, now - slot.startSec);
-  const seekTo    = Math.floor(isFinite(dur) ? Math.min(rawOffset, dur-2) : rawOffset);
-  const targetUtcMs = (Math.floor(trueUtcMs() / TUNE_WINDOW_MS) + 1) * TUNE_WINDOW_MS;
-
-  console.log(`[resync] slot=${idx} seekTo=${seekTo}s target=${new Date(targetUtcMs).toISOString()}`);
-  player.pause();
-  player.currentTime = seekTo;
-  waitThenPlay(seekTo, targetUtcMs, idx);
-}
-
-// startResync: phase-locks the resync interval to the next
-// RESYNC_INTERVAL_MS UTC boundary so all clients fire simultaneously
-// e.g. at UTC :00 and :30 of every minute — not relative to tune-in.
-function startResync(idx){
-  if(resyncHandle){ clearTimeout(resyncHandle); resyncHandle=null; }
-  const msUntilBoundary = RESYNC_INTERVAL_MS - (trueUtcMs() % RESYNC_INTERVAL_MS);
-
-  function scheduleNext(){
-    resyncHandle = setTimeout(()=>{
-      if(currentIdx !== idx) return;
-      doResync(idx);
-      scheduleNext();
-    }, RESYNC_INTERVAL_MS);
-  }
-
-  resyncHandle = setTimeout(()=>{
-    if(currentIdx !== idx) return;
-    doResync(idx);
-    scheduleNext();
-  }, msUntilBoundary);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -627,10 +549,10 @@ async function playSlot(idx, seekLive){
   if(idx<0||idx>=TIMELINE.length) return;
   cancelSync();
   currentIdx = idx;
-  const slot  = TIMELINE[idx];
+  const slot = TIMELINE[idx];
   updateHUD();
 
-  // Resolve the best available URL for this item
+  // Resolve URL — use cache or fallback, confirm in background
   let url = metaCache[slot.id] || slot.url;
   if(!metaCache[slot.id]){
     resolveUrl(slot.id).then(confirmed=>{
@@ -643,42 +565,34 @@ async function playSlot(idx, seekLive){
   }
   if(player.src !== url){ player.src=url; player.load(); }
 
+  // Preload next slot in background
+  const nextSlot = TIMELINE[(idx+1) % TIMELINE.length];
+  if(nextSlot && !metaCache[nextSlot.id]) resolveUrl(nextSlot.id);
+
   const doPlay = ()=>{
-    if(seekLive){
-      const now    = utcSec();
-      const dur    = player.duration;
+    // seekTo: the UTC-correct whole second within this file.
+    // Math.floor ensures Frame 1 of that second — identical on
+    // every client on Earth reading the same true UTC clock.
+    const now       = utcSec();
+    const dur       = player.duration;
+    const rawOffset = seekLive ? Math.max(0, now - slot.startSec) : 0;
+    const seekTo    = Math.floor(isFinite(dur) ? Math.min(rawOffset, dur-2) : rawOffset);
 
-      // seekTo: Floor to the nearest whole UTC second — Frame 1.
-      // Identical on every client from the same true UTC reference.
-      const rawOffset = Math.max(0, now - slot.startSec);
-      const seekTo    = Math.floor(isFinite(dur) ? Math.min(rawOffset, dur-2) : rawOffset);
-
-      // targetUtcMs: the next shared TUNE_WINDOW_MS boundary.
-      // Every client clicking within the same window computes the
-      // identical value — playback starts together on Frame 1.
-      const targetUtcMs = (Math.floor(trueUtcMs() / TUNE_WINDOW_MS) + 1) * TUNE_WINDOW_MS;
-
-      // Preload: seek to correct position and hold paused while buffering.
-      // Also preload the next slot in the background.
-      player.currentTime = seekTo;
-      player.pause();
-
-      const nextSlot = TIMELINE[(idx+1) % TIMELINE.length];
-      if(nextSlot && !metaCache[nextSlot.id]) resolveUrl(nextSlot.id);
-
-      waitThenPlay(seekTo, targetUtcMs, idx);
-
-      // Start the 30-second resync cycle, phase-locked to UTC boundaries,
-      // so all clients snap back to the exact correct frame simultaneously.
-      startResync(idx);
-    } else {
-      // Slot transition (doCut) — play at next TUNE_WINDOW_MS boundary
-      // so transitions stay on Frame 1 across all clients.
-      const targetUtcMs = (Math.floor(trueUtcMs() / TUNE_WINDOW_MS) + 1) * TUNE_WINDOW_MS;
-      player.pause();
-      waitThenPlay(0, targetUtcMs, idx);
-      startResync(idx);
-    }
+    // Seek to the correct frame and play immediately once ready.
+    // No waiting for other clients — UTC arithmetic guarantees
+    // every client is at the same frame independently.
+    player.currentTime = seekTo;
+    player.play().catch(async e=>{
+      const confirmed = await resolveUrl(slot.id);
+      if(confirmed && currentIdx===idx){
+        player.src=confirmed; player.load();
+        player.currentTime=seekTo;
+        player.play().catch(()=>{});
+      } else if(!confirmed){
+        console.warn('Skipping unplayable slot:', slot.title);
+        doCut((idx+1)%TIMELINE.length);
+      }
+    });
   };
 
   if(player.readyState >= 1) doPlay();
