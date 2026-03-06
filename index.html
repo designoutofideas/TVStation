@@ -279,7 +279,7 @@ var db = firebase.firestore();
 // ─────────────────────────────────────────────────────────────
 const FALLBACK_BLOCKS = [
   {
-    name:"普通話 — Mandarin Chinese", genre:"Mandarin Chinese", start:"00:00",
+    name:"普通話 — Mandarin Chinese", genre:"Mandarin Chinese", start:"00:00:00.000",
     items:[
       {t:"Hong Kong's Face Readers Reshape the Future",        id:"youtube-MJVRwBrkzsg", dur:272},
       {t:"Hong Kong Protesters Disappointed With Talks",       id:"youtube-hlSlk-vcnRU", dur:203},
@@ -289,7 +289,7 @@ const FALLBACK_BLOCKS = [
     ]
   },
   {
-    name:"မြန်မာဘာသာ — Burmese", genre:"Burmese", start:"02:40",
+    name:"မြန်မာဘာသာ — Burmese", genre:"Burmese", start:"02:40:00.000",
     items:[
       {t:"Myanmar's Jasmine Garland Sellers Go Back to School",  id:"youtube-9Nma364RVCg", dur:183},
       {t:"Myanmar Insurance Industry Grows As Economy Opens",    id:"youtube-zbq6lEW9FNU", dur:214},
@@ -308,7 +308,14 @@ const DAY = 86400;
 let BLOCKS   = FALLBACK_BLOCKS;
 let TIMELINE = [];
 
-function toSec(hhmm){const[h,m]=hhmm.split(':').map(Number);return h*3600+m*60}
+function toSec(t){
+  if(!t) return 0;
+  // Supports HH:MM, HH:MM:SS, and HH:MM:SS.mmm
+  const [hhmm, ms='0'] = t.split('.');
+  const parts = hhmm.split(':').map(Number);
+  const h = parts[0]||0, m = parts[1]||0, s = parts[2]||0;
+  return h*3600 + m*60 + s + parseFloat('0.'+ms);
+}
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 function utcSec(){const d=new Date();return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000}
 
