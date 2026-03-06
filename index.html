@@ -18,7 +18,8 @@
 }
 html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Share Tech Mono',monospace;color:var(--offwhite)}
 
-#screen{position:fixed;inset:0;background:#000;overflow:hidden}
+#screen{position:fixed;inset:0;background:#000}
+#player{width:100%;height:100%;object-fit:contain;display:block}
 
 /* ── HUD ── */
 #hud{
@@ -206,8 +207,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 <body>
 
 <div id="screen">
-  <video id="playerA" playsinline preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block"></video>
-  <video id="playerB" playsinline preload="auto" style="position:absolute;inset:0;width:100%;height:100%;object-fit:contain;display:block;opacity:0"></video>
+  <video id="player" playsinline preload="auto"></video>
 </div>
 
 <div id="hud">
@@ -310,7 +310,6 @@ let TIMELINE = [];
 
 function toSec(t){
   if(!t) return 0;
-  // Supports HH:MM, HH:MM:SS, and HH:MM:SS.mmm
   const [hhmm, ms='0'] = t.split('.');
   const parts = hhmm.split(':').map(Number);
   const h = parts[0]||0, m = parts[1]||0, s = parts[2]||0;
@@ -318,36 +317,23 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// ── NTP-CALIBRATED UTC CLOCK ──────────────────────────────────
-// Each machine's system clock may be offset from true UTC by
-// ±50–500ms. We correct this by comparing local Date.now()
-// against the Date header of an Archive.org HEAD response —
-// a trusted NTP-synced server we're already talking to.
-// Every client then shares the same true UTC reference.
+// NTP-calibrated UTC clock — corrects local clock against Archive.org server time
 let clockOffset = 0;
-
 async function calibrateClockOffset(){
   try{
-    const t0 = Date.now();
-    const r  = await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
-    const t1 = Date.now();
-    const serverMs = new Date(r.headers.get('Date')).getTime();
-    if(!isNaN(serverMs)){
-      clockOffset = serverMs + Math.round((t1-t0)/2) - t1;
-      console.log(`[clock] offset=${clockOffset}ms`);
-    }
-  }catch(e){
-    console.warn('[clock] calibration failed, using local clock:',e.message);
-    clockOffset = 0;
-  }
+    const t0=Date.now();
+    const r=await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
+    const t1=Date.now();
+    const serverMs=new Date(r.headers.get('Date')).getTime();
+    if(!isNaN(serverMs)) clockOffset=serverMs+Math.round((t1-t0)/2)-t1;
+  }catch(e){ clockOffset=0; }
 }
 calibrateClockOffset();
-setInterval(calibrateClockOffset, 5*60*1000);
-
-function trueUtcMs(){ return Date.now() + clockOffset; }
+setInterval(calibrateClockOffset,5*60*1000);
+function trueUtcMs(){ return Date.now()+clockOffset; }
 function utcSec(){
-  const d = new Date(trueUtcMs());
-  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
+  const d=new Date(trueUtcMs());
+  return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000;
 }
 
 function buildTimeline(blocks){
@@ -379,8 +365,7 @@ function findSlot(sec){
 }
 
 // ── DOM ──────────────────────────────────────────────────────
-const playerA     = document.getElementById('playerA');
-const playerB     = document.getElementById('playerB');
+const player      = document.getElementById('player');
 const clockEl     = document.getElementById('clock');
 const dateEl      = document.getElementById('dateline');
 const nowTitleEl  = document.getElementById('now-title');
@@ -397,18 +382,12 @@ const volIcon     = document.getElementById('vol-icon');
 const pubDateEl   = document.getElementById('pub-date');
 const toastEl     = document.getElementById('reload-toast');
 
-// ── DOUBLE-BUFFER STATE ───────────────────────────────────────
-// active:  the player currently visible and playing
-// standby: the player preloading the next slot in background
-let active        = playerA;
-let standby       = playerB;
-let player        = active; // alias used by sync engine and HUD
-let currentIdx    = -1;
-let standbyIdx    = -1;     // which slot standby is preloaded for
-let tickInterval  = null;
-let metaCache     = {};
-let dateCache     = {};
-let hasBooted     = false;
+// ── STATE ────────────────────────────────────────────────────
+let currentIdx  = -1;
+let tickInterval = null;
+let metaCache   = {};
+let dateCache   = {};
+let hasBooted   = false;
 
 // ── FIRESTORE LIVE SCHEDULE ───────────────────────────────────
 db.collection('broadcast').doc('schedule').onSnapshot(function(snap) {
@@ -432,8 +411,6 @@ db.collection('broadcast').doc('schedule').onSnapshot(function(snap) {
     var now = utcSec();
     var ni  = findSlot(now);
     doCut(ni);
-  } else if(isFirstLoad) {
-    preResolve(); // begin buffering as soon as schedule arrives
   }
 }, function(err) {
   console.warn('Firestore error, using fallback schedule:', err.message);
@@ -481,7 +458,7 @@ function updateVolIcon(v){
 }
 volSlider.addEventListener('input',()=>{
   const v=parseInt(volSlider.value);
-  syncVolume(v/100);
+  player.volume=v/100;
   volPct.textContent=v+'%';
   updateVolIcon(v);
   volSlider.style.setProperty('--vol-pct',v+'%');
@@ -539,71 +516,23 @@ async function fetchPublishDate(id){
   return dateCache[id];
 }
 
-// ── PRE-RESOLUTION ────────────────────────────────────────────
-// Called as soon as the schedule is known — before Tune In.
-// Resolves and buffers the live slot into `active` and the next
-// slot into `standby` while the user is on the tune-in screen.
-// By the time they click, both files are decoded and ready.
-async function preResolve(){
-  if(TIMELINE.length === 0) return;
-  const now    = utcSec();
-  const idx    = findSlot(now);
-  const nxtIdx = (idx+1) % TIMELINE.length;
-  const slot   = TIMELINE[idx];
-  const next   = TIMELINE[nxtIdx];
-  const [urlA, urlB] = await Promise.all([resolveUrl(slot.id), resolveUrl(next.id)]);
-
-  // Active: seek to UTC-correct position, hold paused
-  const seekTo = Math.floor(Math.max(0, now - slot.startSec));
-  active.src   = urlA || slot.url;
-  active.load();
-  active.addEventListener('loadedmetadata', function h(){
-    active.removeEventListener('loadedmetadata',h);
-    const dur = active.duration;
-    active.currentTime = isFinite(dur) ? Math.min(seekTo, dur-2) : seekTo;
-    active.pause();
-    console.log(`[prebuf] active preloaded slot=${idx} seekTo=${seekTo}s`);
-  }, {once:true});
-
-  // Standby: load next slot from beginning, hold paused
-  standby.src = urlB || next.url;
-  standby.load();
-  standby.addEventListener('loadedmetadata', function h(){
-    standby.removeEventListener('loadedmetadata',h);
-    standby.currentTime = 0;
-    standby.pause();
-    standbyIdx = nxtIdx;
-    console.log(`[prebuf] standby preloaded slot=${nxtIdx}`);
-  }, {once:true});
-}
-
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// Five-layer frame sync:
-// 1. NTP UTC        — trueUtcMs() corrects local clock
-// 2. UTC + Frame 1  — seekTo = Math.floor(utcSec() - slot.startSec)
-// 3. Anticipatory   — seekTo pre-advanced by measured seek latency
-// 4. Shared start   — waitThenPlay holds paused until shared UTC ms
-// 5. Drift lock     — ±3% aggressive → ±0.5% maintenance
+// driftInterval: handle for the continuous drift-correction loop
+let driftInterval = null;
 
-const ONE_FRAME      = 1/30;
-const PLAY_WINDOW_MS = 3000;
-let driftInterval    = null;
-let rafHandle        = null;
-let lastSeekLatencyMs = 0;
-
+// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
-  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
   player.playbackRate = 1.0;
 }
 
-function waitThenPlay(seekTo, targetUtcMs, idx){
-  if(rafHandle){ cancelAnimationFrame(rafHandle); rafHandle=null; }
+// precisePlay: spins a rAF loop until Date.now() reaches targetUtcMs,
+// then fires play(). Far more accurate than setTimeout for sub-100ms timing.
+function precisePlay(seekTo, targetUtcMs, idx){
   function loop(){
-    if(currentIdx !== idx){ rafHandle=null; return; }
-    if(trueUtcMs() >= targetUtcMs){
-      rafHandle = null;
-      player.currentTime = seekTo;
+    if(currentIdx !== idx) return; // slot changed — abort
+    if(Date.now() >= targetUtcMs){
+      player.currentTime = seekTo; // final position confirm
       player.play().catch(async e=>{
         const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
         if(confirmed && currentIdx===idx){
@@ -617,133 +546,107 @@ function waitThenPlay(seekTo, targetUtcMs, idx){
       });
       startDriftCorrection(idx);
     } else {
-      rafHandle = requestAnimationFrame(loop);
+      requestAnimationFrame(loop);
     }
   }
-  rafHandle = requestAnimationFrame(loop);
+  requestAnimationFrame(loop);
 }
 
-function seekDecodeAndWait(rawSeekTo, targetUtcMs, idx){
-  const dur = player.duration;
-  const compensationSec = lastSeekLatencyMs / 1000;
-  const seekTo = Math.min(
-    Math.floor(rawSeekTo + compensationSec),
-    isFinite(dur) ? dur-2 : rawSeekTo
-  );
-  const seekStart = trueUtcMs();
-  function onSeeked(){
-    if(currentIdx !== idx) return;
-    const measured = trueUtcMs() - seekStart;
-    lastSeekLatencyMs = Math.round((lastSeekLatencyMs + measured) / 2);
-    console.log(`[sync] seekLatency=${measured}ms avg=${lastSeekLatencyMs}ms seekTo=${seekTo}s`);
-    waitThenPlay(seekTo, targetUtcMs, idx);
-  }
-  player.addEventListener('seeked', onSeeked, {once:true});
-  player.pause();
-  player.currentTime = seekTo;
-}
-
+// startDriftCorrection: every 2s, compare player.currentTime against
+// where UTC says we should be. Nudge playbackRate for small drift,
+// hard-seek for large drift.
 function startDriftCorrection(idx){
-  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
-  let locked = false;
-  const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
-  setTimeout(()=>{
-    if(currentIdx !== idx) return;
-    driftInterval = setInterval(()=>{
-      if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
-      const slot = TIMELINE[idx];
-      if(!slot || player.paused || player.readyState < 2) return;
-      const targetFrame1 = Math.floor(Math.max(0, utcSec() - slot.startSec));
-      const drift        = player.currentTime - targetFrame1;
-      if(Math.abs(drift) <= ONE_FRAME){
-        locked = true;
-        player.playbackRate = 1.0;
-      } else if(!locked){
-        player.playbackRate = drift > 0 ? 0.97 : 1.03;
-      } else {
-        player.playbackRate = drift > 0 ? 0.995 : 1.005;
-      }
-    }, 1000);
-  }, msUntilNextSecond);
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+    const slot = TIMELINE[idx];
+    if(!slot || player.paused || player.readyState < 2) return;
+
+    // targetFrame1: Frame 1 of the UTC-correct second.
+    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
+    // that is identical on every client on Earth. Snapping here means
+    // every drift correction lands all clients on the same frame.
+    const expectedPos  = utcSec() - slot.startSec;
+    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
+    const drift        = player.currentTime - targetFrame1;
+
+    if(Math.abs(drift) > 2){
+      // More than 2s off — hard resync to Frame 1 of the correct second
+      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+      player.currentTime = targetFrame1;
+      player.playbackRate = 1.0;
+    } else if(Math.abs(drift) > 0.08){
+      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
+      player.playbackRate = drift > 0 ? 0.98 : 1.02;
+    } else {
+      // Locked on Frame 1 — restore normal rate
+      player.playbackRate = 1.0;
+    }
+  }, 2000);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
-async function playSlot(idx, seekLive){
-  if(idx<0||idx>=TIMELINE.length) return;
+async function playSlot(idx,seekLive){
+  if(idx<0||idx>=TIMELINE.length)return;
   cancelSync();
-  currentIdx = idx;
-  player     = active;
-  const slot = TIMELINE[idx];
-  const offset = seekLive ? Math.max(0, utcSec()-slot.startSec) : 0;
+  currentIdx=idx;
+  const slot=TIMELINE[idx];
+  const offset=seekLive?Math.max(0,utcSec()-slot.startSec):0;
   updateHUD();
+  let url=metaCache[slot.id]||null;
+  if(!url){
+    url=slot.url;
+    resolveUrl(slot.id).then(confirmed=>{
+      if(confirmed&&confirmed!==player.src&&currentIdx===idx){
+        const t=player.currentTime;
+        player.src=confirmed;player.load();
+        player.currentTime=t;player.play().catch(()=>{});
+      }
+    });
+  }
+  if(player.src!==url){player.src=url;player.load()}
+  const doPlay=()=>{
+    if(offset>2){
+      const dur=player.duration;
+      // Floor to whole second — every whole UTC second is a frame boundary.
+      // All clients seek to the same integer position independent of seek latency.
+      const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
+      player.currentTime=seekTo;
+      player.pause();
 
-  const url = metaCache[slot.id] || slot.url;
-  if(player.src !== url){ player.src=url; player.load(); }
-
-  const doPlay = ()=>{
-    if(offset > 2){
-      const dur       = player.duration;
-      const rawSeekTo = Math.floor(isFinite(dur) ? Math.min(offset, dur-2) : offset);
-      const targetUtcMs = (Math.floor((trueUtcMs()+PLAY_WINDOW_MS)/1000)+1)*1000;
-      seekDecodeAndWait(rawSeekTo, targetUtcMs, idx);
-    } else {
-      player.play().catch(async e=>{
-        const confirmed = await resolveUrl(slot.id);
-        if(confirmed && currentIdx===idx){
-          player.src=confirmed; player.load();
-          player.currentTime=0;
-          player.play().catch(()=>{});
-        } else if(!confirmed){ doCut((idx+1)%TIMELINE.length); }
-      });
-      startDriftCorrection(idx);
+      // Target: top of the next whole UTC second.
+      // precisePlay() spins rAF until Date.now() hits this exact millisecond,
+      // so play() fires simultaneously on all clients regardless of seek time.
+      const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
+      precisePlay(seekTo, targetUtcMs, idx);
+      return;
     }
-    preloadStandby((idx+1)%TIMELINE.length);
+    player.play().catch(async e=>{
+      const confirmed=await resolveUrl(slot.id);
+      if(confirmed&&currentIdx===idx){
+        player.src=confirmed;player.load();
+        player.currentTime=offset>2?Math.floor(offset):0;
+        player.play().catch(()=>{});
+      }else if(!confirmed){
+        console.warn('Skipping unplayable slot:',slot.title);
+        doCut((idx+1)%TIMELINE.length);
+      }
+    });
+    if(seekLive) startDriftCorrection(idx);
   };
-
-  if(player.readyState>=1) doPlay();
-  else player.addEventListener('loadedmetadata', function h(){
-    player.removeEventListener('loadedmetadata',h); doPlay();
-  });
+  if(player.readyState>=1)doPlay();
+  else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
 }
 
-// preloadStandby: buffer the next slot into the standby player
-// while current slot plays — zero cold-load delay on doCut.
-async function preloadStandby(idx){
-  if(idx === standbyIdx) return;
-  const slot = TIMELINE[idx];
-  if(!slot) return;
-  standbyIdx = idx;
-  const url  = await resolveUrl(slot.id) || slot.url;
-  standby.src = url;
-  standby.load();
-  standby.addEventListener('loadedmetadata', function h(){
-    standby.removeEventListener('loadedmetadata',h);
-    standby.currentTime = 0;
-    standby.pause();
-    console.log(`[standby] ready slot=${idx} "${slot.title}"`);
-  }, {once:true});
-}
-
-// doCut: swap active↔standby. Incoming player is already buffered —
-// sync its UTC position and play. Zero cold-load delay.
 function doCut(nextIdx){
   cancelSync();
   flashEl.classList.add('on');
   setTimeout(()=>flashEl.classList.remove('on'),55);
-
-  const incoming = standby;
-  const outgoing = active;
-  active  = incoming;
-  standby = outgoing;
-  player  = active;
-
-  outgoing.pause();
-  outgoing.style.opacity = '0';
-  incoming.style.opacity = '1';
-
-  attachVideoEvents();
+  player.pause();
   showHUD();
-  playSlot(nextIdx, true);
+  playSlot(nextIdx,false);
+  const nn=TIMELINE[(nextIdx+1)%TIMELINE.length];
+  if(nn&&!metaCache[nn.id])resolveUrl(nn.id);
 }
 
 // ── TICK ──────────────────────────────────────────────────────
@@ -784,36 +687,28 @@ function updateHUD(){
 }
 
 // ── VIDEO EVENTS ──────────────────────────────────────────────
-function attachVideoEvents(){
-  [playerA, playerB].forEach(p=>{ p.onended=null; p.onerror=null; });
-  active.onended = ()=>{
-    const now=utcSec();
-    const ni=findSlot(now)===currentIdx?(currentIdx+1)%TIMELINE.length:findSlot(now);
-    doCut(ni);
-  };
-  active.onerror = ()=>{
-    console.warn('player error — skipping');
-    setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
-  };
-}
-attachVideoEvents();
-
-// ── VOLUME ────────────────────────────────────────────────────
-function syncVolume(v){ playerA.volume=v; playerB.volume=v; }
+player.addEventListener('ended',()=>{
+  const now=utcSec();
+  const ni=findSlot(now)===currentIdx?(currentIdx+1)%TIMELINE.length:findSlot(now);
+  doCut(ni);
+});
+player.addEventListener('error',()=>{
+  console.warn('player error — skipping');
+  setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
+});
 
 // ── TUNE IN ───────────────────────────────────────────────────
 window.tuneIn = function(){
   tuneinEl.style.display='none';
-  hasBooted = true;
-  active.style.opacity = '1';
-  player = active;
-  const idx = findSlot(utcSec());
-  playSlot(idx, true);
-  if(tickInterval) clearInterval(tickInterval);
-  tickInterval = setInterval(tick, 500);
+  hasBooted=true;
+  const now=utcSec();
+  const idx=findSlot(now);
+  playSlot(idx,true);
+  const next=TIMELINE[(idx+1)%TIMELINE.length];
+  if(next&&!metaCache[next.id])resolveUrl(next.id);
+  if(tickInterval)clearInterval(tickInterval);
+  tickInterval=setInterval(tick,500);
 };
-
-
 </script>
 </body>
 </html>
