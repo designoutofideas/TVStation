@@ -565,9 +565,11 @@ function precisePlay(seekTo, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: every 2s, compare player.currentTime against
-// where UTC says we should be. Nudge playbackRate for small drift,
-// hard-seek for large drift.
+// startDriftCorrection: every UTC second, compare player.currentTime
+// against where true UTC says we should be. Uses a proportional
+// controller — correction rate scales with drift magnitude, capped
+// at ±0.5% so audio pitch shift is imperceptible. Phase-locked to
+// the *.000 UTC second boundary so all clients check simultaneously.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
 
@@ -577,30 +579,30 @@ function startDriftCorrection(idx){
     if(!slot || player.paused || player.readyState < 2) return;
 
     // targetFrame1: Frame 1 of the UTC-correct second — HH:MM:SS.000.
-    // Identical on every client on Earth. Every correction lands all
-    // clients on the same frame.
+    // Identical on every client on Earth via NTP-calibrated trueUtcMs().
     const expectedPos  = utcSec() - slot.startSec;
     const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
     if(Math.abs(drift) > 2){
-      // Large drift — hard snap to Frame 1 of the UTC-correct second
+      // Large drift (buffering stall, tab suspension etc) — hard snap
       console.log(`[sync] hard snap drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
-    } else if(Math.abs(drift) > 0.05){
-      // Small drift — nudge ±0.2% to glide silently back to Frame 1.
-      // All clients converge to the same target without jarring jumps.
-      player.playbackRate = drift > 0 ? 0.983 : 1.017;
+    } else if(Math.abs(drift) > 0.02){
+      // Proportional correction: rate scales with drift, capped at ±0.5%.
+      // Converges quickly for large drift, barely perceptible for small drift.
+      // At max rate (0.5%), 1s of drift corrects in ~3.3 minutes.
+      const correction = Math.min(Math.abs(drift) * 0.005, 0.005);
+      player.playbackRate = drift > 0 ? 1 - correction : 1 + correction;
     } else {
-      // Within 50ms — locked on Frame 1, restore normal rate
+      // Within 20ms — locked, restore normal rate
       player.playbackRate = 1.0;
     }
   }
 
-  // Phase-lock interval start to the next *.000 UTC second boundary.
-  // All clients begin their drift checks on the same Frame 1, so the
-  // 2-second recompute cycle is synchronized across every machine.
+  // Phase-lock to the next *.000 UTC second boundary so all clients
+  // begin their correction cycles on the same frame simultaneously.
   const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
   setTimeout(()=>{
     if(currentIdx !== idx) return;
