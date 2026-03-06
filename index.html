@@ -601,11 +601,14 @@ function seekThenPlay(rawSeekTo, idx){
 }
 
 // Phase-locked drift correction: checks every UTC second.
-// ±0.5% playbackRate nudge — invisible to viewer, no seeking.
+// Two-speed correction — aggressive ±3% to close the initial
+// tune-in gap fast (~5s for 1s drift), then drops to ±0.5%
+// maintenance once within one frame. No seeking, no interruption.
 // Phase-locked to the next whole UTC second so all clients
 // run their checks at the same moment simultaneously.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  let locked = false;
   const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
   setTimeout(()=>{
     if(currentIdx !== idx) return;
@@ -615,9 +618,17 @@ function startDriftCorrection(idx){
       if(!slot || player.paused || player.readyState < 2) return;
       const targetFrame1 = Math.floor(Math.max(0, utcSec() - slot.startSec));
       const drift        = player.currentTime - targetFrame1;
-      if      (drift >  ONE_FRAME) player.playbackRate = 0.995;
-      else if (drift < -ONE_FRAME) player.playbackRate = 1.005;
-      else                         player.playbackRate = 1.0;
+      if(Math.abs(drift) <= ONE_FRAME){
+        // Within one frame — locked, gentle maintenance rate
+        locked = true;
+        player.playbackRate = 1.0;
+      } else if(!locked){
+        // Not yet locked — aggressive ±3% to close gap fast
+        player.playbackRate = drift > 0 ? 0.97 : 1.03;
+      } else {
+        // Was locked but drifted again — gentle ±0.5% to nudge back
+        player.playbackRate = drift > 0 ? 0.995 : 1.005;
+      }
     }, 1000);
   }, msUntilNextSecond);
 }
