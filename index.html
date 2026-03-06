@@ -545,10 +545,10 @@ function cancelSync(){
   player.playbackRate = 1.0;
 }
 
-// startFrameSync: checks drift every UTC second. If player.currentTime
-// has drifted more than one frame from the UTC-correct position, snaps
-// directly to Frame 1 of that second. Phase-locked to the next whole
-// UTC second so all clients run their checks at the same moment.
+// startFrameSync: every UTC second, measure drift between
+// player.currentTime and the UTC-correct frame. Correct with
+// a ±0.5% playbackRate nudge — invisible to the viewer, no
+// seeking, no interruption to the decode pipeline.
 function startFrameSync(idx){
   if(driftHandle){ clearInterval(driftHandle); driftHandle=null; }
   const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
@@ -560,9 +560,9 @@ function startFrameSync(idx){
       if(!slot || player.paused || player.readyState < 2) return;
       const targetFrame1 = Math.floor(Math.max(0, utcSec() - slot.startSec));
       const drift        = player.currentTime - targetFrame1;
-      if(Math.abs(drift) > ONE_FRAME){
-        player.currentTime = targetFrame1;
-      }
+      if      (drift >  ONE_FRAME) player.playbackRate = 0.995; // ahead — slow down
+      else if (drift < -ONE_FRAME) player.playbackRate = 1.005; // behind — speed up
+      else                         player.playbackRate = 1.0;   // locked
     }, 1000);
   }, msUntilNextSecond);
 }
