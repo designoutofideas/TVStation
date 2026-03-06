@@ -533,14 +533,10 @@ async function fetchPublishDate(id){
 // ── SYNC ENGINE ───────────────────────────────────────────────
 // On tune-in: seekTo computed from trueUtcMs() — NTP-calibrated
 // true UTC, identical on every client. Math.floor lands on Frame 1
-// of that second. precisePlay() spins rAF until trueUtcMs() hits
-// the next whole UTC second, firing play() simultaneously on all
-// clients regardless of individual seek latency.
-//
-// During playback: startDriftCorrection() checks every UTC second,
-// phase-locked to the same boundary on all clients. A ±0.5%
-// playbackRate nudge corrects drift silently — no seeking, no
-// interruption to the decode pipeline.
+// of that second. seekThenPlay() sets currentTime and waits for the
+// 'seeked' event — the browser confirming it has decoded to the exact
+// keyframe — then calls play(). Same file + same seekTo = same keyframe
+// on every client, so playback starts from the identical frame.
 
 const ONE_FRAME   = 1/30; // ~33ms — minimum correctable drift unit
 let driftInterval = null;
@@ -550,29 +546,30 @@ function cancelSync(){
   player.playbackRate = 1.0;
 }
 
-// Spin rAF until trueUtcMs() hits targetUtcMs, then play.
-function precisePlay(seekTo, targetUtcMs, idx){
-  function loop(){
+// seekThenPlay: defined below in sync engine
+// seekThenPlay: sets currentTime, waits for the 'seeked' event
+// confirming the browser has decoded to the exact keyframe, then
+// plays immediately. Because all clients seek to the same UTC-derived
+// integer second in the same file, they all land on the same keyframe
+// and play from the identical position — without any coordination.
+function seekThenPlay(seekTo, idx){
+  function onSeeked(){
     if(currentIdx !== idx) return;
-    if(trueUtcMs() >= targetUtcMs){
-      player.currentTime = seekTo;
-      player.play().catch(async e=>{
-        const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
-        if(confirmed && currentIdx===idx){
-          player.src=confirmed; player.load();
-          player.currentTime=seekTo;
-          player.play().catch(()=>{});
-        } else if(!confirmed){
-          console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
-          doCut((idx+1)%TIMELINE.length);
-        }
-      });
-      startDriftCorrection(idx);
-    } else {
-      requestAnimationFrame(loop);
-    }
+    player.play().catch(async e=>{
+      const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
+      if(confirmed && currentIdx===idx){
+        player.src=confirmed; player.load();
+        player.currentTime=seekTo;
+        player.addEventListener('seeked', onSeeked, {once:true});
+      } else if(!confirmed){
+        console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
+        doCut((idx+1)%TIMELINE.length);
+      }
+    });
+    startDriftCorrection(idx);
   }
-  requestAnimationFrame(loop);
+  player.addEventListener('seeked', onSeeked, {once:true});
+  player.currentTime = seekTo;
 }
 
 // Phase-locked drift correction: checks every UTC second.
@@ -619,17 +616,12 @@ async function playSlot(idx,seekLive){
   const doPlay=()=>{
     if(offset>2){
       const dur=player.duration;
-      // Floor to whole second — every whole UTC second is a frame boundary.
-      // All clients seek to the same integer position independent of seek latency.
+      // seekTo: UTC-correct whole second = Frame 1 of that second.
+      // Identical on every client. Browser snaps to the nearest keyframe
+      // before this position — same keyframe on every client since it's
+      // the same file. 'seeked' fires when decode is complete, then play().
       const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
-      player.currentTime=seekTo;
-      player.pause();
-
-      // Target: top of the next whole UTC second.
-      // precisePlay() spins rAF until Date.now() hits this exact millisecond,
-      // so play() fires simultaneously on all clients regardless of seek time.
-      const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
-      precisePlay(seekTo, targetUtcMs, idx);
+      seekThenPlay(seekTo, idx);
       return;
     }
     player.play().catch(async e=>{
