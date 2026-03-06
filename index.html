@@ -492,9 +492,75 @@ async function fetchPublishDate(id){
   return dateCache[id];
 }
 
+// ── SYNC ENGINE ───────────────────────────────────────────────
+// driftInterval: handle for the continuous drift-correction loop
+let driftInterval = null;
+
+// cancelSync: stops any in-flight rAF trigger and drift loop
+function cancelSync(){
+  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  player.playbackRate = 1.0;
+}
+
+// precisePlay: spins a rAF loop until Date.now() reaches targetUtcMs,
+// then fires play(). Far more accurate than setTimeout for sub-100ms timing.
+function precisePlay(seekTo, targetUtcMs, idx){
+  function loop(){
+    if(currentIdx !== idx) return; // slot changed — abort
+    if(Date.now() >= targetUtcMs){
+      player.currentTime = seekTo; // final position confirm
+      player.play().catch(async e=>{
+        const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
+        if(confirmed && currentIdx===idx){
+          player.src=confirmed; player.load();
+          player.currentTime=seekTo;
+          player.play().catch(()=>{});
+        } else if(!confirmed){
+          console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
+          doCut((idx+1)%TIMELINE.length);
+        }
+      });
+      startDriftCorrection(idx);
+    } else {
+      requestAnimationFrame(loop);
+    }
+  }
+  requestAnimationFrame(loop);
+}
+
+// startDriftCorrection: every 2s, compare player.currentTime against
+// where UTC says we should be. Nudge playbackRate for small drift,
+// hard-seek for large drift.
+function startDriftCorrection(idx){
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+    const slot = TIMELINE[idx];
+    if(!slot || player.paused || player.readyState < 2) return;
+
+    const expectedPos = utcSec() - slot.startSec;
+    const drift = player.currentTime - expectedPos; // +ve = ahead, -ve = behind
+
+    if(Math.abs(drift) > 2){
+      // More than 2s off — hard resync to a whole-second boundary
+      const corrected = Math.floor(Math.max(0, expectedPos));
+      console.log(`[sync] hard resync drift=${drift.toFixed(2)}s → ${corrected}s`);
+      player.currentTime = corrected;
+      player.playbackRate = 1.0;
+    } else if(Math.abs(drift) > 0.08){
+      // 80ms–2s drift — silently nudge rate to drift back into phase
+      player.playbackRate = drift > 0 ? 0.98 : 1.02;
+    } else {
+      // Locked — restore normal rate
+      player.playbackRate = 1.0;
+    }
+  }, 2000);
+}
+
 // ── PLAYBACK ──────────────────────────────────────────────────
 async function playSlot(idx,seekLive){
   if(idx<0||idx>=TIMELINE.length)return;
+  cancelSync();
   currentIdx=idx;
   const slot=TIMELINE[idx];
   const offset=seekLive?Math.max(0,utcSec()-slot.startSec):0;
@@ -515,29 +581,17 @@ async function playSlot(idx,seekLive){
     if(offset>2){
       const dur=player.duration;
       // Floor to whole second — every whole UTC second is a frame boundary.
+      // All clients seek to the same integer position independent of seek latency.
       const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
       player.currentTime=seekTo;
-      player.pause(); // hold while the browser decodes to the keyframe
+      player.pause();
 
-      // Schedule play() at the top of the next whole UTC second.
-      // Every client independently computes the same target millisecond,
-      // so play() fires simultaneously regardless of individual seek latency.
-      const msUntilNextSecond = 1000 - (Date.now() % 1000);
-      setTimeout(()=>{
-        player.currentTime=seekTo; // re-confirm position after seek has settled
-        player.play().catch(async e=>{
-          const confirmed=await resolveUrl(slot.id);
-          if(confirmed&&currentIdx===idx){
-            player.src=confirmed;player.load();
-            player.currentTime=seekTo;
-            player.play().catch(()=>{});
-          }else if(!confirmed){
-            console.warn('Skipping unplayable slot:',slot.title);
-            doCut((idx+1)%TIMELINE.length);
-          }
-        });
-      }, msUntilNextSecond);
-      return; // play() is called inside setTimeout above
+      // Target: top of the next whole UTC second.
+      // precisePlay() spins rAF until Date.now() hits this exact millisecond,
+      // so play() fires simultaneously on all clients regardless of seek time.
+      const targetUtcMs = Math.ceil(Date.now() / 1000) * 1000;
+      precisePlay(seekTo, targetUtcMs, idx);
+      return;
     }
     player.play().catch(async e=>{
       const confirmed=await resolveUrl(slot.id);
@@ -550,12 +604,14 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
+    if(seekLive) startDriftCorrection(idx);
   };
   if(player.readyState>=1)doPlay();
   else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
 }
 
 function doCut(nextIdx){
+  cancelSync();
   flashEl.classList.add('on');
   setTimeout(()=>flashEl.classList.remove('on'),55);
   player.pause();
