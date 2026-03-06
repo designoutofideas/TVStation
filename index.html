@@ -538,20 +538,24 @@ function startDriftCorrection(idx){
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
-    const expectedPos = utcSec() - slot.startSec;
-    const drift = player.currentTime - expectedPos; // +ve = ahead, -ve = behind
+    // targetFrame1: Frame 1 of the UTC-correct second.
+    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
+    // that is identical on every client on Earth. Snapping here means
+    // every drift correction lands all clients on the same frame.
+    const expectedPos  = utcSec() - slot.startSec;
+    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
+    const drift        = player.currentTime - targetFrame1;
 
     if(Math.abs(drift) > 2){
-      // More than 2s off — hard resync to a whole-second boundary
-      const corrected = Math.floor(Math.max(0, expectedPos));
-      console.log(`[sync] hard resync drift=${drift.toFixed(2)}s → ${corrected}s`);
-      player.currentTime = corrected;
+      // More than 2s off — hard resync to Frame 1 of the correct second
+      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+      player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
     } else if(Math.abs(drift) > 0.08){
-      // 80ms–2s drift — silently nudge rate to drift back into phase
+      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
-      // Locked — restore normal rate
+      // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
   }, 2000);
