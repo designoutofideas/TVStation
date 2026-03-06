@@ -327,7 +327,7 @@ function buildTimeline(blocks){
       const dur=parseInt(item.dur)||0;
       if(!archiveId||dur<=0){i++;continue;}
       const end=Math.min(cursor+dur,bEnd);
-      tl.push({title:item.t||archiveId,id:archiveId,url:archiveUrl(archiveId),blockName:block.name,genre:block.genre,startSec:cursor,endSec:end});
+      tl.push({title:item.t||archiveId,id:archiveId,url:archiveUrl(archiveId),blockName:block.name,genre:block.genre,startSec:cursor,endSec:end,frameRate:parseFloat(item.frameRate)||0,gopSize:parseInt(item.gopSize)||0});
       cursor=end;i++;
     }
   });
@@ -514,8 +514,39 @@ async function playSlot(idx,seekLive){
   const doPlay=()=>{
     if(offset>2){
       const dur=player.duration;
-      const t=isFinite(dur)?Math.min(offset,dur-2):offset;
-      if(t>0)player.currentTime=t;
+      const seekRawS=isFinite(dur)?Math.min(offset,dur-2):offset;
+
+      // ── FRAME-BOUNDARY SYNC (opt-in) ─────────────────────────────
+      // Set FRAME_SYNC_ENABLED=true to activate sub-second GOP-boundary
+      // synchronization. Requires frameRate + gopSize on schedule items.
+      // Leave false for standard operation and broad browser compatibility.
+      const FRAME_SYNC_ENABLED = false;
+
+      const frameRate = slot.frameRate || 0;
+      const gopSize   = slot.gopSize   || 0;
+
+      if(FRAME_SYNC_ENABLED && frameRate>0 && gopSize>0 && seekRawS>2){
+        const gopDuration   = gopSize / frameRate;
+        const gopIndex      = Math.floor(seekRawS / gopDuration);
+        const nextGopStartS = (gopIndex + 1) * gopDuration;
+        const waitMs        = Math.max(0, (nextGopStartS - seekRawS) * 1000);
+        player.currentTime  = seekRawS;
+        // Hold at seekRawS, then snap to Frame 1 of the next GOP and play.
+        // setTimeout is used (not requestVideoFrameCallback) because a paused
+        // video cannot advance mediaTime — rVFC would deadlock.
+        setTimeout(()=>{
+          player.currentTime = nextGopStartS;
+          player.play().catch(async e=>{
+            const confirmed=await resolveUrl(slot.id);
+            if(confirmed&&currentIdx===idx){ player.src=confirmed; player.load(); player.currentTime=nextGopStartS; player.play().catch(()=>{}); }
+            else if(!confirmed){ console.warn('Skipping unplayable slot:',slot.title); doCut((idx+1)%TIMELINE.length); }
+          });
+        }, waitMs);
+        return; // play() is called inside setTimeout above
+      }
+
+      // ── STANDARD SEEK ────────────────────────────────────────────
+      if(seekRawS>0) player.currentTime=seekRawS;
     }
     player.play().catch(async e=>{
       const confirmed=await resolveUrl(slot.id);
