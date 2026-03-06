@@ -317,7 +317,38 @@ function toSec(t){
   return h*3600 + m*60 + s + parseFloat('0.'+ms);
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
-function utcSec(){const d=new Date();return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000}
+
+// ── NTP-CALIBRATED UTC CLOCK ──────────────────────────────────
+// Each machine's system clock may be offset from true UTC by
+// ±50–500ms. We correct this by comparing local Date.now()
+// against the Date header of an Archive.org HEAD response —
+// a trusted NTP-synced server we're already talking to.
+// Every client then shares the same true UTC reference.
+let clockOffset = 0;
+
+async function calibrateClockOffset(){
+  try{
+    const t0 = Date.now();
+    const r  = await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
+    const t1 = Date.now();
+    const serverMs = new Date(r.headers.get('Date')).getTime();
+    if(!isNaN(serverMs)){
+      clockOffset = serverMs + Math.round((t1-t0)/2) - t1;
+      console.log(`[clock] offset=${clockOffset}ms`);
+    }
+  }catch(e){
+    console.warn('[clock] calibration failed, using local clock:',e.message);
+    clockOffset = 0;
+  }
+}
+calibrateClockOffset();
+setInterval(calibrateClockOffset, 5*60*1000);
+
+function trueUtcMs(){ return Date.now() + clockOffset; }
+function utcSec(){
+  const d = new Date(trueUtcMs());
+  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
+}
 
 function buildTimeline(blocks){
   const sorted=blocks.slice().sort((a,b)=>toSec(a.start)-toSec(b.start));
@@ -500,22 +531,31 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// driftInterval: handle for the continuous drift-correction loop
+// On tune-in: seekTo computed from trueUtcMs() — NTP-calibrated
+// true UTC, identical on every client. Math.floor lands on Frame 1
+// of that second. precisePlay() spins rAF until trueUtcMs() hits
+// the next whole UTC second, firing play() simultaneously on all
+// clients regardless of individual seek latency.
+//
+// During playback: startDriftCorrection() checks every UTC second,
+// phase-locked to the same boundary on all clients. A ±0.5%
+// playbackRate nudge corrects drift silently — no seeking, no
+// interruption to the decode pipeline.
+
+const ONE_FRAME   = 1/30; // ~33ms — minimum correctable drift unit
 let driftInterval = null;
 
-// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
 }
 
-// precisePlay: spins a rAF loop until Date.now() reaches targetUtcMs,
-// then fires play(). Far more accurate than setTimeout for sub-100ms timing.
+// Spin rAF until trueUtcMs() hits targetUtcMs, then play.
 function precisePlay(seekTo, targetUtcMs, idx){
   function loop(){
-    if(currentIdx !== idx) return; // slot changed — abort
-    if(Date.now() >= targetUtcMs){
-      player.currentTime = seekTo; // final position confirm
+    if(currentIdx !== idx) return;
+    if(trueUtcMs() >= targetUtcMs){
+      player.currentTime = seekTo;
       player.play().catch(async e=>{
         const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
         if(confirmed && currentIdx===idx){
@@ -535,37 +575,25 @@ function precisePlay(seekTo, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: every 2s, compare player.currentTime against
-// where UTC says we should be. Nudge playbackRate for small drift,
-// hard-seek for large drift.
+// Phase-locked drift correction: checks every UTC second.
+// ±0.5% playbackRate nudge — invisible to viewer, no seeking.
+// All clients check at the same UTC second simultaneously.
 function startDriftCorrection(idx){
-  if(driftInterval){ clearInterval(driftInterval); }
-  driftInterval = setInterval(()=>{
-    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
-    const slot = TIMELINE[idx];
-    if(!slot || player.paused || player.readyState < 2) return;
-
-    // targetFrame1: Frame 1 of the UTC-correct second.
-    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
-    // that is identical on every client on Earth. Snapping here means
-    // every drift correction lands all clients on the same frame.
-    const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
-    const drift        = player.currentTime - targetFrame1;
-
-    if(Math.abs(drift) > 2){
-      // More than 2s off — hard resync to Frame 1 of the correct second
-      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
-      player.currentTime = targetFrame1;
-      player.playbackRate = 1.0;
-    } else if(Math.abs(drift) > 0.08){
-      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
-      player.playbackRate = drift > 0 ? 0.98 : 1.02;
-    } else {
-      // Locked on Frame 1 — restore normal rate
-      player.playbackRate = 1.0;
-    }
-  }, 2000);
+  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  const msUntilNextSecond = 1000 - (trueUtcMs() % 1000);
+  setTimeout(()=>{
+    if(currentIdx !== idx) return;
+    driftInterval = setInterval(()=>{
+      if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+      const slot = TIMELINE[idx];
+      if(!slot || player.paused || player.readyState < 2) return;
+      const targetFrame1 = Math.floor(Math.max(0, utcSec() - slot.startSec));
+      const drift        = player.currentTime - targetFrame1;
+      if      (drift >  ONE_FRAME) player.playbackRate = 0.995;
+      else if (drift < -ONE_FRAME) player.playbackRate = 1.005;
+      else                         player.playbackRate = 1.0;
+    }, 1000);
+  }, msUntilNextSecond);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -600,7 +628,7 @@ async function playSlot(idx,seekLive){
       // Target: top of the next whole UTC second.
       // precisePlay() spins rAF until Date.now() hits this exact millisecond,
       // so play() fires simultaneously on all clients regardless of seek time.
-      const targetUtcMs = Math.ceil(Date.now() / 1000) * 1000;
+      const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
       precisePlay(seekTo, targetUtcMs, idx);
       return;
     }
