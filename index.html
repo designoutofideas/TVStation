@@ -492,11 +492,6 @@ let driftInterval = null;
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
-  lastDriftVal = null;
-  lastDriftUtc = null;
-  // trimRate is intentionally preserved — media clock skew is a device
-  // property, not a per-slot property. Keeping it means faster lock on
-  // the next slot rather than re-learning from scratch every cut.
 }
 
 // precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
@@ -536,26 +531,25 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: every 2s, compare player.currentTime against UTC.
+// startDriftCorrection: rate-only sync — never assigns currentTime after
+// initial tune-in seek. This is the critical mobile fix.
 //
-// MOBILE MEDIA CLOCK SKEW: mobile browsers run their video clock at a
-// slightly different rate than wall time (~0.996–0.999x on iOS Safari).
-// player.currentTime is reported by this slow clock, so the device reaches
-// sync, locks to rate=1.0, and immediately drifts back at the same rate.
-// The loop catches it, nudges to 1.02x, it catches up, locks — repeat.
-// This produces the exact 2-minute catch-up / drop-back cycle observed.
+// iOS Safari silently reverts currentTime assignments that don't align
+// with a buffered keyframe. The video appears to accept the seek, the
+// drift loop reads it as synced, then iOS snaps back to its own buffer
+// position — producing the "catches up then immediately drops back" cycle.
 //
-// FIX: measure the actual drift rate accumulating between ticks and maintain
-// a persistent "trim" — a small permanent rate offset above 1.0 that exactly
-// cancels the media clock skew. The trim self-calibrates every tick so it
-// converges to the correct value for each specific device automatically.
-// Desktop browsers have near-zero skew so their trim converges to ~0 and
-// behaviour is identical to before.
-
-let trimRate     = 0;      // persistent rate correction for this device's media clock
-let lastDriftVal = null;   // drift measured on the previous tick
-let lastDriftUtc = null;   // utcSec() when that measurement was taken
-
+// playbackRate adjustments are not affected by keyframe boundaries.
+// The decoder just runs faster or slower from wherever it already is.
+// So rate-only sync converges correctly on all devices without triggering
+// the iOS keyframe snap.
+//
+// Three rate tiers:
+//   |drift| < 0.08s  → locked,       rate = 1.0   (inaudible)
+//   |drift| < 2s     → gentle nudge, rate = 0.98/1.02 (inaudible)
+//   |drift| < 30s    → strong nudge, rate = 0.90/1.10 (closes 10s in ~100s)
+//   |drift| >= 30s   → hard seek only — device is genuinely lost and the
+//                      keyframe imprecision (~2s) is acceptable at that scale
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
   driftInterval = setInterval(()=>{
@@ -563,46 +557,25 @@ function startDriftCorrection(idx){
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
-    const nowUtc       = utcSec();
-    const expectedPos  = nowUtc - slot.startSec;
+    const expectedPos  = utcSec() - slot.startSec;
     const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
-    // ── Trim calibration ──────────────────────────────────────
-    // If we have a previous measurement, compute how fast drift is
-    // accumulating per second. That rate IS the media clock skew.
-    // Absorb it into trimRate so the base playback rate corrects it.
-    if(lastDriftVal !== null && lastDriftUtc !== null){
-      const dtUtc   = nowUtc - lastDriftUtc;          // wall seconds elapsed
-      const ddrift  = drift  - lastDriftVal;           // drift change over that period
-      if(dtUtc > 1.5){                                 // only update with a meaningful interval
-        // driftRate: how many seconds of lag accumulate per wall second.
-        // e.g. -0.002 means the media clock runs 0.2% slow.
-        const driftRate = ddrift / dtUtc;
-        // Blend into trimRate with a slow low-pass filter (α=0.2) so
-        // a single noisy measurement doesn't overcorrect.
-        trimRate = trimRate * 0.8 + (-driftRate) * 0.2;
-        // Clamp trim to ±2% — beyond that something else is wrong
-        trimRate = Math.max(-0.02, Math.min(0.02, trimRate));
-        console.log(`[trim] driftRate=${driftRate.toFixed(5)} trimRate=${trimRate.toFixed(5)}`);
-      }
-    }
-    lastDriftVal = drift;
-    lastDriftUtc = nowUtc;
-
-    // ── Rate assignment ───────────────────────────────────────
-    if(Math.abs(drift) > 2){
-      // Hard resync — genuinely lost (tune-in, long background, seek error)
+    if(Math.abs(drift) >= 30){
+      // Genuinely lost — only case where we seek. Hard seek + reset rate.
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
-      player.playbackRate = 1.0 + trimRate;
-      lastDriftVal = null; lastDriftUtc = null; // reset trim measurement after seek
+      player.playbackRate = 1.0;
+    } else if(Math.abs(drift) > 2){
+      // Large drift — strong rate nudge, no seek, no keyframe snap
+      console.log(`[sync] strong nudge drift=${drift.toFixed(3)}s rate=${drift>0?'0.90':'1.10'}`);
+      player.playbackRate = drift > 0 ? 0.90 : 1.10;
     } else if(Math.abs(drift) > 0.08){
-      // Closing drift — nudge toward target plus apply trim
-      player.playbackRate = (drift > 0 ? 0.98 : 1.02) + trimRate;
+      // Small drift — gentle inaudible nudge
+      player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
-      // Locked — hold trim rate so media clock skew is continuously cancelled
-      player.playbackRate = 1.0 + trimRate;
+      // Locked
+      player.playbackRate = 1.0;
     }
   }, 2000);
 }
