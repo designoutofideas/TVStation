@@ -577,26 +577,10 @@ function startDriftCorrection(idx){
   syncIdx = idx;
   driftTimeout = setTimeout(()=>driftCorrect(idx), 2000);
 }
-
-// ── VISIBILITY WAKE GUARD ─────────────────────────────────────
-// Fires when the user returns to the tab/app after screen-off, app-switch,
-// or backgrounding. Mobile browsers can suspend the entire JS thread for
-// seconds or minutes. On wake, we hard-resync immediately — don't wait for
-// the next drift correction tick which could be arbitrarily delayed.
-document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden) return;                         // going to background — nothing to do
-  if(!hasBooted || currentIdx < 0) return;
-  const slot = TIMELINE[currentIdx];
-  if(!slot || player.paused || player.readyState < 2) return;
-  const expectedPos  = utcSec() - slot.startSec;
-  const targetFrame1 = Math.floor(expectedPos);
-  const drift        = player.currentTime - targetFrame1;
-  console.log(`[wake] visibility restored drift=${drift.toFixed(3)}s → hard resync to ${targetFrame1}s`);
-  player.currentTime = targetFrame1;
-  player.playbackRate = 1.0;
-  // Re-arm drift correction from scratch so the timeout chain is fresh
-  startDriftCorrection(currentIdx);
-});
+// No visibilitychange handler — it caused competing hard-seeks across devices.
+// Wake recovery is handled entirely by the driftCorrect loop: when the browser
+// resumes after suspension the pending setTimeout fires, finds large drift,
+// and hard-seeks. One loop, one authority, no inter-device races.
 
 // ── PLAYBACK ──────────────────────────────────────────────────
 async function playSlot(idx,seekLive){
