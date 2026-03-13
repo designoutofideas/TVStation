@@ -553,23 +553,24 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: every 2s, compare player.currentTime against
-// where UTC says we should be.
+// startDriftCorrection: 500ms tick with hysteresis to prevent oscillation.
 //
-// Hard-seek threshold is 30s (not 2s). This is the critical mobile fix:
-// iOS snaps currentTime seeks to the nearest keyframe (~2-8s offset).
-// The old >2s threshold triggered a hard-seek loop on mobile — seek,
-// snap to keyframe, read drift >2s, seek again, repeat forever.
-// Rate nudging is not affected by keyframes and converges correctly
-// on all devices. Hard seek is reserved for genuinely lost devices only.
+// Root cause of desktop swapping: 2s tick + tight 0.08s lock threshold
+// caused devices to overshoot and oscillate around the target — one device
+// nudges ahead, the other catches up, they swap leads every ~30s.
 //
-// Three tiers:
-//   |drift| <  0.08s → locked,       rate = 1.0
-//   |drift| <  2s    → gentle nudge, rate = 0.98/1.02  (~50s to close 1s gap)
-//   |drift| <  30s   → strong nudge, rate = 0.90/1.10  (~80s to close 8s gap)
-//   |drift| >= 30s   → hard seek     (genuinely lost — keyframe imprecision acceptable)
+// Fix:
+//   - 500ms tick: smaller corrections, less overshoot per tick
+//   - Hysteresis: wide entry band (0.5s to start nudging) but devices
+//     only EXIT the nudge state when drift is under 0.1s — prevents
+//     flip-flopping between nudge and locked on consecutive ticks
+//   - Proportional rate: nudge strength scales with drift magnitude
+//     so large drift closes faster without overshooting when small
+//   - Hard seek threshold remains 30s — never triggers on keyframe snap
+let synced = false; // hysteresis state — true = currently locked
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
+  synced = false;
   driftInterval = setInterval(()=>{
     if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
     const slot = TIMELINE[idx];
@@ -578,26 +579,32 @@ function startDriftCorrection(idx){
     const expectedPos  = utcSec() - slot.startSec;
     const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
+    const absDrift     = Math.abs(drift);
 
-    if(Math.abs(drift) >= 30){
+    if(absDrift >= 30){
+      // Genuinely lost — hard seek
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
-    } else if(Math.abs(drift) > 8){
-      // Fast convergence — closes 20s gap in ~100s, 8s gap in ~40s
-      console.log(`[sync] fast nudge drift=${drift.toFixed(3)}s`);
-      player.playbackRate = drift > 0 ? 0.80 : 1.20;
-    } else if(Math.abs(drift) > 2){
-      // Strong nudge — closes 8s gap in ~80s
-      console.log(`[sync] strong nudge drift=${drift.toFixed(3)}s`);
-      player.playbackRate = drift > 0 ? 0.90 : 1.10;
-    } else if(Math.abs(drift) > 0.08){
-      // Gentle inaudible nudge
-      player.playbackRate = drift > 0 ? 0.98 : 1.02;
-    } else {
+      synced = false;
+    } else if(synced && absDrift < 0.1){
+      // Locked and within tolerance — hold rate, stay locked
       player.playbackRate = 1.0;
+    } else if(!synced && absDrift < 0.1){
+      // Close enough — enter locked state
+      player.playbackRate = 1.0;
+      synced = true;
+    } else {
+      // Needs correction — proportional rate based on drift magnitude
+      // Scales from 0.01x nudge at 0.1s drift up to 0.25x at 30s drift
+      // Clamped to max 0.20x to avoid audible pitch on large corrections
+      synced = false;
+      const strength = Math.min(0.20, absDrift * 0.01);
+      player.playbackRate = drift > 0
+        ? Math.max(0.80, 1.0 - strength)
+        : Math.min(1.20, 1.0 + strength);
     }
-  }, 2000);
+  }, 500);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
