@@ -492,6 +492,11 @@ let driftInterval = null;
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
+  lastDriftVal = null;
+  lastDriftUtc = null;
+  // trimRate is intentionally preserved — media clock skew is a device
+  // property, not a per-slot property. Keeping it means faster lock on
+  // the next slot rather than re-learning from scratch every cut.
 }
 
 // precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
@@ -531,9 +536,26 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: every 2s, compare player.currentTime against
-// where UTC says we should be. Nudge playbackRate for small drift,
-// hard-seek for large drift.
+// startDriftCorrection: every 2s, compare player.currentTime against UTC.
+//
+// MOBILE MEDIA CLOCK SKEW: mobile browsers run their video clock at a
+// slightly different rate than wall time (~0.996–0.999x on iOS Safari).
+// player.currentTime is reported by this slow clock, so the device reaches
+// sync, locks to rate=1.0, and immediately drifts back at the same rate.
+// The loop catches it, nudges to 1.02x, it catches up, locks — repeat.
+// This produces the exact 2-minute catch-up / drop-back cycle observed.
+//
+// FIX: measure the actual drift rate accumulating between ticks and maintain
+// a persistent "trim" — a small permanent rate offset above 1.0 that exactly
+// cancels the media clock skew. The trim self-calibrates every tick so it
+// converges to the correct value for each specific device automatically.
+// Desktop browsers have near-zero skew so their trim converges to ~0 and
+// behaviour is identical to before.
+
+let trimRate     = 0;      // persistent rate correction for this device's media clock
+let lastDriftVal = null;   // drift measured on the previous tick
+let lastDriftUtc = null;   // utcSec() when that measurement was taken
+
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
   driftInterval = setInterval(()=>{
@@ -541,25 +563,46 @@ function startDriftCorrection(idx){
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
-    // targetFrame1: Frame 1 of the UTC-correct second.
-    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
-    // that is identical on every client on Earth. Snapping here means
-    // every drift correction lands all clients on the same frame.
-    const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
+    const nowUtc       = utcSec();
+    const expectedPos  = nowUtc - slot.startSec;
+    const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
+    // ── Trim calibration ──────────────────────────────────────
+    // If we have a previous measurement, compute how fast drift is
+    // accumulating per second. That rate IS the media clock skew.
+    // Absorb it into trimRate so the base playback rate corrects it.
+    if(lastDriftVal !== null && lastDriftUtc !== null){
+      const dtUtc   = nowUtc - lastDriftUtc;          // wall seconds elapsed
+      const ddrift  = drift  - lastDriftVal;           // drift change over that period
+      if(dtUtc > 1.5){                                 // only update with a meaningful interval
+        // driftRate: how many seconds of lag accumulate per wall second.
+        // e.g. -0.002 means the media clock runs 0.2% slow.
+        const driftRate = ddrift / dtUtc;
+        // Blend into trimRate with a slow low-pass filter (α=0.2) so
+        // a single noisy measurement doesn't overcorrect.
+        trimRate = trimRate * 0.8 + (-driftRate) * 0.2;
+        // Clamp trim to ±2% — beyond that something else is wrong
+        trimRate = Math.max(-0.02, Math.min(0.02, trimRate));
+        console.log(`[trim] driftRate=${driftRate.toFixed(5)} trimRate=${trimRate.toFixed(5)}`);
+      }
+    }
+    lastDriftVal = drift;
+    lastDriftUtc = nowUtc;
+
+    // ── Rate assignment ───────────────────────────────────────
     if(Math.abs(drift) > 2){
-      // More than 2s off — hard resync to Frame 1 of the correct second
+      // Hard resync — genuinely lost (tune-in, long background, seek error)
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
-      player.playbackRate = 1.0;
+      player.playbackRate = 1.0 + trimRate;
+      lastDriftVal = null; lastDriftUtc = null; // reset trim measurement after seek
     } else if(Math.abs(drift) > 0.08){
-      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
-      player.playbackRate = drift > 0 ? 0.98 : 1.02;
+      // Closing drift — nudge toward target plus apply trim
+      player.playbackRate = (drift > 0 ? 0.98 : 1.02) + trimRate;
     } else {
-      // Locked on Frame 1 — restore normal rate
-      player.playbackRate = 1.0;
+      // Locked — hold trim rate so media clock skew is continuously cancelled
+      player.playbackRate = 1.0 + trimRate;
     }
   }, 2000);
 }
@@ -675,49 +718,6 @@ player.addEventListener('ended',()=>{
 player.addEventListener('error',()=>{
   console.warn('player error — skipping');
   setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
-});
-
-// ── OS INTERRUPTION RECOVERY (mobile) ────────────────────────
-// iOS periodically interrupts audio sessions (Bluetooth renegotiation,
-// silent-switch checks, AirPlay probes). The video element emits 'pause'
-// then auto-resumes with 'play', but resumes from the wrong position —
-// where the OS left off, not where UTC says we should be.
-// This is the ~2-minute drift cycle seen on mobile.
-//
-// On 'play' resume: if we didn't trigger the pause ourselves (player was
-// not intentionally stopped), re-anchor currentTime to the UTC frame.
-// Uses a 200ms debounce — the OS pause+play pair fires within ~50ms,
-// so this only triggers on genuine resumes, not on user-initiated plays.
-//
-// Desktop: this event fires too on programmatic play() calls, but the
-// UTC seek is idempotent — seeking to the correct frame when already
-// on the correct frame has no audible effect.
-
-let osInterruptPauseAt = null;
-
-player.addEventListener('pause', ()=>{
-  // Record when the pause happened so we can detect short OS interruptions
-  osInterruptPauseAt = Date.now();
-});
-
-player.addEventListener('play', ()=>{
-  if(!hasBooted || currentIdx < 0) return;
-  if(osInterruptPauseAt === null) return;
-  const pauseDurationMs = Date.now() - osInterruptPauseAt;
-  osInterruptPauseAt = null;
-  // Only re-anchor if the pause was short (OS interruption pattern: <2s).
-  // A long pause means the user backgrounded the app — let the existing
-  // drift correction handle it on its next tick rather than seeking
-  // immediately (which could fight a seek already in progress).
-  if(pauseDurationMs > 2000) return;
-  const slot = TIMELINE[currentIdx];
-  if(!slot || player.readyState < 2) return;
-  const targetFrame1 = Math.floor(utcSec() - slot.startSec);
-  const drift = player.currentTime - targetFrame1;
-  if(Math.abs(drift) > 0.1){
-    console.log(`[os-resume] pauseMs=${pauseDurationMs} drift=${drift.toFixed(3)}s → seek ${targetFrame1}s`);
-    player.currentTime = targetFrame1;
-  }
 });
 
 // ── TUNE IN ───────────────────────────────────────────────────
