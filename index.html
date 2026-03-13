@@ -494,77 +494,58 @@ function cancelSync(){
   player.playbackRate = 1.0;
 }
 
-// precisePlay: Phase 1 — compensated approximate landing.
-// Measures actual seek latency by listening for the 'seeked' event, then
-// recomputes the UTC position at that exact moment and makes one final
-// currentTime correction before play(). This compensates for the
-// 500ms–2000ms seek time on mobile without requiring a precision rAF spin.
-function precisePlay(slot, _unused, idx){
-  if(currentIdx !== idx) return;
-
-  const seekRequestedAt = trueUtcMs();
-  const initialOffset   = (seekRequestedAt / 1000) - slot.startSec;
-  const initialSeek     = Math.max(0, Math.floor(initialOffset));
-  const dur             = player.duration;
-  const clampedInitial  = isFinite(dur) ? Math.min(initialSeek, dur - 2) : initialSeek;
-
-  // Listen for seeked — fires when the decoder has actually landed
-  function onSeeked(){
-    player.removeEventListener('seeked', onSeeked);
-    if(currentIdx !== idx) return;
-
-    // Recompute UTC position at the moment the seek completed
-    const seekCompletedAt = trueUtcMs();
-    const seekLatencyMs   = seekCompletedAt - seekRequestedAt;
-    const liveOffset      = (seekCompletedAt / 1000) - slot.startSec;
-    const correctedSeek   = Math.max(0, Math.floor(liveOffset));
-    const clamped         = isFinite(dur) ? Math.min(correctedSeek, dur - 2) : correctedSeek;
-
-    console.log(`[precisePlay] seekLatency=${seekLatencyMs}ms initial=${clampedInitial}s corrected=${clamped}s`);
-
-    // Only re-seek if the correction is meaningful (>0.5s improvement)
-    // Avoids triggering a second seek on fast desktop connections
-    if(Math.abs(clamped - player.currentTime) > 0.5){
-      player.currentTime = clamped;
+// precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
+// then computes the LIVE seek position at that exact instant and fires play().
+// seekTo is computed at fire-time — not before — so the position is accurate
+// regardless of how long the seek or rAF wait took.
+function precisePlay(slot, targetUtcMs, idx){
+  function loop(){
+    if(currentIdx !== idx) return; // slot changed — abort
+    const now = trueUtcMs();
+    if(now >= targetUtcMs){
+      // Compute where we should be at THIS exact millisecond.
+      // Floor to whole second: every whole UTC second is a universal frame
+      // boundary that is identical on every client on Earth.
+      const liveOffset = (now / 1000) - slot.startSec;
+      const seekTo = Math.max(0, Math.floor(liveOffset));
+      const dur = player.duration;
+      const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
+      console.log(`[precisePlay] firing at utc=${(now/1000).toFixed(3)} seekTo=${clampedSeek}s`);
+      player.currentTime = clampedSeek;
+      player.play().catch(async e=>{
+        const confirmed = await resolveUrl(slot.id);
+        if(confirmed && currentIdx===idx){
+          player.src=confirmed; player.load();
+          player.currentTime=clampedSeek;
+          player.play().catch(()=>{});
+        } else if(!confirmed){
+          console.warn('Skipping unplayable slot:', slot.title);
+          doCut((idx+1)%TIMELINE.length);
+        }
+      });
+      startDriftCorrection(idx);
+    } else {
+      requestAnimationFrame(loop);
     }
-
-    player.play().catch(async e=>{
-      const confirmed = await resolveUrl(slot.id);
-      if(confirmed && currentIdx===idx){
-        player.src=confirmed; player.load();
-        player.currentTime=clamped;
-        player.play().catch(()=>{});
-      } else if(!confirmed){
-        console.warn('Skipping unplayable slot:', slot.title);
-        doCut((idx+1)%TIMELINE.length);
-      }
-    });
-    startDriftCorrection(idx);
   }
-
-  player.addEventListener('seeked', onSeeked);
-  player.currentTime = clampedInitial;
+  requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: rate-only sync — never assigns currentTime after
-// initial tune-in seek. This is the critical mobile fix.
+// startDriftCorrection: every 2s, compare player.currentTime against
+// where UTC says we should be.
 //
-// iOS Safari silently reverts currentTime assignments that don't align
-// with a buffered keyframe. The video appears to accept the seek, the
-// drift loop reads it as synced, then iOS snaps back to its own buffer
-// position — producing the "catches up then immediately drops back" cycle.
+// Hard-seek threshold is 30s (not 2s). This is the critical mobile fix:
+// iOS snaps currentTime seeks to the nearest keyframe (~2-8s offset).
+// The old >2s threshold triggered a hard-seek loop on mobile — seek,
+// snap to keyframe, read drift >2s, seek again, repeat forever.
+// Rate nudging is not affected by keyframes and converges correctly
+// on all devices. Hard seek is reserved for genuinely lost devices only.
 //
-// playbackRate adjustments are not affected by keyframe boundaries.
-// The decoder just runs faster or slower from wherever it already is.
-// So rate-only sync converges correctly on all devices without triggering
-// the iOS keyframe snap.
-//
-// Three rate tiers:
-//   |drift| < 0.08s  → locked,       rate = 1.0   (inaudible)
-//   |drift| < 2s     → gentle nudge, rate = 0.98/1.02 (inaudible)
-//   |drift| < 30s    → strong nudge, rate = 0.90/1.10 (closes 10s in ~100s)
-//   |drift| >= 30s   → hard seek only — device is genuinely lost and the
-//                      keyframe imprecision (~2s) is acceptable at that scale
+// Three tiers:
+//   |drift| <  0.08s → locked,       rate = 1.0
+//   |drift| <  2s    → gentle nudge, rate = 0.98/1.02  (~50s to close 1s gap)
+//   |drift| <  30s   → strong nudge, rate = 0.90/1.10  (~80s to close 8s gap)
+//   |drift| >= 30s   → hard seek     (genuinely lost — keyframe imprecision acceptable)
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
   driftInterval = setInterval(()=>{
@@ -577,19 +558,21 @@ function startDriftCorrection(idx){
     const drift        = player.currentTime - targetFrame1;
 
     if(Math.abs(drift) >= 30){
-      // Genuinely lost — only case where we seek. Hard seek + reset rate.
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
+    } else if(Math.abs(drift) > 8){
+      // Fast convergence — closes 20s gap in ~80s, 8s gap in ~32s
+      console.log(`[sync] fast nudge drift=${drift.toFixed(3)}s`);
+      player.playbackRate = drift > 0 ? 0.75 : 1.25;
     } else if(Math.abs(drift) > 2){
-      // Large drift — strong rate nudge, no seek, no keyframe snap
-      console.log(`[sync] strong nudge drift=${drift.toFixed(3)}s rate=${drift>0?'0.90':'1.10'}`);
+      // Strong nudge — closes 8s gap in ~80s
+      console.log(`[sync] strong nudge drift=${drift.toFixed(3)}s`);
       player.playbackRate = drift > 0 ? 0.90 : 1.10;
     } else if(Math.abs(drift) > 0.08){
-      // Small drift — gentle inaudible nudge
+      // Gentle inaudible nudge
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
-      // Locked
       player.playbackRate = 1.0;
     }
   }, 2000);
@@ -617,11 +600,19 @@ async function playSlot(idx,seekLive){
   if(player.src!==url){player.src=url;player.load()}
   const doPlay=()=>{
     if(offset>2){
+      // Pre-seek to approximate position so the browser has something buffered.
+      // The exact frame position is recomputed at fire-time inside precisePlay.
       const dur=player.duration;
       const preSeek=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
       player.currentTime=preSeek;
       player.pause();
-      precisePlay(slot, 0, idx); // targetUtcMs unused — precisePlay now computes live position directly
+
+      // Target: top of the next whole UTC second.
+      // precisePlay() spins rAF until trueUtcMs() hits this exact millisecond,
+      // then recomputes the live seek position at that instant, so play() fires
+      // simultaneously on all clients at the same frame regardless of seek latency.
+      const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
+      precisePlay(slot, targetUtcMs, idx);
       return;
     }
     player.play().catch(async e=>{
