@@ -562,9 +562,9 @@ function startDriftCorrection(idx){
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
     } else if(Math.abs(drift) > 8){
-      // Fast convergence — closes 20s gap in ~80s, 8s gap in ~32s
+      // Fast convergence — closes 20s gap in ~100s, 8s gap in ~40s
       console.log(`[sync] fast nudge drift=${drift.toFixed(3)}s`);
-      player.playbackRate = drift > 0 ? 0.75 : 1.25;
+      player.playbackRate = drift > 0 ? 0.80 : 1.20;
     } else if(Math.abs(drift) > 2){
       // Strong nudge — closes 8s gap in ~80s
       console.log(`[sync] strong nudge drift=${drift.toFixed(3)}s`);
@@ -626,7 +626,7 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
-    if(seekLive) startDriftCorrection(idx);
+    startDriftCorrection(idx);
   };
   if(player.readyState>=1)doPlay();
   else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
