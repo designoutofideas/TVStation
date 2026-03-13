@@ -240,13 +240,6 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 <script src="https://www.gstatic.com/firebasejs/9.23.0/firebase-firestore-compat.js"></script>
 <script>
 
-// ─────────────────────────────────────────────────────────────
-//  🔧 PASTE YOUR FIREBASE CONFIG HERE
-//  Get this from: Firebase Console → Project Settings → Your Apps
-// ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-//  🔧 PASTE YOUR FIREBASE CONFIG HERE
-// ─────────────────────────────────────────────────────────────
 firebase.initializeApp({
   apiKey:            "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o",
   authDomain:        "rfa-legacy.firebaseapp.com",
@@ -501,21 +494,32 @@ function cancelSync(){
   player.playbackRate = 1.0;
 }
 
-// precisePlay: spins a rAF loop until Date.now() reaches targetUtcMs,
-// then fires play(). Far more accurate than setTimeout for sub-100ms timing.
-function precisePlay(seekTo, targetUtcMs, idx){
+// precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
+// then computes the LIVE seek position at that exact instant and fires play().
+// seekTo is computed at fire-time — not before — so the position is accurate
+// regardless of how long the seek or rAF wait took.
+function precisePlay(slot, targetUtcMs, idx){
   function loop(){
     if(currentIdx !== idx) return; // slot changed — abort
-    if(Date.now() >= targetUtcMs){
-      player.currentTime = seekTo; // final position confirm
+    const now = trueUtcMs();
+    if(now >= targetUtcMs){
+      // Compute where we should be at THIS exact millisecond.
+      // Floor to whole second: every whole UTC second is a universal frame
+      // boundary that is identical on every client on Earth.
+      const liveOffset = (now / 1000) - slot.startSec;
+      const seekTo = Math.max(0, Math.floor(liveOffset));
+      const dur = player.duration;
+      const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
+      console.log(`[precisePlay] firing at utc=${(now/1000).toFixed(3)} seekTo=${clampedSeek}s`);
+      player.currentTime = clampedSeek;
       player.play().catch(async e=>{
-        const confirmed = await resolveUrl(TIMELINE[idx]&&TIMELINE[idx].id);
+        const confirmed = await resolveUrl(slot.id);
         if(confirmed && currentIdx===idx){
           player.src=confirmed; player.load();
-          player.currentTime=seekTo;
+          player.currentTime=clampedSeek;
           player.play().catch(()=>{});
         } else if(!confirmed){
-          console.warn('Skipping unplayable slot:', TIMELINE[idx]&&TIMELINE[idx].title);
+          console.warn('Skipping unplayable slot:', slot.title);
           doCut((idx+1)%TIMELINE.length);
         }
       });
@@ -582,18 +586,19 @@ async function playSlot(idx,seekLive){
   if(player.src!==url){player.src=url;player.load()}
   const doPlay=()=>{
     if(offset>2){
+      // Pre-seek to approximate position so the browser has something buffered.
+      // The exact frame position is recomputed at fire-time inside precisePlay.
       const dur=player.duration;
-      // Floor to whole second — every whole UTC second is a frame boundary.
-      // All clients seek to the same integer position independent of seek latency.
-      const seekTo=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
-      player.currentTime=seekTo;
+      const preSeek=Math.floor(isFinite(dur)?Math.min(offset,dur-2):offset);
+      player.currentTime=preSeek;
       player.pause();
 
       // Target: top of the next whole UTC second.
-      // precisePlay() spins rAF until Date.now() hits this exact millisecond,
-      // so play() fires simultaneously on all clients regardless of seek time.
+      // precisePlay() spins rAF until trueUtcMs() hits this exact millisecond,
+      // then recomputes the live seek position at that instant, so play() fires
+      // simultaneously on all clients at the same frame regardless of seek latency.
       const targetUtcMs = Math.ceil(trueUtcMs() / 1000) * 1000;
-      precisePlay(seekTo, targetUtcMs, idx);
+      precisePlay(slot, targetUtcMs, idx);
       return;
     }
     player.play().catch(async e=>{
