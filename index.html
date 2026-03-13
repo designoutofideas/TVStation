@@ -485,45 +485,32 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// Mobile-hardened: immune to setInterval throttling, rAF suspension,
-// and tab/screen wake. Three mechanisms work together:
-//   1. precisePlay   — live seek computed at fire-time, rAF aborts if
-//                      page was hidden during spin (mobile wake guard)
-//   2. driftCorrect  — self-rescheduling setTimeout (not setInterval),
-//                      so throttled late fires don't stack or silence
-//   3. visibilitychange — hard resync the instant a device wakes up,
-//                      before drift correction even has a chance to run
+// driftInterval: handle for the continuous drift-correction loop
+let driftInterval = null;
 
-let driftTimeout = null;   // was driftInterval — now self-rescheduling setTimeout
-let syncIdx      = -1;     // which slot the drift loop is anchored to
-
-// cancelSync: kills pending drift reschedule and resets playback rate
+// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
-  if(driftTimeout){ clearTimeout(driftTimeout); driftTimeout=null; }
-  syncIdx = -1;
+  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
 }
 
-// precisePlay: spins rAF until trueUtcMs() >= targetUtcMs, then fires
-// play() with a seekTo computed at that exact millisecond — not before.
-// Mobile wake guard: if the page was hidden at any point during the spin
-// (screen dim, app switch), the rAF wakes up with a stale targetUtcMs.
-// In that case we skip the stale target and fire immediately from live UTC.
+// precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
+// then computes the LIVE seek position at that exact instant and fires play().
+// seekTo is computed at fire-time — not before — so the position is accurate
+// regardless of how long the seek or rAF wait took.
 function precisePlay(slot, targetUtcMs, idx){
-  let wasHidden = document.hidden;
   function loop(){
-    if(currentIdx !== idx) return;                    // slot changed — abort
-    if(document.hidden){ wasHidden=true; requestAnimationFrame(loop); return; }
+    if(currentIdx !== idx) return; // slot changed — abort
     const now = trueUtcMs();
-    // If the page was hidden during the spin, targetUtcMs is in the past
-    // by an unknown amount — bypass it and fire from live UTC immediately.
-    const fireNow = wasHidden || now >= targetUtcMs;
-    if(fireNow){
+    if(now >= targetUtcMs){
+      // Compute where we should be at THIS exact millisecond.
+      // Floor to whole second: every whole UTC second is a universal frame
+      // boundary that is identical on every client on Earth.
       const liveOffset = (now / 1000) - slot.startSec;
-      const seekTo     = Math.max(0, Math.floor(liveOffset));
-      const dur        = player.duration;
+      const seekTo = Math.max(0, Math.floor(liveOffset));
+      const dur = player.duration;
       const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      console.log(`[precisePlay] fire utc=${(now/1000).toFixed(3)} seek=${clampedSeek}s wasHidden=${wasHidden}`);
+      console.log(`[precisePlay] firing at utc=${(now/1000).toFixed(3)} seekTo=${clampedSeek}s`);
       player.currentTime = clampedSeek;
       player.play().catch(async e=>{
         const confirmed = await resolveUrl(slot.id);
@@ -544,43 +531,77 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// driftCorrect: one tick of the sync loop. Compares player.currentTime
-// against the UTC-correct frame boundary and nudges or hard-seeks.
-// Reschedules itself via setTimeout so a throttled late fire doesn't
-// cause interval stacking (the mobile setInterval failure mode).
-function driftCorrect(idx){
-  if(syncIdx !== idx) return;                         // cancelled — stop chain
-  const slot = TIMELINE[idx];
-  if(slot && !player.paused && player.readyState >= 2){
-    // targetFrame1: floor of expected position = Frame 1 of the correct UTC second.
-    // Identical on every device on Earth — the universal sync anchor.
+// startDriftCorrection: every 2s, compare player.currentTime against
+// where UTC says we should be. Nudge playbackRate for small drift,
+// hard-seek for large drift.
+function startDriftCorrection(idx){
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+    const slot = TIMELINE[idx];
+    if(!slot || player.paused || player.readyState < 2) return;
+
+    // targetFrame1: Frame 1 of the UTC-correct second.
+    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
+    // that is identical on every client on Earth. Snapping here means
+    // every drift correction lands all clients on the same frame.
     const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos);
+    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
     const drift        = player.currentTime - targetFrame1;
+
     if(Math.abs(drift) > 2){
+      // More than 2s off — hard resync to Frame 1 of the correct second
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
     } else if(Math.abs(drift) > 0.08){
+      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
+      // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
-  }
-  // Reschedule — self-rescheduling setTimeout survives mobile throttling
-  // because each call is fresh; there is no interval queue to drain or skip.
-  driftTimeout = setTimeout(()=>driftCorrect(idx), 2000);
+  }, 2000);
 }
 
-function startDriftCorrection(idx){
-  if(driftTimeout){ clearTimeout(driftTimeout); driftTimeout=null; }
-  syncIdx = idx;
-  driftTimeout = setTimeout(()=>driftCorrect(idx), 2000);
-}
-// No visibilitychange handler — it caused competing hard-seeks across devices.
-// Wake recovery is handled entirely by the driftCorrect loop: when the browser
-// resumes after suspension the pending setTimeout fires, finds large drift,
-// and hard-seeks. One loop, one authority, no inter-device races.
+// ── MOBILE WAKE RECOVERY ─────────────────────────────────────
+// Mobile browsers suspend the JS thread entirely on screen-lock or
+// app-switch. The drift correction setInterval cannot fire while frozen,
+// so large drift accumulates silently. On wake we do ONE corrective seek
+// — identical logic to the existing hard-resync inside startDriftCorrection
+// — then leave the already-running interval completely alone.
+//
+// Critical constraints that prevent the inter-device race seen before:
+//   1. We do NOT call startDriftCorrection() — no new interval is armed,
+//      no existing interval is cancelled. The loop keeps running unmodified.
+//   2. We only act if the thread was actually suspended (lastTickMs gap > 3s).
+//      A normal visibility event on desktop (e.g. alt-tab) fires with a gap
+//      of ~0ms and is ignored, so desktop behaviour is completely unchanged.
+//   3. The seek target is Math.floor(utcSec() - slot.startSec) — the same
+//      universal whole-second anchor used by every other device. All devices
+//      that wake within the same UTC second converge to the same frame.
+
+let lastTickMs = Date.now();
+// Heartbeat: update lastTickMs every second so we can measure suspension gaps.
+// Uses setInterval which IS throttled on mobile — intentionally. If it fires
+// late, the gap between lastTickMs and Date.now() on wake is large, which is
+// exactly the signal we want to detect.
+setInterval(()=>{ lastTickMs = Date.now(); }, 1000);
+
+document.addEventListener('visibilitychange', ()=>{
+  if(document.hidden){ lastTickMs = Date.now(); return; }
+  if(!hasBooted || currentIdx < 0) return;
+  const suspendedMs = Date.now() - lastTickMs;
+  if(suspendedMs < 3000) return;           // < 3s gap — desktop alt-tab or brief dim, ignore
+  const slot = TIMELINE[currentIdx];
+  if(!slot || player.paused || player.readyState < 2) return;
+  const targetFrame1 = Math.floor(utcSec() - slot.startSec);
+  const drift = player.currentTime - targetFrame1;
+  console.log(`[wake] suspended=${suspendedMs}ms drift=${drift.toFixed(3)}s → seek ${targetFrame1}s`);
+  player.currentTime = targetFrame1;
+  player.playbackRate = 1.0;
+  // Do NOT call startDriftCorrection() — existing interval continues unchanged
+});
 
 // ── PLAYBACK ──────────────────────────────────────────────────
 async function playSlot(idx,seekLive){
