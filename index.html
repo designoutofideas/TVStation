@@ -505,9 +505,9 @@ async function fetchPublishDate(id){
 // driftInterval: handle for the continuous drift-correction loop
 let driftInterval = null;
 
-// cancelSync: stops any in-flight rAF trigger and drift loop
+// cancelSync: kills the rAF drift loop and resets playback rate
 function cancelSync(){
-  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  if(driftInterval){ cancelAnimationFrame(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
 }
 
@@ -548,37 +548,50 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: every 2s, compare player.currentTime against
-// where UTC says we should be. Nudge playbackRate for small drift,
-// hard-seek for large drift.
+// startDriftCorrection: rAF-based sync loop — cannot be throttled by mobile
+// browsers when the tab is visible, unlike setInterval which iOS Safari and
+// Android Chrome clamp to ~1 minute intervals under battery/background policy.
+// The drift logic itself runs every 2s (gated by lastDriftCheck) — rAF just
+// keeps the loop alive and unthrottleable at display refresh rate.
+let lastDriftCheck = 0;
+
 function startDriftCorrection(idx){
-  if(driftInterval){ clearInterval(driftInterval); }
-  driftInterval = setInterval(()=>{
-    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+  if(driftInterval){ cancelAnimationFrame(driftInterval); driftInterval=null; }
+
+  function driftLoop(){
+    // Always reschedule first — ensures the loop survives even if we return early
+    if(currentIdx !== idx){ driftInterval=null; return; }
+    driftInterval = requestAnimationFrame(driftLoop);
+
+    // Gate: only run drift logic every 2s, not every frame
+    const now = Date.now();
+    if(now - lastDriftCheck < 2000) return;
+    lastDriftCheck = now;
+
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
-    // targetFrame1: Frame 1 of the UTC-correct second.
-    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
-    // that is identical on every client on Earth. Snapping here means
-    // every drift correction lands all clients on the same frame.
+    // targetFrame1: floor of UTC position = Frame 1 of the correct UTC second.
+    // Identical on every device on Earth — the universal sync anchor.
     const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
+    const targetFrame1 = Math.floor(expectedPos);
     const drift        = player.currentTime - targetFrame1;
 
     if(Math.abs(drift) > 2){
-      // More than 2s off — hard resync to Frame 1 of the correct second
+      // Hard resync — more than 2s off (e.g. after mobile wake from suspension)
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
     } else if(Math.abs(drift) > 0.08){
-      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
+      // Soft nudge — bleed drift back to zero without audible jump
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
-      // Locked on Frame 1 — restore normal rate
+      // Locked — restore normal rate
       player.playbackRate = 1.0;
     }
-  }, 2000);
+  }
+
+  driftInterval = requestAnimationFrame(driftLoop);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
