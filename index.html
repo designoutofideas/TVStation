@@ -294,23 +294,45 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// NTP-calibrated UTC clock — corrects local clock against Archive.org server time
+// UTC clock — NTP-calibrated against Archive.org server time where reliable.
+// clockOffset is only applied if it falls within ±500ms of zero.
+// Rationale: all modern devices (phones, laptops) sync to NTP automatically
+// and are accurate to within ~50ms. A legitimate correction from Archive.org
+// should therefore never exceed ~500ms. If it does, the Date header was
+// blocked (mobile CORS/ITP), the RTT was inflated by mobile network latency,
+// or the header was unparseable — in all these cases, raw Date.now() is more
+// accurate than the corrupted estimate. Applying a bad offset is what caused
+// mobile UTC to diverge from desktop UTC in earlier versions.
 let clockOffset = 0;
 async function calibrateClockOffset(){
   try{
-    const t0=Date.now();
-    const r=await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
-    const t1=Date.now();
-    const serverMs=new Date(r.headers.get('Date')).getTime();
-    if(!isNaN(serverMs)) clockOffset=serverMs+Math.round((t1-t0)/2)-t1;
-  }catch(e){ clockOffset=0; }
+    const t0 = Date.now();
+    const r  = await fetch('https://archive.org/', {method:'HEAD', cache:'no-store'});
+    const t1 = Date.now();
+    const dateHeader = r.headers.get('Date');
+    if(!dateHeader) return; // header blocked — keep existing offset
+    const serverMs = new Date(dateHeader).getTime();
+    if(isNaN(serverMs)) return; // unparseable — keep existing offset
+    const rtt       = t1 - t0;
+    const candidate = serverMs + Math.round(rtt / 2) - t1;
+    // Only apply if within ±500ms — beyond that the measurement is unreliable.
+    // All NTP-synced devices are within 50ms of true UTC, so 500ms is generous.
+    if(Math.abs(candidate) <= 500){
+      clockOffset = candidate;
+      console.log(`[clock] offset=${clockOffset}ms rtt=${rtt}ms`);
+    } else {
+      console.warn(`[clock] offset=${candidate}ms rejected (>500ms) — using device NTP`);
+    }
+  }catch(e){
+    console.log('[clock] calibration failed — using device NTP');
+  }
 }
 calibrateClockOffset();
-setInterval(calibrateClockOffset,5*60*1000);
-function trueUtcMs(){ return Date.now()+clockOffset; }
+setInterval(calibrateClockOffset, 5*60*1000);
+function trueUtcMs(){ return Date.now() + clockOffset; }
 function utcSec(){
-  const d=new Date(trueUtcMs());
-  return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000;
+  const d = new Date(trueUtcMs());
+  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
 }
 
 function buildTimeline(blocks){
