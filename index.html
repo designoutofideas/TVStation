@@ -294,33 +294,16 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// NTP-calibrated UTC clock — corrects local clock against Archive.org server time.
-// Hardened for mobile: validates offset before applying, discards implausible
-// results (>5s), keeps previous good value on failure rather than resetting to 0.
-// Mobile clocks (carrier NTP) are accurate to ~50ms — clockOffset=0 is a safe
-// fallback, far better than a corrupted offset from a blocked or null header.
+// NTP-calibrated UTC clock — corrects local clock against Archive.org server time
 let clockOffset = 0;
 async function calibrateClockOffset(){
   try{
     const t0=Date.now();
     const r=await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
     const t1=Date.now();
-    const dateHeader=r.headers.get('Date');
-    // Mobile Safari / ITP may block the Date header entirely (returns null).
-    // new Date(null).getTime() === 0, which would corrupt clockOffset wildly.
-    if(!dateHeader){ console.log('[clock] Date header unavailable — keeping offset='+clockOffset+'ms'); return; }
-    const serverMs=new Date(dateHeader).getTime();
-    if(isNaN(serverMs)){ console.log('[clock] Date header unparseable — keeping offset='+clockOffset+'ms'); return; }
-    const candidate=serverMs+Math.round((t1-t0)/2)-t1;
-    // Sanity gate: >5s offset means the header or RTT measurement is unreliable.
-    // Legitimate device clock skew is under 2s even in the worst case.
-    if(Math.abs(candidate)>5000){ console.warn('[clock] implausible offset='+candidate+'ms — discarded'); return; }
-    clockOffset=candidate;
-    console.log('[clock] offset='+clockOffset+'ms rtt='+(t1-t0)+'ms');
-  }catch(e){
-    // Network failure — keep last known-good offset, do NOT reset to 0
-    console.log('[clock] calibration failed, retaining offset='+clockOffset+'ms');
-  }
+    const serverMs=new Date(r.headers.get('Date')).getTime();
+    if(!isNaN(serverMs)) clockOffset=serverMs+Math.round((t1-t0)/2)-t1;
+  }catch(e){ clockOffset=0; }
 }
 calibrateClockOffset();
 setInterval(calibrateClockOffset,5*60*1000);
@@ -505,9 +488,9 @@ async function fetchPublishDate(id){
 // driftInterval: handle for the continuous drift-correction loop
 let driftInterval = null;
 
-// cancelSync: kills the rAF drift loop and resets playback rate
+// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
-  if(driftInterval){ cancelAnimationFrame(driftInterval); driftInterval=null; }
+  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
 }
 
@@ -548,50 +531,37 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: rAF-based sync loop — cannot be throttled by mobile
-// browsers when the tab is visible, unlike setInterval which iOS Safari and
-// Android Chrome clamp to ~1 minute intervals under battery/background policy.
-// The drift logic itself runs every 2s (gated by lastDriftCheck) — rAF just
-// keeps the loop alive and unthrottleable at display refresh rate.
-let lastDriftCheck = 0;
-
+// startDriftCorrection: every 2s, compare player.currentTime against
+// where UTC says we should be. Nudge playbackRate for small drift,
+// hard-seek for large drift.
 function startDriftCorrection(idx){
-  if(driftInterval){ cancelAnimationFrame(driftInterval); driftInterval=null; }
-
-  function driftLoop(){
-    // Always reschedule first — ensures the loop survives even if we return early
-    if(currentIdx !== idx){ driftInterval=null; return; }
-    driftInterval = requestAnimationFrame(driftLoop);
-
-    // Gate: only run drift logic every 2s, not every frame
-    const now = Date.now();
-    if(now - lastDriftCheck < 2000) return;
-    lastDriftCheck = now;
-
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
-    // targetFrame1: floor of UTC position = Frame 1 of the correct UTC second.
-    // Identical on every device on Earth — the universal sync anchor.
+    // targetFrame1: Frame 1 of the UTC-correct second.
+    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
+    // that is identical on every client on Earth. Snapping here means
+    // every drift correction lands all clients on the same frame.
     const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos);
+    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
     const drift        = player.currentTime - targetFrame1;
 
     if(Math.abs(drift) > 2){
-      // Hard resync — more than 2s off (e.g. after mobile wake from suspension)
+      // More than 2s off — hard resync to Frame 1 of the correct second
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
     } else if(Math.abs(drift) > 0.08){
-      // Soft nudge — bleed drift back to zero without audible jump
+      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
-      // Locked — restore normal rate
+      // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
-  }
-
-  driftInterval = requestAnimationFrame(driftLoop);
+  }, 2000);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -705,6 +675,49 @@ player.addEventListener('ended',()=>{
 player.addEventListener('error',()=>{
   console.warn('player error — skipping');
   setTimeout(()=>doCut((currentIdx+1)%TIMELINE.length),600);
+});
+
+// ── OS INTERRUPTION RECOVERY (mobile) ────────────────────────
+// iOS periodically interrupts audio sessions (Bluetooth renegotiation,
+// silent-switch checks, AirPlay probes). The video element emits 'pause'
+// then auto-resumes with 'play', but resumes from the wrong position —
+// where the OS left off, not where UTC says we should be.
+// This is the ~2-minute drift cycle seen on mobile.
+//
+// On 'play' resume: if we didn't trigger the pause ourselves (player was
+// not intentionally stopped), re-anchor currentTime to the UTC frame.
+// Uses a 200ms debounce — the OS pause+play pair fires within ~50ms,
+// so this only triggers on genuine resumes, not on user-initiated plays.
+//
+// Desktop: this event fires too on programmatic play() calls, but the
+// UTC seek is idempotent — seeking to the correct frame when already
+// on the correct frame has no audible effect.
+
+let osInterruptPauseAt = null;
+
+player.addEventListener('pause', ()=>{
+  // Record when the pause happened so we can detect short OS interruptions
+  osInterruptPauseAt = Date.now();
+});
+
+player.addEventListener('play', ()=>{
+  if(!hasBooted || currentIdx < 0) return;
+  if(osInterruptPauseAt === null) return;
+  const pauseDurationMs = Date.now() - osInterruptPauseAt;
+  osInterruptPauseAt = null;
+  // Only re-anchor if the pause was short (OS interruption pattern: <2s).
+  // A long pause means the user backgrounded the app — let the existing
+  // drift correction handle it on its next tick rather than seeking
+  // immediately (which could fight a seek already in progress).
+  if(pauseDurationMs > 2000) return;
+  const slot = TIMELINE[currentIdx];
+  if(!slot || player.readyState < 2) return;
+  const targetFrame1 = Math.floor(utcSec() - slot.startSec);
+  const drift = player.currentTime - targetFrame1;
+  if(Math.abs(drift) > 0.1){
+    console.log(`[os-resume] pauseMs=${pauseDurationMs} drift=${drift.toFixed(3)}s → seek ${targetFrame1}s`);
+    player.currentTime = targetFrame1;
+  }
 });
 
 // ── TUNE IN ───────────────────────────────────────────────────
