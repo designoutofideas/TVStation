@@ -187,6 +187,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 
 #flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
 #flash.on{opacity:.35}
+#dbg{position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(0,0,0,0.85);color:#0f0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;padding:8px 12px;pointer-events:none;white-space:pre;}
 </style>
 </head>
 <body>
@@ -194,6 +195,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 <div id="screen">
   <video id="player" playsinline preload="auto"></video>
 </div>
+
+<div id="dbg">waiting...</div>
 
 <div id="hud">
   <div class="hud-top">
@@ -689,6 +692,23 @@ window.tuneIn = function(){
   if(tickInterval)clearInterval(tickInterval);
   tickInterval=setInterval(tick,500);
 };
+
+// ── DEBUG OVERLAY ─────────────────────────────────────────────
+const dbgEl = document.getElementById('dbg');
+setInterval(()=>{
+  const slot = TIMELINE[currentIdx];
+  const utc  = utcSec();
+  const exp  = slot ? (utc - slot.startSec) : 0;
+  const drift= slot ? (player.currentTime - Math.floor(exp)) : 0;
+  dbgEl.textContent =
+    `UTC      ${utc.toFixed(3)}s\n`+
+    `offset   ${clockOffset}ms\n`+
+    `expected ${exp.toFixed(3)}s\n`+
+    `actual   ${player.currentTime.toFixed(3)}s\n`+
+    `drift    ${drift.toFixed(3)}s\n`+
+    `rate     ${player.playbackRate.toFixed(4)}x`;
+}, 250);
 </script>
 </body>
 </html>
+
