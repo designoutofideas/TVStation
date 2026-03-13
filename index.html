@@ -294,16 +294,33 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// NTP-calibrated UTC clock — corrects local clock against Archive.org server time
+// NTP-calibrated UTC clock — corrects local clock against Archive.org server time.
+// Hardened for mobile: validates offset before applying, discards implausible
+// results (>5s), keeps previous good value on failure rather than resetting to 0.
+// Mobile clocks (carrier NTP) are accurate to ~50ms — clockOffset=0 is a safe
+// fallback, far better than a corrupted offset from a blocked or null header.
 let clockOffset = 0;
 async function calibrateClockOffset(){
   try{
     const t0=Date.now();
     const r=await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
     const t1=Date.now();
-    const serverMs=new Date(r.headers.get('Date')).getTime();
-    if(!isNaN(serverMs)) clockOffset=serverMs+Math.round((t1-t0)/2)-t1;
-  }catch(e){ clockOffset=0; }
+    const dateHeader=r.headers.get('Date');
+    // Mobile Safari / ITP may block the Date header entirely (returns null).
+    // new Date(null).getTime() === 0, which would corrupt clockOffset wildly.
+    if(!dateHeader){ console.log('[clock] Date header unavailable — keeping offset='+clockOffset+'ms'); return; }
+    const serverMs=new Date(dateHeader).getTime();
+    if(isNaN(serverMs)){ console.log('[clock] Date header unparseable — keeping offset='+clockOffset+'ms'); return; }
+    const candidate=serverMs+Math.round((t1-t0)/2)-t1;
+    // Sanity gate: >5s offset means the header or RTT measurement is unreliable.
+    // Legitimate device clock skew is under 2s even in the worst case.
+    if(Math.abs(candidate)>5000){ console.warn('[clock] implausible offset='+candidate+'ms — discarded'); return; }
+    clockOffset=candidate;
+    console.log('[clock] offset='+clockOffset+'ms rtt='+(t1-t0)+'ms');
+  }catch(e){
+    // Network failure — keep last known-good offset, do NOT reset to 0
+    console.log('[clock] calibration failed, retaining offset='+clockOffset+'ms');
+  }
 }
 calibrateClockOffset();
 setInterval(calibrateClockOffset,5*60*1000);
@@ -563,45 +580,6 @@ function startDriftCorrection(idx){
     }
   }, 2000);
 }
-
-// ── MOBILE WAKE RECOVERY ─────────────────────────────────────
-// Mobile browsers suspend the JS thread entirely on screen-lock or
-// app-switch. The drift correction setInterval cannot fire while frozen,
-// so large drift accumulates silently. On wake we do ONE corrective seek
-// — identical logic to the existing hard-resync inside startDriftCorrection
-// — then leave the already-running interval completely alone.
-//
-// Critical constraints that prevent the inter-device race seen before:
-//   1. We do NOT call startDriftCorrection() — no new interval is armed,
-//      no existing interval is cancelled. The loop keeps running unmodified.
-//   2. We only act if the thread was actually suspended (lastTickMs gap > 3s).
-//      A normal visibility event on desktop (e.g. alt-tab) fires with a gap
-//      of ~0ms and is ignored, so desktop behaviour is completely unchanged.
-//   3. The seek target is Math.floor(utcSec() - slot.startSec) — the same
-//      universal whole-second anchor used by every other device. All devices
-//      that wake within the same UTC second converge to the same frame.
-
-let lastTickMs = Date.now();
-// Heartbeat: update lastTickMs every second so we can measure suspension gaps.
-// Uses setInterval which IS throttled on mobile — intentionally. If it fires
-// late, the gap between lastTickMs and Date.now() on wake is large, which is
-// exactly the signal we want to detect.
-setInterval(()=>{ lastTickMs = Date.now(); }, 1000);
-
-document.addEventListener('visibilitychange', ()=>{
-  if(document.hidden){ lastTickMs = Date.now(); return; }
-  if(!hasBooted || currentIdx < 0) return;
-  const suspendedMs = Date.now() - lastTickMs;
-  if(suspendedMs < 3000) return;           // < 3s gap — desktop alt-tab or brief dim, ignore
-  const slot = TIMELINE[currentIdx];
-  if(!slot || player.paused || player.readyState < 2) return;
-  const targetFrame1 = Math.floor(utcSec() - slot.startSec);
-  const drift = player.currentTime - targetFrame1;
-  console.log(`[wake] suspended=${suspendedMs}ms drift=${drift.toFixed(3)}s → seek ${targetFrame1}s`);
-  player.currentTime = targetFrame1;
-  player.playbackRate = 1.0;
-  // Do NOT call startDriftCorrection() — existing interval continues unchanged
-});
 
 // ── PLAYBACK ──────────────────────────────────────────────────
 async function playSlot(idx,seekLive){
