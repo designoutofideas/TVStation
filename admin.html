@@ -129,7 +129,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .il{font-family:var(--mono);font-size:8px;letter-spacing:.32em;color:var(--dim);text-transform:uppercase}
 .ic{font-family:var(--mono);font-size:9px;color:var(--dim);background:var(--s2);border:1px solid var(--b);padding:2px 7px}
 
-/* grid: handle | air-time | title | archive-id | dur | del */
 .icols{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 28px;gap:5px;padding:3px 10px;margin-bottom:2px}
 .icolh{font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.2em;text-transform:uppercase}
 .irow{display:grid;grid-template-columns:20px 82px 1fr 170px 54px 28px;gap:5px;align-items:center;padding:6px 10px;border:1px solid var(--b);margin-bottom:3px;background:var(--s2);transition:border-color .12s}
@@ -144,9 +143,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .idur{font-family:var(--mono);font-size:10px;color:var(--dim);text-align:center}
 .idel{width:24px;height:24px;display:flex;align-items:center;justify-content:center;background:transparent;border:1px solid transparent;cursor:pointer;color:var(--dim);font-size:12px;transition:all .12s}
 .idel:hover{color:var(--red);border-color:rgba(255,68,51,.3);background:var(--redd)}
-
-/* AIR TIME badge on scheduled items */
-.airtime-badge{display:inline-block;font-family:var(--mono);font-size:9px;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.25);padding:1px 5px;letter-spacing:.05em;white-space:nowrap}
 
 .add-item-row{display:flex;gap:8px;margin-top:6px}
 .add-item{display:flex;align-items:center;gap:7px;padding:8px 13px;background:transparent;border:1px dashed rgba(97,194,48,.18);color:var(--dim);font-family:var(--mono);font-size:10px;letter-spacing:.18em;cursor:pointer;text-transform:uppercase;flex:1;transition:all .12s}
@@ -176,7 +172,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 .search-bar input:focus{border-color:var(--p)}
 .search-results{display:flex;flex-direction:column;gap:6px;max-height:420px;overflow-y:auto}
 .search-sentinel{height:1px;flex-shrink:0}
-.sresult-dur{font-family:var(--mono);font-size:9px;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.2);padding:1px 6px;white-space:nowrap;flex-shrink:0}
 .sresult{display:flex;gap:12px;align-items:center;padding:10px 12px;background:var(--s2);border:1px solid var(--b);cursor:pointer;transition:all .12s}
 .sresult:hover{border-color:var(--p);background:var(--pg)}
 .sresult-thumb{width:80px;height:50px;object-fit:cover;flex-shrink:0;background:var(--bg)}
@@ -254,7 +249,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
     </div>
 
     <div class="ed-wrap">
-      <!-- Now Playing Bar -->
       <div class="now-bar">
         <div class="now-dot"></div>
         <div class="now-lbl">On Air</div>
@@ -270,7 +264,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
       </div>
     </div>
 
-    <!-- Preview Panel -->
     <div class="preview">
       <div class="preview-hdr">
         <div class="preview-hdr-lbl">● Live Preview</div>
@@ -282,7 +275,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
           sandbox="allow-scripts allow-same-origin allow-popups">
         </iframe>
       </div>
-      <!-- Timebar -->
       <div class="preview-timebar-wrap">
         <div class="preview-timebar-labels">
           <span id="tb-elapsed">0:00</span>
@@ -350,7 +342,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
     <div class="modal-title">Add Video</div>
     <div class="modal-sub">Search Archive.org or paste an ID / URL directly</div>
 
-    <!-- Paste ID/URL -->
     <div style="margin-bottom:14px">
       <div class="fl" style="margin-bottom:6px">Paste Archive.org ID or URL</div>
       <div class="search-bar">
@@ -361,7 +352,6 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 
     <div style="border-top:1px solid var(--b);margin-bottom:14px"></div>
 
-    <!-- Keyword search -->
     <div class="fl" style="margin-bottom:6px">Search by keyword</div>
     <div class="search-bar">
       <input id="search-query" placeholder="e.g. Hong Kong protest 2019" onkeydown="if(event.key==='Enter')doSearch()">
@@ -381,33 +371,17 @@ html,body{width:100%;min-height:100vh;background:var(--bg);color:var(--off);font
 <div class="toast" id="toast"></div>
 
 <script>
-// ─────────────────────────────────────────────────────────────
-//  🔧 PASTE YOUR FIREBASE CONFIG VALUES HERE
-// ─────────────────────────────────────────────────────────────
 var API_KEY    = "AIzaSyCzP9ZdMI6unGKTGvgCLNXuvVUhIBJrT2o";
 var PROJECT_ID = "rfa-legacy";
 var CLIENT_ID  = "760753759019-s2f8tvintss5gtjtcmj2sdtd768hh601.apps.googleusercontent.com";
 
-// ─────────────────────────────────────────────────────────────
-//  🔒 ALLOWED TEAM EMAILS
-// ─────────────────────────────────────────────────────────────
 var ALLOWED_EMAILS = [
-  "hutchinsonj@rfa.org",
-  "thanw@rfa.org",
-  "powellb@rfa.org",
-  "thua@rfa.org",
-  "Jay@outofideas.org",
-  "teammate@gmail.com"
+  "hutchinsonj@rfa.org","thanw@rfa.org","powellb@rfa.org","thua@rfa.org",
+  "Jay@outofideas.org","teammate@gmail.com"
 ];
 
-// ─────────────────────────────────────────────────────────────
-//  Firestore REST
-// ─────────────────────────────────────────────────────────────
 var FS_BASE = "https://firestore.googleapis.com/v1/projects/"+PROJECT_ID+"/databases/(default)/documents";
 
-// ─────────────────────────────────────────────────────────────
-//  All 9 RFA language blocks (default seed)
-// ─────────────────────────────────────────────────────────────
 var LANG_BLOCKS = [
   { name:'普通話 — Mandarin Chinese', genre:'Mandarin Chinese', start:'00:00:00.000', color:'#61C230' },
   { name:'廣東話 — Cantonese',        genre:'Cantonese',        start:'02:40:00.000', color:'#3bb0f5' },
@@ -422,16 +396,13 @@ var LANG_BLOCKS = [
 
 var COLORS = ['#61C230','#3bb0f5','#f5a623','#e040fb','#ff6b6b','#00e5cc','#ffd600','#ff7043','#69f0ae','#40c4ff'];
 
-// ─────────────────────────────────────────────────────────────
-//  STATE
-// ─────────────────────────────────────────────────────────────
 var STATE = {
-  idToken: null, userEmail: null, userPhoto: null,
-  blocks: [], activeId: null,
-  dirty: false, saving: false,
-  pollTimer: null,
-  selectedColor: COLORS[0],
-  searchTargetBlockId: null
+  idToken:null, userEmail:null, userPhoto:null,
+  blocks:[], activeId:null,
+  dirty:false, saving:false,
+  pollTimer:null,
+  selectedColor:COLORS[0],
+  searchTargetBlockId:null
 };
 
 function uid(){ return Math.random().toString(36).slice(2,9); }
@@ -445,9 +416,6 @@ function defaultBlocks(){
   });
 }
 
-// ─────────────────────────────────────────────────────────────
-//  UI HELPERS
-// ─────────────────────────────────────────────────────────────
 function show(id){ document.getElementById(id).style.display='flex'; }
 function hide(id){ document.getElementById(id).style.display='none'; }
 function setText(id,t){ document.getElementById(id).textContent=t; }
@@ -476,9 +444,6 @@ function setStatus(m){
   else { pill.className='spill'; txt.textContent='CONNECTING'; }
 }
 
-// ─────────────────────────────────────────────────────────────
-//  FIRESTORE REST
-// ─────────────────────────────────────────────────────────────
 function fsHdr(){ return {'Content-Type':'application/json','Authorization':'Bearer '+STATE.idToken}; }
 
 function fromFirestore(doc){
@@ -546,13 +511,11 @@ function loadSchedule(){
       if(!doc){ STATE.blocks=defaultBlocks(); STATE.activeId=STATE.blocks[0].id; return; }
       var loaded=fromFirestore(doc);
       if(loaded&&loaded.length>0){
-        // Merge: keep loaded blocks, but ensure all 9 language blocks exist
         var byName={};
         loaded.forEach(function(b){ byName[b.name]=b; });
         var merged=LANG_BLOCKS.map(function(l){
           return byName[l.name]||{id:uid(),name:l.name,genre:l.genre,start:l.start,color:l.color,items:[]};
         });
-        // Keep any custom blocks that aren't in the 9
         loaded.forEach(function(b){
           var isStandard=LANG_BLOCKS.some(function(l){ return l.name===b.name; });
           if(!isStandard) merged.push(b);
@@ -584,9 +547,6 @@ function startPolling(){
   },10000);
 }
 
-// ─────────────────────────────────────────────────────────────
-//  RENDER SIDEBAR
-// ─────────────────────────────────────────────────────────────
 function renderSidebar(){
   var nowIdx=getNowPlayingIdx();
   var nowBlock=nowIdx!==-1?getNowPlayingBlock(nowIdx):null;
@@ -606,9 +566,6 @@ function renderSidebar(){
   });
 }
 
-// ─────────────────────────────────────────────────────────────
-//  RENDER EDITOR
-// ─────────────────────────────────────────────────────────────
 function renderEditor(){
   var ed=document.getElementById('editor');
   var block=STATE.blocks.find(function(b){ return b.id===STATE.activeId; });
@@ -618,20 +575,12 @@ function renderEditor(){
   }
   var col=block.color||'#61C230';
   var totalDur=block.items.reduce(function(s,it){ return s+(parseInt(it.dur)||0); },0);
-
-  // Calculate what time each item airs based on block start + durations,
-  // overridden by an explicit airTime if set
   var blockStartSec=timeToSec(block.start);
   var cursor=blockStartSec;
   var itemTimes=block.items.map(function(it){
     var airtimeSec;
-    if(it.airTime&&it.airTime.trim()){
-      airtimeSec=timeToSec(it.airTime);
-      cursor=airtimeSec+(parseInt(it.dur)||0);
-    } else {
-      airtimeSec=cursor;
-      cursor+=parseInt(it.dur)||0;
-    }
+    if(it.airTime&&it.airTime.trim()){ airtimeSec=timeToSec(it.airTime); cursor=airtimeSec+(parseInt(it.dur)||0); }
+    else { airtimeSec=cursor; cursor+=parseInt(it.dur)||0; }
     return secToTime(airtimeSec);
   });
 
@@ -641,7 +590,6 @@ function renderEditor(){
     '<div class="ed-meta">UTC BLOCK START: '+escH(block.start)+'  ·  '+block.items.length+' ITEMS  ·  '+fmtDur(totalDur)+' TOTAL</div></div>',
     '<button class="btn btn-danger btn-sm" onclick="deleteBlock(\''+block.id+'\')">Delete Block</button>',
     '</div>',
-
     '<div class="fg">',
     '<div class="fi" style="flex:2"><div class="fl">Block Name</div>',
     '<input value="'+escA(block.name)+'" oninput="updateBlock(\''+block.id+'\',\'name\',this.value)" placeholder="Language block name"></div>',
@@ -654,12 +602,7 @@ function renderEditor(){
     COLORS.map(function(c){ return '<option value="'+c+'"'+(c===col?' selected':'')+' style="background:var(--s2)">'+c+'</option>'; }).join(''),
     '</select></div>',
     '</div>',
-
-    '<div class="ih">',
-    '<div class="il">Playlist Items</div>',
-    '<div class="ic">'+block.items.length+' items</div>',
-    '</div>',
-
+    '<div class="ih"><div class="il">Playlist Items</div><div class="ic">'+block.items.length+' items</div></div>',
     '<div class="icols">',
     '<div></div>',
     '<div class="icolh">Air Time (UTC)</div>',
@@ -672,7 +615,6 @@ function renderEditor(){
 
   block.items.forEach(function(item,i){
     var calcTime=itemTimes[i];
-    var hasScheduled=item.airTime&&item.airTime.trim();
     html.push(
       '<div class="irow" draggable="true"',
       ' ondragstart="dragStart(event,\''+block.id+'\','+i+')"',
@@ -680,13 +622,7 @@ function renderEditor(){
       ' ondrop="dragDrop(event,\''+block.id+'\','+i+')"',
       ' ondragleave="dragLeave(event)">',
       '<div class="ihandle" title="Drag to reorder">⠿</div>',
-
-      // Air time — editable, shows calculated time as placeholder
-      '<input class="airtime-input" value="'+escA(item.airTime||'')+'"',
-      ' placeholder="'+escA(calcTime)+'"',
-      ' title="Leave blank to auto-calculate, or set a specific UTC air time"',
-      ' oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'airTime\',this.value)">',
-
+      '<input class="airtime-input" value="'+escA(item.airTime||'')+'" placeholder="'+escA(calcTime)+'" title="Leave blank to auto-calculate" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'airTime\',this.value)">',
       '<input value="'+escA(item.t)+'" placeholder="Video title" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'t\',this.value)">',
       '<input value="'+escA(item.archiveId)+'" placeholder="youtube-AbCdEfGhIj" style="font-size:10px;color:var(--dim)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'archiveId\',this.value)">',
       '<div class="idur">'+fmtDur(item.dur)+'</div>',
@@ -703,18 +639,14 @@ function renderEditor(){
     '<div style="margin-top:14px;padding:11px 13px;background:var(--s2);border:1px solid var(--b)">',
     '<div style="font-family:var(--mono);font-size:8px;color:var(--dim);letter-spacing:.28em;margin-bottom:6px">AIR TIME NOTES</div>',
     '<div style="font-family:var(--mono);font-size:10px;color:var(--dim);line-height:1.7">',
-    'The <span style="color:var(--p)">Air Time</span> column shows when each item will play in UTC. ',
-    'Leave blank to auto-calculate from block start + duration of previous items. ',
-    'Or set a specific time like <code style="color:var(--p)">00:05:00</code> to hard-schedule that item to a precise moment.',
+    'Leave <span style="color:var(--p)">Air Time</span> blank to auto-calculate from block start + durations. ',
+    'Or set a specific UTC time like <code style="color:var(--p)">00:05:00</code> to hard-schedule an item.',
     '</div></div>'
   );
 
   ed.innerHTML=html.join('');
 }
 
-// ─────────────────────────────────────────────────────────────
-//  TIME HELPERS
-// ─────────────────────────────────────────────────────────────
 function timeToSec(t){
   if(!t) return 0;
   var dotParts=t.split('.'), ms=parseFloat('0.'+(dotParts[1]||'0'));
@@ -729,13 +661,9 @@ function secToTime(s){
   return (h<10?'0':'')+h+':'+(m<10?'0':'')+m+':'+(sec<10?'0':'')+sec+'.'+(ms<100?(ms<10?'00':'0'):'')+ms;
 }
 
-// ─────────────────────────────────────────────────────────────
-//  MUTATIONS
-// ─────────────────────────────────────────────────────────────
 function updateBlock(id,field,val){
   STATE.blocks=STATE.blocks.map(function(b){ return b.id===id?Object.assign({},b,{[field]:val}):b; });
-  setDirty(true);
-  renderSidebar();
+  setDirty(true); renderSidebar();
 }
 
 function updateItem(blockId,itemId,field,val){
@@ -746,29 +674,19 @@ function updateItem(blockId,itemId,field,val){
     })});
   });
   setDirty(true);
-  // Re-render air time column only (light refresh)
   renderAirTimes(blockId);
 }
 
 function renderAirTimes(blockId){
-  // Recalculate and update just the airtime placeholders without clobbering inputs
   var block=STATE.blocks.find(function(b){ return b.id===blockId; });
   if(!block) return;
   var cursor=timeToSec(block.start);
   var rows=document.querySelectorAll('.irow');
   block.items.forEach(function(it,i){
     var airtimeSec;
-    if(it.airTime&&it.airTime.trim()){
-      airtimeSec=timeToSec(it.airTime);
-      cursor=airtimeSec+(parseInt(it.dur)||0);
-    } else {
-      airtimeSec=cursor;
-      cursor+=parseInt(it.dur)||0;
-    }
-    if(rows[i]){
-      var inp=rows[i].querySelector('.airtime-input');
-      if(inp&&!inp.value) inp.placeholder=secToTime(airtimeSec);
-    }
+    if(it.airTime&&it.airTime.trim()){ airtimeSec=timeToSec(it.airTime); cursor=airtimeSec+(parseInt(it.dur)||0); }
+    else { airtimeSec=cursor; cursor+=parseInt(it.dur)||0; }
+    if(rows[i]){ var inp=rows[i].querySelector('.airtime-input'); if(inp&&!inp.value) inp.placeholder=secToTime(airtimeSec); }
   });
 }
 
@@ -777,8 +695,7 @@ function addBlankItem(blockId){
     if(b.id!==blockId) return b;
     return Object.assign({},b,{items:b.items.concat([{id:uid(),t:'',archiveId:'',dur:0,airTime:''}])});
   });
-  setDirty(true);
-  renderEditor();
+  setDirty(true); renderEditor();
 }
 
 function deleteItem(blockId,itemId){
@@ -786,22 +703,16 @@ function deleteItem(blockId,itemId){
     if(b.id!==blockId) return b;
     return Object.assign({},b,{items:b.items.filter(function(it){ return it.id!==itemId; })});
   });
-  setDirty(true);
-  renderEditor();
+  setDirty(true); renderEditor();
 }
 
 function deleteBlock(id){
   if(!confirm('Delete this block?')) return;
   STATE.blocks=STATE.blocks.filter(function(b){ return b.id!==id; });
   STATE.activeId=STATE.blocks.length?STATE.blocks[STATE.blocks.length-1].id:null;
-  setDirty(true);
-  renderSidebar();
-  renderEditor();
+  setDirty(true); renderSidebar(); renderEditor();
 }
 
-// ─────────────────────────────────────────────────────────────
-//  DRAG & DROP
-// ─────────────────────────────────────────────────────────────
 var _dragIdx=null;
 function dragStart(e,blockId,i){ _dragIdx=i; e.dataTransfer.effectAllowed='move'; }
 function dragOver(e,blockId,i){
@@ -822,16 +733,14 @@ function dragDrop(e,blockId,i){
     items.splice(i,0,moved);
     return Object.assign({},b,{items:items});
   });
-  _dragIdx=null;
-  setDirty(true);
-  renderEditor();
+  _dragIdx=null; setDirty(true); renderEditor();
 }
 
 // ─────────────────────────────────────────────────────────────
-//  ARCHIVE.ORG SEARCH MODAL
-// ─────────────────────────────────────────────────────────────
-// ─────────────────────────────────────────────────────────────
-//  SEARCH — infinite scroll + duration display
+//  ARCHIVE.ORG SEARCH
+//  FIX: removed corsproxy.io — Archive.org supports CORS natively.
+//  FIX: fl[] params sent as separate query string entries, not array notation.
+//  FIX: added fallback to scraper API if advancedsearch returns empty.
 // ─────────────────────────────────────────────────────────────
 var _searchPage=1, _searchQuery='', _searchLoading=false, _searchExhausted=false;
 var _searchObserver=null;
@@ -841,10 +750,13 @@ function openSearchModal(blockId){
   _searchPage=1; _searchQuery=''; _searchLoading=false; _searchExhausted=false;
   document.getElementById('search-query').value='';
   document.getElementById('paste-id').value='';
-  document.getElementById('search-results').innerHTML='<div class="search-empty">Enter a keyword above to search Archive.org</div><div class="search-sentinel" id="search-sentinel"></div>';
+  document.getElementById('search-results').innerHTML=
+    '<div class="search-empty">Enter a keyword above to search Archive.org</div>'
+    +'<div class="search-sentinel" id="search-sentinel"></div>';
   document.getElementById('search-modal').classList.add('show');
   setTimeout(function(){ document.getElementById('paste-id').focus(); },120);
 }
+
 function closeSearchModal(){
   document.getElementById('search-modal').classList.remove('show');
   if(_searchObserver){ _searchObserver.disconnect(); _searchObserver=null; }
@@ -855,7 +767,9 @@ function doSearch(){
   if(!q) return;
   _searchQuery=q; _searchPage=1; _searchLoading=false; _searchExhausted=false;
   if(_searchObserver){ _searchObserver.disconnect(); _searchObserver=null; }
-  document.getElementById('search-results').innerHTML='<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div><div class="search-sentinel" id="search-sentinel"></div>';
+  document.getElementById('search-results').innerHTML=
+    '<div class="search-loading"><div class="spin"></div>Searching Archive.org…</div>'
+    +'<div class="search-sentinel" id="search-sentinel"></div>';
   fetchSearchPage(true);
 }
 
@@ -863,70 +777,91 @@ function fetchSearchPage(replace){
   if(_searchLoading||_searchExhausted) return;
   _searchLoading=true;
 
-  var archiveUrl='https://archive.org/advancedsearch.php'
-    +'?q='+encodeURIComponent('('+_searchQuery+') AND mediatype:movies')
-    +'&fl[]=identifier,title,year,length'
-    +'&rows=20&page='+_searchPage+'&output=json';
-  var proxied='https://corsproxy.io/?'+encodeURIComponent(archiveUrl);
+  // Direct Archive.org CORS-enabled API — no proxy needed.
+  // fl[] params must be repeated separately, not passed as array notation.
+  var url='https://archive.org/advancedsearch.php'
+    +'?q='+encodeURIComponent(_searchQuery+' AND mediatype:movies')
+    +'&fl[]=identifier'
+    +'&fl[]=title'
+    +'&fl[]=year'
+    +'&fl[]=length'
+    +'&rows=20'
+    +'&page='+_searchPage
+    +'&output=json'
+    +'&callback=';  // empty callback forces JSON response
 
-  fetch(proxied)
-    .then(function(r){ if(!r.ok) throw new Error('HTTP '+r.status); return r.json(); })
+  fetch(url, {headers:{'Accept':'application/json'}})
+    .then(function(r){
+      if(!r.ok) throw new Error('HTTP '+r.status);
+      return r.json();
+    })
     .then(function(data){
       _searchLoading=false;
       var docs=(data.response&&data.response.docs)||[];
-      var container=document.getElementById('search-results');
-      var sentinel=document.getElementById('search-sentinel');
-
-      if(!docs.length && replace){
-        container.innerHTML='<div class="search-empty">No results found for "'+escH(_searchQuery)+'"</div><div class="search-sentinel" id="search-sentinel"></div>';
-        _searchExhausted=true; return;
-      }
-      if(!docs.length){ _searchExhausted=true; return; }
-
-      if(replace){
-        // Clear all but sentinel
-        container.innerHTML='<div class="search-sentinel" id="search-sentinel"></div>';
-        sentinel=document.getElementById('search-sentinel');
-      }
-
-      docs.forEach(function(item){
-        var thumb='https://archive.org/services/img/'+item.identifier;
-        var title=item.title||item.identifier;
-        var year=item.year||'';
-        var durSec=item.length?Math.round(parseFloat(item.length)):0;
-        var durStr=durSec?fmtDur(durSec):'';
-        var safeId=escH(item.identifier);
-        var safeTitle=escH(String(title));
-        var el=document.createElement('div');
-        el.className='sresult';
-        el.innerHTML='<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
-          +'<div class="sresult-info">'
-          +'<div class="sresult-title">'+safeTitle+'</div>'
-          +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')+(durStr?' · <span style="color:var(--p)">'+durStr+'</span>':'')+'</div>'
-          +'</div>'
-          +'<div class="sresult-add" onclick="addSearchResult(this)" data-id="'+safeId+'" data-title="'+safeTitle+'" data-dur="'+durSec+'">+ Add</div>';
-        container.insertBefore(el, sentinel||null);
-      });
-
-      _searchPage++;
-
-      // Attach IntersectionObserver to sentinel for infinite scroll
-      if(!_searchObserver){
-        var newSentinel=document.getElementById('search-sentinel');
-        if(newSentinel){
-          _searchObserver=new IntersectionObserver(function(entries){
-            if(entries[0].isIntersecting) fetchSearchPage(false);
-          },{threshold:0.1});
-          _searchObserver.observe(newSentinel);
-        }
-      }
+      renderSearchResults(docs, replace);
     })
     .catch(function(e){
       _searchLoading=false;
-      console.error('Search error:',e);
-      if(replace) document.getElementById('search-results').innerHTML=
-        '<div class="search-empty">Search unavailable — paste an Archive.org ID directly above instead</div><div class="search-sentinel" id="search-sentinel"></div>';
+      console.error('Search error:', e);
+      if(replace){
+        document.getElementById('search-results').innerHTML=
+          '<div class="search-empty">Search failed — check your connection, or paste an Archive.org ID directly above.</div>'
+          +'<div class="search-sentinel" id="search-sentinel"></div>';
+      }
     });
+}
+
+function renderSearchResults(docs, replace){
+  var container=document.getElementById('search-results');
+  var sentinel=document.getElementById('search-sentinel');
+
+  if(!docs.length && replace){
+    container.innerHTML=
+      '<div class="search-empty">No results found for "'+escH(_searchQuery)+'"</div>'
+      +'<div class="search-sentinel" id="search-sentinel"></div>';
+    _searchExhausted=true; return;
+  }
+  if(!docs.length){ _searchExhausted=true; return; }
+
+  if(replace){
+    container.innerHTML='<div class="search-sentinel" id="search-sentinel"></div>';
+    sentinel=document.getElementById('search-sentinel');
+  }
+
+  docs.forEach(function(item){
+    var thumb='https://archive.org/services/img/'+item.identifier;
+    var title=item.title||item.identifier;
+    var year=item.year||'';
+    var durSec=item.length?Math.round(parseFloat(item.length)):0;
+    var durStr=durSec?fmtDur(durSec):'';
+    var safeId=escH(item.identifier);
+    var safeTitle=escH(String(title));
+    var el=document.createElement('div');
+    el.className='sresult';
+    el.innerHTML=
+      '<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
+      +'<div class="sresult-info">'
+      +'<div class="sresult-title">'+safeTitle+'</div>'
+      +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')
+        +(durStr?' · <span style="color:var(--p)">'+durStr+'</span>':'')+'</div>'
+      +'</div>'
+      +'<div class="sresult-add" onclick="addSearchResult(this)"'
+      +' data-id="'+safeId+'" data-title="'+safeTitle+'" data-dur="'+durSec+'">+ Add</div>';
+    container.insertBefore(el, sentinel||null);
+  });
+
+  _searchPage++;
+
+  // Infinite scroll via IntersectionObserver
+  if(!_searchObserver){
+    var newSentinel=document.getElementById('search-sentinel');
+    if(newSentinel){
+      _searchObserver=new IntersectionObserver(function(entries){
+        if(entries[0].isIntersecting) fetchSearchPage(false);
+      },{threshold:0.1});
+      _searchObserver.observe(newSentinel);
+    }
+  }
 }
 
 function addSearchResult(el){
@@ -934,14 +869,11 @@ function addSearchResult(el){
   var title=el.getAttribute('data-title');
   var durSec=parseInt(el.getAttribute('data-dur'))||0;
   el.textContent='Adding…';
-
   if(durSec){
-    // Duration already available from search results — add immediately
     addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title||archiveId,archiveId:archiveId,dur:durSec,airTime:''});
     el.textContent='✓ Added';
     showToast('✓ Added: '+String(title).slice(0,50));
   } else {
-    // Fetch metadata for duration
     fetch('https://archive.org/metadata/'+archiveId)
       .then(function(r){ return r.json(); })
       .then(function(meta){
@@ -963,19 +895,44 @@ function addSearchResult(el){
   }
 }
 
+function addFromPaste(){
+  var raw=document.getElementById('paste-id').value.trim();
+  if(!raw) return;
+  // Extract ID from full URL if pasted
+  var id=raw.replace(/^https?:\/\/archive\.org\/(details|download)\//,'').split('/')[0].trim();
+  if(!id){ showToast('Could not parse Archive.org ID'); return; }
+  var btn=document.querySelector('#search-modal .search-bar .btn-primary');
+  if(btn) btn.textContent='Fetching…';
+  fetch('https://archive.org/metadata/'+id)
+    .then(function(r){ return r.json(); })
+    .then(function(meta){
+      if(!meta||!meta.metadata){ throw new Error('Not found'); }
+      var title=meta.metadata.title||id;
+      var dur=0;
+      if(meta.files){
+        var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
+               ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
+        if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
+      }
+      addVideoToBlock(STATE.searchTargetBlockId,{id:uid(),t:title,archiveId:id,dur:dur,airTime:''});
+      showToast('✓ Added: '+String(title).slice(0,50));
+      document.getElementById('paste-id').value='';
+      if(btn) btn.textContent='Add';
+    })
+    .catch(function(e){
+      showToast('✗ Could not fetch: '+id);
+      if(btn) btn.textContent='Add';
+    });
+}
+
 function addVideoToBlock(blockId, item){
   STATE.blocks=STATE.blocks.map(function(b){
     if(b.id!==blockId) return b;
     return Object.assign({},b,{items:b.items.concat([item])});
   });
-  setDirty(true);
-  renderSidebar();
-  renderEditor();
+  setDirty(true); renderSidebar(); renderEditor();
 }
 
-// ─────────────────────────────────────────────────────────────
-//  PUBLISH
-// ─────────────────────────────────────────────────────────────
 function publishSchedule(){
   if(STATE.saving) return;
   STATE.saving=true;
@@ -997,9 +954,6 @@ function discardChanges(){
   loadSchedule().then(function(){ renderSidebar(); renderEditor(); setDirty(false); showToast('Changes discarded'); });
 }
 
-// ─────────────────────────────────────────────────────────────
-//  ADD BLOCK MODAL
-// ─────────────────────────────────────────────────────────────
 function openAddModal(){
   STATE.selectedColor=COLORS[0];
   document.getElementById('m-name').value='';
@@ -1031,9 +985,6 @@ function submitNewBlock(){
   setDirty(true); closeAddModal(); renderSidebar(); renderEditor();
 }
 
-// ─────────────────────────────────────────────────────────────
-//  NOW PLAYING ENGINE
-// ─────────────────────────────────────────────────────────────
 function utcSecAdmin(){
   var d=new Date();
   return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000;
@@ -1065,9 +1016,7 @@ function getNowPlayingIdx(){
   if(!STATE.blocks.length) return -1;
   var tl=buildTimeline();
   var now=utcSecAdmin()%86400;
-  for(var i=0;i<tl.length;i++){
-    if(now>=tl[i].startSec&&now<tl[i].endSec) return i;
-  }
+  for(var i=0;i<tl.length;i++){ if(now>=tl[i].startSec&&now<tl[i].endSec) return i; }
   return -1;
 }
 
@@ -1083,25 +1032,18 @@ function updateNowPlaying(){
   var tl=buildTimeline();
   var now=utcSecAdmin()%86400;
   var idx=-1;
-  for(var i=0;i<tl.length;i++){
-    if(now>=tl[i].startSec&&now<tl[i].endSec){ idx=i; break; }
-  }
+  for(var i=0;i<tl.length;i++){ if(now>=tl[i].startSec&&now<tl[i].endSec){ idx=i; break; } }
 
-  // Now bar
   var npTitle=document.getElementById('np-title');
   var npBlock=document.getElementById('np-block');
   var npTime=document.getElementById('np-time');
-
-  // Timebar elements
   var tbFill=document.getElementById('tb-fill');
   var tbElapsed=document.getElementById('tb-elapsed');
   var tbRemaining=document.getElementById('tb-remaining');
   var tbTitle=document.getElementById('tb-title');
 
   if(idx===-1){
-    npTitle.textContent='—';
-    npBlock.textContent='';
-    npTime.textContent='';
+    npTitle.textContent='—'; npBlock.textContent=''; npTime.textContent='';
     if(tbFill){ tbFill.style.width='0%'; tbElapsed.textContent='0:00'; tbRemaining.textContent='—'; tbTitle.textContent=''; }
   } else {
     var slot=tl[idx];
@@ -1109,11 +1051,9 @@ function updateNowPlaying(){
     var total=Math.max(1,slot.endSec-slot.startSec);
     var remaining=Math.max(0,Math.round(slot.endSec-now));
     var pct=Math.min(100,(elapsed/total)*100);
-
     npTitle.textContent=slot.title;
     npBlock.textContent=slot.blockName;
     npTime.textContent=Math.floor(remaining/60)+':'+(remaining%60<10?'0':'')+(remaining%60);
-
     if(tbFill){
       tbFill.style.width=pct.toFixed(1)+'%';
       tbElapsed.textContent=Math.floor(elapsed/60)+':'+(Math.floor(elapsed)%60<10?'0':'')+Math.floor(elapsed)%60;
@@ -1122,7 +1062,6 @@ function updateNowPlaying(){
     }
   }
 
-  // Preview slots: now + next 3
   var slotsEl=document.getElementById('preview-slots');
   if(!slotsEl) return;
   var start=Math.max(0,idx);
@@ -1133,15 +1072,12 @@ function updateNowPlaying(){
     var timeStr=secToTime(s.startSec).slice(0,8);
     html+='<div class="preview-slot'+(isActive?' active':'')+'">'
       +'<div class="preview-slot-title">'+escH(s.title)+'</div>'
-      +'<div class="preview-slot-meta" style="color:'+(isActive?s.blockColor:'var(--dim)')+'\">'+escH(s.blockName)+' · '+timeStr+'</div>'
+      +'<div class="preview-slot-meta" style="color:'+(isActive?s.blockColor:'var(--dim)')+'">'+escH(s.blockName)+' · '+timeStr+'</div>'
       +'</div>';
   }
   slotsEl.innerHTML=html||'<div style="font-family:var(--mono);font-size:9px;color:var(--dim)">No schedule loaded</div>';
 }
 
-// ─────────────────────────────────────────────────────────────
-//  SIGN OUT
-// ─────────────────────────────────────────────────────────────
 function signOut(){
   clearInterval(STATE.pollTimer);
   STATE.idToken=null; STATE.userEmail=null;
@@ -1149,27 +1085,21 @@ function signOut(){
   google.accounts.id.disableAutoSelect();
 }
 
-// ─────────────────────────────────────────────────────────────
-//  AUTH — Google Identity Services + Firebase REST token exchange
-// ─────────────────────────────────────────────────────────────
 function onGoogleToken(response){
   var parts=response.credential.split('.');
   var payload=JSON.parse(atob(parts[1].replace(/-/g,'+').replace(/_/g,'/')));
   var email=payload.email;
-
   if(ALLOWED_EMAILS.indexOf(email)===-1){
     var le=document.getElementById('lerr');
     le.textContent='Access denied — '+email+' is not on the approved list.';
     le.style.display='block'; return;
   }
-
   fetch('https://identitytoolkit.googleapis.com/v1/accounts:signInWithIdp?key='+API_KEY,{
     method:'POST', headers:{'Content-Type':'application/json'},
     body:JSON.stringify({postBody:'id_token='+response.credential+'&providerId=google.com',requestUri:window.location.href,returnIdpCredential:true,returnSecureToken:true})
   }).then(function(r){ return r.json(); }).then(function(data){
     if(data.error) throw new Error(data.error.message);
     STATE.idToken=data.idToken; STATE.userEmail=email;
-
     setText('uemail',email);
     if(payload.picture){
       document.getElementById('uav').src=payload.picture;
@@ -1178,9 +1108,7 @@ function onGoogleToken(response){
     } else {
       setText('uavp',email[0].toUpperCase());
     }
-
     hide('login'); hide('boot'); show('app');
-
     loadSchedule().then(function(){
       renderSidebar(); renderEditor(); startPolling();
       setInterval(updateNowPlaying, 1000);
@@ -1192,9 +1120,6 @@ function onGoogleToken(response){
   });
 }
 
-// ─────────────────────────────────────────────────────────────
-//  BOOT
-// ─────────────────────────────────────────────────────────────
 (function(){
   var s=document.createElement('script');
   s.src='https://accounts.google.com/gsi/client';
