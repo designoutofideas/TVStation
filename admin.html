@@ -600,14 +600,32 @@ function renderEditor(){
     '</div>'
   ];
 
-  // Determine which item index is currently on air within this block
+  // Determine which item is currently on air within this block,
+  // accounting for playlist looping. Uses the same cursor logic as
+  // buildTimeline so loop iterations are correctly mapped to UTC time.
   var nowSec = utcSecAdmin() % 86400;
   var nowItemIdx = -1;
-  block.items.forEach(function(item, i){
-    var s = timeToSec(itemTimes[i]);
-    var dur = parseInt(item.dur)||0;
-    if(nowSec >= s && nowSec < s + dur) nowItemIdx = i;
-  });
+  (function(){
+    var bStart = timeToSec(block.start);
+    // Find the block's end time (start of next block or end of day)
+    var sorted = STATE.blocks.slice().sort(function(a,b){ return timeToSec(a.start)-timeToSec(b.start); });
+    var bIdx = sorted.findIndex(function(b2){ return b2.id===block.id; });
+    var bEnd = (bIdx+1 < sorted.length) ? timeToSec(sorted[bIdx+1].start) : 86400;
+    if(nowSec < bStart || nowSec >= bEnd) return; // not currently in this block's time window
+    var cursor = bStart, i = 0, safety = 0;
+    while(cursor < bEnd && safety < 10000){
+      safety++;
+      var item = block.items[i % block.items.length];
+      var dur = parseInt(item.dur)||0;
+      if(!item.archiveId || dur <= 0){ i++; continue; }
+      var end = Math.min(cursor + dur, bEnd);
+      if(nowSec >= cursor && nowSec < end){
+        nowItemIdx = i % block.items.length;
+        return;
+      }
+      cursor = end; i++;
+    }
+  })();
 
   block.items.forEach(function(item,i){
     var calcTime=itemTimes[i];
@@ -844,10 +862,20 @@ function renderSearchResults(docs, replace){
     var durStr=durSec?fmtDur(durSec):'';
     var safeId=escH(item.identifier);
     var safeTitle=escH(String(title));
-    // subject can be a string or array depending on how many topics the item has
-    var subjects=item.subject
-      ? (Array.isArray(item.subject)?item.subject:[item.subject]).slice(0,3).map(escH).join(' · ')
-      : '';
+    // subject can be string or array — take top 3 meaningful topics,
+    // filtering out generic tags like 'youtube', 'video', 'movies'
+    var FILTER_TAGS = /^(youtube|video|movies|movie|film|films|internet archive|archive\.org|news|media)$/i;
+    var rawSubjects = item.subject
+      ? (Array.isArray(item.subject) ? item.subject : [item.subject])
+      : [];
+    var filteredSubjects = rawSubjects
+      .map(function(s){ return String(s).trim(); })
+      .filter(function(s){ return s && !FILTER_TAGS.test(s); })
+      .slice(0, 3)
+      .map(escH);
+    var subjectLine = filteredSubjects.length
+      ? filteredSubjects.join(' · ')
+      : (year ? escH(String(year)) : safeId);
     var el=document.createElement('div');
     el.className='sresult';
     el.innerHTML=
@@ -855,8 +883,8 @@ function renderSearchResults(docs, replace){
       +'<div class="sresult-info">'
       +'<a href="https://archive.org/details/'+safeId+'" target="_blank" class="sresult-title" style="color:var(--off);text-decoration:none;display:block" onmouseover="this.style.color=\'var(--p)\'" onmouseout="this.style.color=\'var(--off)\'">'+safeTitle+'</a>'
       +'<div class="sresult-meta">'
-      +safeId+(year?' · '+escH(String(year)):'')
-      +(subjects?'<br><span style="color:var(--p);opacity:0.7">⬛ '+subjects+'</span>':'')
+      +(year?'<span style="color:var(--dim)">'+escH(String(year))+'</span> · ':'')
+      +'<span style="color:var(--p);opacity:0.75">'+subjectLine+'</span>'
       +'</div>'
       +'</div>'
       +'<div class="sresult-dur" data-id="'+safeId+'" style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.25);padding:3px 8px;white-space:nowrap;flex-shrink:0;align-self:center;min-width:36px;text-align:center">'
