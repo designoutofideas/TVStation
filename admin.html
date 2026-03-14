@@ -862,20 +862,33 @@ function renderSearchResults(docs, replace){
     var durStr=durSec?fmtDur(durSec):'';
     var safeId=escH(item.identifier);
     var safeTitle=escH(String(title));
-    // subject can be string or array — take top 3 meaningful topics,
-    // filtering out generic tags like 'youtube', 'video', 'movies'
-    var FILTER_TAGS = /^(youtube|video|movies|movie|film|films|internet archive|archive\.org|news|media)$/i;
+    // Split search query into individual terms for matching
+    var searchTerms = _searchQuery.toLowerCase().split(/\s+/).filter(Boolean);
+    var FILTER_TAGS = /^(youtube|video|movies|movie|film|films|internet archive|archive\.org|media)$/i;
     var rawSubjects = item.subject
       ? (Array.isArray(item.subject) ? item.subject : [item.subject])
       : [];
-    var filteredSubjects = rawSubjects
+    // Score each subject by how many search terms it contains
+    // Exact matches score highest, partial matches score lower
+    var scoredSubjects = rawSubjects
       .map(function(s){ return String(s).trim(); })
       .filter(function(s){ return s && !FILTER_TAGS.test(s); })
+      .map(function(s){
+        var sl = s.toLowerCase();
+        var score = 0;
+        searchTerms.forEach(function(term){
+          if(sl === term) score += 10;           // exact match
+          else if(sl.indexOf(term) === 0) score += 6;  // starts with term
+          else if(sl.indexOf(term) !== -1) score += 3; // contains term
+        });
+        return { s: s, score: score };
+      })
+      .sort(function(a, b){ return b.score - a.score; })
       .slice(0, 3)
-      .map(escH);
-    var subjectLine = filteredSubjects.length
-      ? filteredSubjects.join(' · ')
-      : (year ? escH(String(year)) : safeId);
+      .map(function(x){ return escH(x.s); });
+    var subjectLine = scoredSubjects.length
+      ? scoredSubjects.join(' · ')
+      : (year ? '' : safeId);
     var el=document.createElement('div');
     el.className='sresult';
     el.innerHTML=
