@@ -587,20 +587,7 @@ function renderEditor(){
   var html=[
     '<div class="ed-hdr">',
     '<div><div class="ed-title" style="color:'+col+'">'+escH(block.name||'Untitled')+'</div>',
-    '<div class="ed-meta">UTC BLOCK START: '+escH(block.start)+'  ·  '+block.items.length+' ITEMS  ·  '+fmtDur(totalDur)+' TOTAL</div></div>',
-    '<button class="btn btn-danger btn-sm" onclick="deleteBlock(\''+block.id+'\')">Delete Block</button>',
-    '</div>',
-    '<div class="fg">',
-    '<div class="fi" style="flex:2"><div class="fl">Block Name</div>',
-    '<input value="'+escA(block.name)+'" oninput="updateBlock(\''+block.id+'\',\'name\',this.value)" placeholder="Language block name"></div>',
-    '<div class="fi"><div class="fl">Genre Label</div>',
-    '<input value="'+escA(block.genre)+'" oninput="updateBlock(\''+block.id+'\',\'genre\',this.value)" placeholder="Language"></div>',
-    '<div class="fi" style="max-width:110px"><div class="fl">Block UTC Start</div>',
-    '<input value="'+escA(block.start)+'" oninput="updateBlock(\''+block.id+'\',\'start\',this.value)" placeholder="HH:MM:SS.mmm"></div>',
-    '<div class="fi" style="max-width:80px"><div class="fl">Color</div>',
-    '<select onchange="updateBlock(\''+block.id+'\',\'color\',this.value)" style="background:'+col+'22;border-color:'+col+'">',
-    COLORS.map(function(c){ return '<option value="'+c+'"'+(c===col?' selected':'')+' style="background:var(--s2)">'+c+'</option>'; }).join(''),
-    '</select></div>',
+    '<div class="ed-meta">UTC '+escH(block.start)+'  ·  '+block.items.length+' ITEMS  ·  '+fmtDur(totalDur)+' TOTAL</div></div>',
     '</div>',
     '<div class="ih"><div class="il">Playlist Items</div><div class="ic">'+block.items.length+' items</div></div>',
     '<div class="icols">',
@@ -613,15 +600,26 @@ function renderEditor(){
     '</div>'
   ];
 
+  // Determine which item index is currently on air within this block
+  var nowSec = utcSecAdmin() % 86400;
+  var nowItemIdx = -1;
+  block.items.forEach(function(item, i){
+    var s = timeToSec(itemTimes[i]);
+    var dur = parseInt(item.dur)||0;
+    if(nowSec >= s && nowSec < s + dur) nowItemIdx = i;
+  });
+
   block.items.forEach(function(item,i){
     var calcTime=itemTimes[i];
+    var isNowPlaying=(i===nowItemIdx);
     html.push(
-      '<div class="irow" draggable="true"',
-      ' ondragstart="dragStart(event,\''+block.id+'\','+i+')"',
+      '<div class="irow" draggable="true"'
+      +(isNowPlaying?' style="border-color:var(--red);background:rgba(255,68,51,.07);box-shadow:inset 3px 0 0 var(--red)"':'')
+      +' ondragstart="dragStart(event,\''+block.id+'\','+i+')"',
       ' ondragover="dragOver(event,\''+block.id+'\','+i+')"',
       ' ondrop="dragDrop(event,\''+block.id+'\','+i+')"',
       ' ondragleave="dragLeave(event)">',
-      '<div class="ihandle" title="Drag to reorder">⠿</div>',
+      (isNowPlaying?'<div class="ihandle" style="color:var(--red);font-size:9px;letter-spacing:0;text-align:center" title="On Air">●</div>':'<div class="ihandle" title="Drag to reorder">⠿</div>'),
       '<input class="airtime-input" value="'+escA(item.airTime||'')+'" placeholder="'+escA(calcTime)+'" title="Leave blank to auto-calculate" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'airTime\',this.value)">',
       '<input value="'+escA(item.t)+'" placeholder="Video title" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'t\',this.value)">',
       '<input value="'+escA(item.archiveId)+'" placeholder="youtube-AbCdEfGhIj" style="font-size:10px;color:var(--dim)" oninput="updateItem(\''+block.id+'\',\''+item.id+'\',\'archiveId\',this.value)">',
@@ -633,7 +631,6 @@ function renderEditor(){
 
   html.push(
     '<div class="add-item-row">',
-    '<button class="add-item" onclick="addBlankItem(\''+block.id+'\')">+ Add Item Manually</button>',
     '<button class="add-item search-item" onclick="openSearchModal(\''+block.id+'\')">⌕ Search Archive.org</button>',
     '</div>',
     '<div style="margin-top:14px;padding:11px 13px;background:var(--s2);border:1px solid var(--b)">',
