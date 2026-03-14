@@ -798,8 +798,8 @@ function fetchSearchPage(replace){
   _searchLoading=true;
 
   var url='https://archive.org/advancedsearch.php'
-    +'?q='+encodeURIComponent(_searchQuery+' AND mediatype:movies')
-    +'&fl[]=identifier&fl[]=title&fl[]=year&fl[]=length'
+    +'?q='+encodeURIComponent('(subject:('+_searchQuery+') OR ('+_searchQuery+')) AND mediatype:movies')
+    +'&fl[]=identifier&fl[]=title&fl[]=year&fl[]=length&fl[]=subject'
     +'&rows=20&page='+_searchPage+'&output=json';
 
   jsonpSearch(url, 'callback', 12000)
@@ -844,13 +844,20 @@ function renderSearchResults(docs, replace){
     var durStr=durSec?fmtDur(durSec):'';
     var safeId=escH(item.identifier);
     var safeTitle=escH(String(title));
+    // subject can be a string or array depending on how many topics the item has
+    var subjects=item.subject
+      ? (Array.isArray(item.subject)?item.subject:[item.subject]).slice(0,3).map(escH).join(' · ')
+      : '';
     var el=document.createElement('div');
     el.className='sresult';
     el.innerHTML=
       '<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
       +'<div class="sresult-info">'
       +'<a href="https://archive.org/details/'+safeId+'" target="_blank" class="sresult-title" style="color:var(--off);text-decoration:none;display:block" onmouseover="this.style.color=\'var(--p)\'" onmouseout="this.style.color=\'var(--off)\'">'+safeTitle+'</a>'
-      +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')+'</div>'
+      +'<div class="sresult-meta">'
+      +safeId+(year?' · '+escH(String(year)):'')
+      +(subjects?'<br><span style="color:var(--p);opacity:0.7">⬛ '+subjects+'</span>':'')
+      +'</div>'
       +'</div>'
       +'<div class="sresult-dur" data-id="'+safeId+'" style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.25);padding:3px 8px;white-space:nowrap;flex-shrink:0;align-self:center;min-width:36px;text-align:center">'
       +(durStr||'…')+'</div>'
