@@ -737,13 +737,36 @@ function dragDrop(e,blockId,i){
 }
 
 // ─────────────────────────────────────────────────────────────
-//  ARCHIVE.ORG SEARCH
-//  FIX: removed corsproxy.io — Archive.org supports CORS natively.
-//  FIX: fl[] params sent as separate query string entries, not array notation.
-//  FIX: added fallback to scraper API if advancedsearch returns empty.
+//  ARCHIVE.ORG SEARCH — JSONP
+//  Archive.org blocks cross-origin fetch from GitHub Pages (no CORS headers).
+//  JSONP bypasses this by injecting a <script> tag — the browser loads it
+//  as a script resource, not a fetch, so CORS policy does not apply.
+//  Each request gets a unique callback name to avoid collisions.
 // ─────────────────────────────────────────────────────────────
 var _searchPage=1, _searchQuery='', _searchLoading=false, _searchExhausted=false;
 var _searchObserver=null;
+var _jsonpCallbackCounter=0;
+
+function jsonpSearch(url, callbackParam, timeout){
+  return new Promise(function(resolve, reject){
+    var cbName='_archiveCb'+(_jsonpCallbackCounter++);
+    var script=document.createElement('script');
+    var timer=setTimeout(function(){
+      cleanup(); reject(new Error('JSONP timeout'));
+    }, timeout||10000);
+    function cleanup(){
+      clearTimeout(timer);
+      delete window[cbName];
+      if(script.parentNode) script.parentNode.removeChild(script);
+    }
+    window[cbName]=function(data){
+      cleanup(); resolve(data);
+    };
+    script.src=url+'&'+callbackParam+'='+cbName;
+    script.onerror=function(){ cleanup(); reject(new Error('JSONP load error')); };
+    document.head.appendChild(script);
+  });
+}
 
 function openSearchModal(blockId){
   STATE.searchTargetBlockId=blockId;
@@ -777,24 +800,12 @@ function fetchSearchPage(replace){
   if(_searchLoading||_searchExhausted) return;
   _searchLoading=true;
 
-  // Direct Archive.org CORS-enabled API — no proxy needed.
-  // fl[] params must be repeated separately, not passed as array notation.
   var url='https://archive.org/advancedsearch.php'
     +'?q='+encodeURIComponent(_searchQuery+' AND mediatype:movies')
-    +'&fl[]=identifier'
-    +'&fl[]=title'
-    +'&fl[]=year'
-    +'&fl[]=length'
-    +'&rows=20'
-    +'&page='+_searchPage
-    +'&output=json'
-    +'&callback=';  // empty callback forces JSON response
+    +'&fl[]=identifier&fl[]=title&fl[]=year&fl[]=length'
+    +'&rows=20&page='+_searchPage+'&output=json';
 
-  fetch(url, {headers:{'Accept':'application/json'}})
-    .then(function(r){
-      if(!r.ok) throw new Error('HTTP '+r.status);
-      return r.json();
-    })
+  jsonpSearch(url, 'callback', 12000)
     .then(function(data){
       _searchLoading=false;
       var docs=(data.response&&data.response.docs)||[];
@@ -805,7 +816,7 @@ function fetchSearchPage(replace){
       console.error('Search error:', e);
       if(replace){
         document.getElementById('search-results').innerHTML=
-          '<div class="search-empty">Search failed — check your connection, or paste an Archive.org ID directly above.</div>'
+          '<div class="search-empty">Search unavailable — paste an Archive.org ID directly above instead.</div>'
           +'<div class="search-sentinel" id="search-sentinel"></div>';
       }
     });
@@ -852,7 +863,6 @@ function renderSearchResults(docs, replace){
 
   _searchPage++;
 
-  // Infinite scroll via IntersectionObserver
   if(!_searchObserver){
     var newSentinel=document.getElementById('search-sentinel');
     if(newSentinel){
