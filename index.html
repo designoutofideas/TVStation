@@ -294,16 +294,65 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// UTC clock — uses Date.now() directly.
-// Modern devices (phones, laptops, desktops) sync to NTP automatically
-// and are accurate to within 50ms — sufficient for frame-level sync.
-// The previous Archive.org HEAD-based calibration was corrupting mobile
-// UTC by applying an incorrect clockOffset derived from blocked CORS
-// headers or inflated mobile network RTT measurements.
-function trueUtcMs(){ return Date.now(); }
+// NTP-calibrated UTC clock — corrects local clock against Archive.org server time
+let clockOffset = 0;
+async function calibrateClockOffset(){
+  try{
+    const t0=Date.now();
+    const r=await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
+    const t1=Date.now();
+    const serverMs=new Date(r.headers.get('Date')).getTime();
+    if(!isNaN(serverMs)) clockOffset=serverMs+Math.round((t1-t0)/2)-t1;
+  }catch(e){ clockOffset=0; }
+}
+
+// Mobile-only NTP layer — replaces Archive.org calibration on mobile devices.
+// Mobile browsers block or corrupt the Archive.org Date header, producing
+// a wrong clockOffset that pulls every device onto a different UTC reference.
+// WorldTimeAPI returns millisecond-accurate UTC in JSON over HTTPS — not
+// subject to CORS header blocking on mobile.
+// Desktop devices keep the Archive.org calibration untouched.
+const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+
+async function calibrateMobileOffset(){
+  try{
+    const t0  = Date.now();
+    const r   = await fetch('https://worldtimeapi.org/api/ip', {cache:'no-store'});
+    const t1  = Date.now();
+    const data = await r.json();
+    // unixtime is whole seconds — use datetime for ms precision
+    const serverMs = new Date(data.utc_datetime).getTime();
+    if(isNaN(serverMs)){ console.warn('[mobile-clock] unparseable response'); return; }
+    const rtt       = t1 - t0;
+    const candidate = serverMs + Math.round(rtt / 2) - t1;
+    // Sanity gate: reject if >2s — indicates API error or bad network
+    if(Math.abs(candidate) > 2000){
+      console.warn(`[mobile-clock] offset=${candidate}ms rejected (>2s)`);
+      return;
+    }
+    clockOffset = candidate;
+    console.log(`[mobile-clock] offset=${clockOffset}ms rtt=${rtt}ms`);
+  }catch(e){
+    console.warn('[mobile-clock] WorldTimeAPI failed — using device NTP', e.message);
+  }
+}
+
+if(isMobile){
+  // Mobile: use WorldTimeAPI for accurate ms-precision UTC.
+  // Recalibrate every 30s — corrects any NITZ drift quickly and
+  // refines the initial calibration before it affects sync.
+  calibrateMobileOffset();
+  setInterval(calibrateMobileOffset, 30*1000);
+} else {
+  // Desktop: use existing Archive.org header calibration
+  calibrateClockOffset();
+  setInterval(calibrateClockOffset, 5*60*1000);
+}
+
+function trueUtcMs(){ return Date.now()+clockOffset; }
 function utcSec(){
-  const d = new Date();
-  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
+  const d=new Date(trueUtcMs());
+  return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000;
 }
 
 function buildTimeline(blocks){
@@ -525,20 +574,8 @@ function precisePlay(slot, targetUtcMs, idx){
 }
 
 // startDriftCorrection: every 2s, compare player.currentTime against
-// where UTC says we should be.
-//
-// Hard-seek threshold is 30s (not 2s). This is the critical mobile fix:
-// iOS snaps currentTime seeks to the nearest keyframe (~2-8s offset).
-// The old >2s threshold triggered a hard-seek loop on mobile — seek,
-// snap to keyframe, read drift >2s, seek again, repeat forever.
-// Rate nudging is not affected by keyframes and converges correctly
-// on all devices. Hard seek is reserved for genuinely lost devices only.
-//
-// Three tiers:
-//   |drift| <  0.08s → locked,       rate = 1.0
-//   |drift| <  2s    → gentle nudge, rate = 0.98/1.02  (~50s to close 1s gap)
-//   |drift| <  30s   → strong nudge, rate = 0.90/1.10  (~80s to close 8s gap)
-//   |drift| >= 30s   → hard seek     (genuinely lost — keyframe imprecision acceptable)
+// where UTC says we should be. Nudge playbackRate for small drift,
+// hard-seek for large drift.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
   driftInterval = setInterval(()=>{
@@ -546,26 +583,24 @@ function startDriftCorrection(idx){
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
+    // targetFrame1: Frame 1 of the UTC-correct second.
+    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
+    // that is identical on every client on Earth. Snapping here means
+    // every drift correction lands all clients on the same frame.
     const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos);
+    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
     const drift        = player.currentTime - targetFrame1;
 
-    if(Math.abs(drift) >= 30){
+    if(Math.abs(drift) > 2){
+      // More than 2s off — hard resync to Frame 1 of the correct second
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
-    } else if(Math.abs(drift) > 8){
-      // Fast convergence — closes 20s gap in ~100s, 8s gap in ~40s
-      console.log(`[sync] fast nudge drift=${drift.toFixed(3)}s`);
-      player.playbackRate = drift > 0 ? 0.80 : 1.20;
-    } else if(Math.abs(drift) > 2){
-      // Strong nudge — closes 8s gap in ~80s
-      console.log(`[sync] strong nudge drift=${drift.toFixed(3)}s`);
-      player.playbackRate = drift > 0 ? 0.90 : 1.10;
     } else if(Math.abs(drift) > 0.08){
-      // Gentle inaudible nudge
+      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
+      // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
   }, 2000);
@@ -619,7 +654,7 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
-    startDriftCorrection(idx);
+    if(seekLive) startDriftCorrection(idx);
   };
   if(player.readyState>=1)doPlay();
   else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
