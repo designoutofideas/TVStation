@@ -454,9 +454,29 @@ function hideHUD(){
 }
 
 document.addEventListener('mousemove', showHUD);
-document.addEventListener('touchstart', showHUD);
 hudEl.addEventListener('mouseenter',()=>{if(hudTimer)clearTimeout(hudTimer)});
 hudEl.addEventListener('mouseleave',()=>{hudTimer=setTimeout(hideHUD,HUD_TIMEOUT)});
+
+// Tap / click on the screen area toggles the HUD.
+// Tapping the HUD itself (controls) does not toggle — it keeps HUD visible.
+// This works identically in the live player and the admin preview iframe.
+const screenEl = document.getElementById('screen');
+screenEl.addEventListener('click', ()=>{
+  const isHidden = hudEl.classList.contains('hud-hidden');
+  if(isHidden){
+    showHUD();
+  } else {
+    if(hudTimer) clearTimeout(hudTimer);
+    hideHUD();
+  }
+});
+// Prevent touch from both toggling AND triggering mousemove on mobile
+screenEl.addEventListener('touchstart', (e)=>{
+  e.preventDefault();
+  const isHidden = hudEl.classList.contains('hud-hidden');
+  if(isHidden){ showHUD(); } else { if(hudTimer) clearTimeout(hudTimer); hideHUD(); }
+}, {passive:false});
+
 showHUD();
 
 // ── VOLUME ───────────────────────────────────────────────────
