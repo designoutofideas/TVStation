@@ -853,11 +853,42 @@ function renderSearchResults(docs, replace){
       '<img class="sresult-thumb" src="'+thumb+'" onerror="this.style.background=\'#1a2a1a\'" loading="lazy">'
       +'<div class="sresult-info">'
       +'<div class="sresult-title">'+safeTitle+'</div>'
-      +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')
-        +(durStr?' · <span style="color:var(--p)">'+durStr+'</span>':'')+'</div>'
+      +'<div class="sresult-meta">'+safeId+(year?' · '+escH(String(year)):'')+'</div>'
       +'</div>'
+      +'<div class="sresult-dur" data-id="'+safeId+'" style="font-family:var(--mono);font-size:11px;font-weight:600;color:var(--p);background:rgba(97,194,48,.08);border:1px solid rgba(97,194,48,.25);padding:3px 8px;white-space:nowrap;flex-shrink:0;align-self:center;min-width:36px;text-align:center">'
+      +(durStr||'…')+'</div>'
       +'<div class="sresult-add" onclick="addSearchResult(this)"'
       +' data-id="'+safeId+'" data-title="'+safeTitle+'" data-dur="'+durSec+'">+ Add</div>';
+    container.insertBefore(el, sentinel||null);
+
+    // If duration missing from search index, fetch it from metadata in background
+    // and update the badge + data-dur before the user clicks Add
+    if(!durSec){
+      (function(element, id){
+        fetch('https://archive.org/metadata/'+id)
+          .then(function(r){ return r.json(); })
+          .then(function(meta){
+            var dur=0;
+            if(meta.files){
+              var mp4=meta.files.find(function(f){ return /\.ia\.mp4$/i.test(f.name); })
+                     ||meta.files.find(function(f){ return /\.mp4$/i.test(f.name); });
+              if(mp4&&mp4.length) dur=Math.round(parseFloat(mp4.length));
+            }
+            var badge=element.querySelector('.sresult-dur');
+            var addBtn=element.querySelector('.sresult-add');
+            if(dur){
+              if(badge) badge.textContent=fmtDur(dur);
+              if(addBtn) addBtn.setAttribute('data-dur', dur);
+            } else {
+              if(badge){ badge.textContent='—'; badge.style.opacity='0.4'; }
+            }
+          })
+          .catch(function(){
+            var badge=element.querySelector('.sresult-dur');
+            if(badge){ badge.textContent='—'; badge.style.opacity='0.4'; }
+          });
+      })(el, item.identifier);
+    }
     container.insertBefore(el, sentinel||null);
   });
 
