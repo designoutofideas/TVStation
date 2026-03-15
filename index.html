@@ -497,51 +497,41 @@ async function fetchPublishDate(id){
 }
 
 // ══════════════════════════════════════════════════════════════
-//  FOUR-GEAR UTC SYNC ENGINE
+//  SYNC ENGINE — MOBILE-AWARE
 //
-//  GEAR 1 — Coarse seek (all devices)
-//    Waits for top of UTC second via rAF. All devices fire simultaneously.
-//    Seeks to floor(utcSec - slot.startSec). Accepts keyframe snap.
+//  IRON RULE: no seeks after play() is called on any device.
 //
-//  GEAR 2 — Iterative re-anchor (all devices)
-//    After each seek, measures actual landed position vs UTC.
-//    Re-seeks until within ±G2_THRESHOLD (500ms) of UTC.
-//    Max G2_MAX_ATTEMPTS before giving up and proceeding anyway.
-//    Does NOT call play() — all seeks happen before playback starts.
+//  DESKTOP path:
+//    Gear 1 → single seek → play() → Gear 3 fine lock (±2%)
+//    Desktop lands within ~500ms of UTC. Gear 3 closes it quietly.
 //
-//  GEAR 2.5 — Mobile pre-compensation (mobile only)
-//    After Gear 2 confirms ±500ms, seeks G25_OFFSET seconds ahead.
-//    Pre-compensates for mobile buffer delay: by the time this seek
-//    completes and the decoder lands, the device is back near UTC.
-//    Waits for 'seeked' then calls play() immediately.
-//    Desktop skips this gear entirely.
+//  MOBILE path:
+//    Gear 1 → single seek → play() → Gear 3 coarse lock (±15%)
+//    Mobile lands within ~3–5s of UTC. Coarse rate closes it in ~30s.
+//    Once within 0.5s → Gear 3 fine lock (±2%) holds it there.
 //
-//  GEAR 3 — Compressor gate (all devices, rate-only, no seeks ever)
-//    Only engages after play() confirms readyState >= 2.
-//    Gate band: drift within ±G3_GATE → rate = exactly 1.0x.
-//    Outside gate: proportional rate correction, max ±G3_MAX.
-//    Correction eases to zero as drift → 0 — true compressor curve.
-//    G3_SMOOTH caps rate-of-change per frame — artifact-free.
+//  Gear 3 is rate-only on both paths. No seeks, no rebuffering,
+//  no choppy playback. The rate tiers step down as drift closes —
+//  like a car downshifting as it reaches cruising speed.
 // ══════════════════════════════════════════════════════════════
 
 const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
 
-// Gear 2 constants
-const G2_THRESHOLD    = 0.5;   // ±500ms — acceptable pre-play accuracy
-const G2_MAX_ATTEMPTS = 8;     // max re-seek attempts
-
-// Gear 2.5 constants (mobile only)
-const G25_OFFSET = 2.5;        // seconds ahead to pre-compensate buffer delay
-
-// Gear 3 constants
-const G3_GATE   = 0.08;        // ±80ms gate band — rate=1.0 within this
-const G3_MAX    = 0.02;        // ±2% max rate correction outside gate
-const G3_GAIN   = 0.04;        // proportional gain
-const G3_SMOOTH = 0.0002;      // max rate change per frame — artifact-free
-
 let driftInterval = null;
 let g3Active      = false;
 let g3Idx         = -1;
+
+// Fine lock constants (all devices once within threshold)
+const G3_FINE_MAX    = 0.02;   // ±2%
+const G3_FINE_GAIN   = 0.04;
+const G3_FINE_THRESH = 0.5;    // seconds — switch from coarse to fine
+
+// Coarse lock constants (mobile only, large initial gap)
+const G3_COARSE_MAX  = 0.15;   // ±15% — closes 5s gap in ~33s
+const G3_COARSE_GAIN = 0.05;
+
+// Rate smoothing — artifact-free
+const G3_SMOOTH      = 0.0002; // max rate change per frame
 
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
@@ -550,30 +540,34 @@ function cancelSync(){
   player.playbackRate = 1.0;
 }
 
-// ── GEAR 3: Compressor gate ───────────────────────────────────
+// ── GEAR 3 ───────────────────────────────────────────────────
 function startGear3(slot, idx){
   g3Active = false;
   g3Idx    = -1;
   if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
   g3Active = true;
   g3Idx    = idx;
-  console.log('[gear3] compressor gate engaged idx='+idx);
+
+  function computeRate(drift){
+    const abs = Math.abs(drift);
+    // Step down through tiers as drift closes
+    const max  = (isMobile && abs > G3_FINE_THRESH) ? G3_COARSE_MAX  : G3_FINE_MAX;
+    const gain = (isMobile && abs > G3_FINE_THRESH) ? G3_COARSE_GAIN : G3_FINE_GAIN;
+    const correction = Math.max(-max, Math.min(max, drift * gain));
+    return 1.0 - correction;
+  }
 
   if(!player.requestVideoFrameCallback){
-    // Fallback: setInterval, rate-only compressor
+    // Fallback: setInterval rate-only
     driftInterval = setInterval(()=>{
       if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
       if(player.paused || player.readyState < 2) return;
-      const drift = player.currentTime - (utcSec() - slot.startSec);
-      if(Math.abs(drift) <= G3_GATE){
-        player.playbackRate = 1.0;
-      } else {
-        const correction = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
-        const target     = 1.0 - correction;
-        const current    = player.playbackRate;
-        player.playbackRate = current + Math.max(-0.002, Math.min(0.002, target - current));
-      }
+      const drift   = player.currentTime - (utcSec() - slot.startSec);
+      const target  = computeRate(drift);
+      const current = player.playbackRate;
+      player.playbackRate = current + Math.max(-0.005, Math.min(0.005, target - current));
     }, 500);
+    console.log('[gear3] fallback started idx='+idx+' mobile='+isMobile);
     return;
   }
 
@@ -585,115 +579,78 @@ function startGear3(slot, idx){
     }
     const expectedPos = utcSec() - slot.startSec;
     const frameDrift  = metadata.mediaTime - expectedPos;
-
-    if(Math.abs(frameDrift) <= G3_GATE){
-      // Within gate — locked at exactly 1.0x
-      player.playbackRate = 1.0;
-    } else {
-      // Outside gate — proportional correction eases back to 1.0
-      const correction = Math.max(-G3_MAX, Math.min(G3_MAX, frameDrift * G3_GAIN));
-      const target     = 1.0 - correction;
-      const current    = player.playbackRate;
-      player.playbackRate = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
-    }
+    const target      = computeRate(frameDrift);
+    const current     = player.playbackRate;
+    player.playbackRate = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
     player.requestVideoFrameCallback(onFrame);
   }
   player.requestVideoFrameCallback(onFrame);
+  console.log('[gear3] engaged idx='+idx+' mobile='+isMobile);
 }
 
-// ── GEAR 2.5: Mobile pre-compensation ────────────────────────
-function startGear25(slot, idx, onComplete){
-  const nowUtc    = utcSec();
-  const livePos   = nowUtc - slot.startSec;
-  const dur       = player.duration;
-  // Seek ahead by G25_OFFSET — pre-compensates for buffer delay
-  const target    = Math.max(0, livePos + G25_OFFSET);
-  const clamped   = isFinite(dur) ? Math.min(target, dur - 2) : target;
-  console.log(`[gear2.5] mobile pre-comp seek → ${clamped.toFixed(2)}s (+${G25_OFFSET}s offset)`);
-
-  function onSeeked(){
-    player.removeEventListener('seeked', onSeeked);
-    if(currentIdx !== idx) return;
-    const finalDelta = player.currentTime - (utcSec() - slot.startSec);
-    console.log(`[gear2.5] landed Δ${finalDelta.toFixed(3)}s → play`);
-    onComplete();
-  }
-  player.addEventListener('seeked', onSeeked);
-  player.currentTime = clamped;
-}
-
-// ── GEAR 2: Iterative re-anchor ───────────────────────────────
-function startGear2(slot, idx, onComplete){
-  let attempts = 0;
-
-  function tryAnchor(){
-    if(currentIdx !== idx) return;
-    const livePos  = utcSec() - slot.startSec;
-    const dur      = player.duration;
-    const clamped  = Math.max(0, isFinite(dur) ? Math.min(livePos, dur - 2) : livePos);
-    const delta    = player.currentTime - clamped;
-    attempts++;
-    console.log(`[gear2] attempt ${attempts} Δ${delta.toFixed(3)}s`);
-
-    if(Math.abs(delta) <= G2_THRESHOLD || attempts >= G2_MAX_ATTEMPTS){
-      console.log(`[gear2] confirmed ±${Math.abs(delta).toFixed(3)}s after ${attempts} attempt(s)`);
-      // Hand to Gear 2.5 on mobile, directly to play on desktop
-      if(isMobile){
-        startGear25(slot, idx, onComplete);
-      } else {
-        onComplete();
-      }
-      return;
-    }
-
-    // Re-seek to live UTC position — before play(), no rebuffering penalty
-    function onSeeked(){
-      player.removeEventListener('seeked', onSeeked);
-      if(currentIdx !== idx) return;
-      setTimeout(tryAnchor, 80);
-    }
-    player.addEventListener('seeked', onSeeked);
-    player.currentTime = clamped;
-  }
-
-  // First measurement fires on the 'seeked' event from Gear 1
-  function onFirstSeeked(){
-    player.removeEventListener('seeked', onFirstSeeked);
-    if(currentIdx !== idx) return;
-    setTimeout(tryAnchor, 80);
-  }
-  player.addEventListener('seeked', onFirstSeeked);
-}
-
-// ── GEAR 1: Coarse seek ───────────────────────────────────────
+// ── GEAR 1 + 2 combined ───────────────────────────────────────
+// One seek (Gear 1), one optional corrective seek (Gear 2),
+// both before play(). Then play() + Gear 3. No seeks after.
 function precisePlay(slot, targetUtcMs, idx){
   function loop(){
     if(currentIdx !== idx) return;
     const now = trueUtcMs();
     if(now >= targetUtcMs){
-      const seekTo  = Math.max(0, Math.floor(utcSec() - slot.startSec));
-      const dur     = player.duration;
-      const clamped = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
+      const seekTo    = Math.max(0, Math.floor(utcSec() - slot.startSec));
+      const dur       = player.duration;
+      const clamped   = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
+      const seekStart = Date.now();
       console.log(`[gear1] seek ${clamped}s utc=${utcSec().toFixed(2)}s`);
 
-      // Arm Gear 2 before seek so 'seeked' is captured
-      startGear2(slot, idx, ()=>{
-        // All pre-play seeks complete — call play() then start Gear 3
-        player.playbackRate = 1.0;
-        player.play().catch(async e=>{
-          const confirmed = await resolveUrl(slot.id);
-          if(confirmed && currentIdx === idx){
-            player.src = confirmed; player.load();
-            player.currentTime = Math.max(0, utcSec() - slot.startSec);
-            player.play().catch(()=>{});
-          } else if(!confirmed){
-            console.warn('Skipping:', slot.title);
-            doCut((idx+1) % TIMELINE.length);
-          }
-        });
-        startGear3(slot, idx);
-      });
+      function onSeeked(){
+        player.removeEventListener('seeked', onSeeked);
+        if(currentIdx !== idx) return;
+        const seekMs    = Date.now() - seekStart;
+        const livePos   = utcSec() - slot.startSec;
+        const delta     = player.currentTime - livePos;
+        console.log(`[gear2] landed Δ${delta.toFixed(2)}s seekMs=${seekMs}`);
 
+        function doPlay(){
+          player.playbackRate = 1.0;
+          player.play().catch(async e=>{
+            const confirmed = await resolveUrl(slot.id);
+            if(confirmed && currentIdx === idx){
+              player.src = confirmed; player.load();
+              player.currentTime = Math.max(0, utcSec() - slot.startSec);
+              player.play().catch(()=>{});
+            } else if(!confirmed){
+              console.warn('Skipping:', slot.title);
+              doCut((idx+1) % TIMELINE.length);
+            }
+          });
+          startGear3(slot, idx);
+        }
+
+        // On desktop: if gap > 1s, one corrective seek before play
+        // On mobile: skip corrective seek entirely — rebuffering is worse
+        //            than letting Gear 3 coarse-close the gap via rate
+        if(!isMobile && Math.abs(delta) > 1.0){
+          const latency   = Math.min(seekMs / 1000, 2.0);
+          const corrected = Math.max(0, Math.min(
+            isFinite(dur) ? dur - 2 : Infinity,
+            livePos + latency
+          ));
+          console.log(`[gear2] desktop corrective seek → ${corrected.toFixed(2)}s`);
+          function onCorrected(){
+            player.removeEventListener('seeked', onCorrected);
+            if(currentIdx !== idx) return;
+            doPlay();
+          }
+          player.addEventListener('seeked', onCorrected);
+          player.currentTime = corrected;
+        } else {
+          // Mobile: play immediately from wherever Gear 1 landed
+          // Gear 3 coarse tier closes the gap via rate — no rebuffering
+          doPlay();
+        }
+      }
+
+      player.addEventListener('seeked', onSeeked);
       player.currentTime = clamped;
     } else {
       requestAnimationFrame(loop);
@@ -868,18 +825,15 @@ window.tuneIn = function(){
     const exp    = slot ? Math.max(0, utc - slot.startSec) : 0;
     const drift  = slot ? (player.currentTime - exp) : 0;
     const slotOk = slot && utc >= slot.startSec && utc < slot.endSec;
-    const locked = g3Active && Math.abs(drift) <= G3_GATE;
-    const gear   = g3Active
-      ? (locked ? 'G3 LOCKED ±80ms' : 'G3 correcting')
-      : 'G1/G2/G2.5';
+    const tier   = g3Active ? (Math.abs(drift) > 0.5 && isMobile ? 'G3 coarse ±15%' : 'G3 fine ±2%') : 'G1/G2';
     dbg.textContent =
       `UTC      ${utc.toFixed(3)}s  ${hh}:${mm}:${ss}.${ms}\n`+
-      `device   ${isMobile?'mobile':'desktop'}\n`+
+      `offset   ${clockOffset}ms  ${isMobile?'[mobile]':'[desktop]'}\n`+
       `expected ${exp.toFixed(3)}s${slotOk?'':' ⚠'}\n`+
       `actual   ${player.currentTime.toFixed(3)}s\n`+
       `drift    ${drift.toFixed(3)}s\n`+
       `rate     ${player.playbackRate.toFixed(4)}x\n`+
-      `sync     ${gear}\n`+
+      `sync     ${tier}\n`+
       `[tap to freeze]`;
   }, 250);
 })();
