@@ -546,35 +546,50 @@ function cancelSync(){
 }
 
 // precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
-// then computes the LIVE seek position at that exact instant and fires play().
-// seekTo is computed at fire-time — not before — so the position is accurate
-// regardless of how long the seek or rAF wait took.
+// then seeks to the live UTC position and waits for the 'seeked' event
+// before calling play(). The post-seek re-anchor compensates for mobile
+// buffer delay — on iOS the seek takes 1–3s, so we recompute the correct
+// position at the moment the decoder has actually landed, not before.
 function precisePlay(slot, targetUtcMs, idx){
   function loop(){
-    if(currentIdx !== idx) return; // slot changed — abort
+    if(currentIdx !== idx) return;
     const now = trueUtcMs();
     if(now >= targetUtcMs){
-      // Compute where we should be at THIS exact millisecond.
-      // Floor to whole second: every whole UTC second is a universal frame
-      // boundary that is identical on every client on Earth.
-      const liveOffset = (now / 1000) - slot.startSec;
-      const seekTo = Math.max(0, Math.floor(liveOffset));
-      const dur = player.duration;
+      const liveOffset  = (now / 1000) - slot.startSec;
+      const seekTo      = Math.max(0, Math.floor(liveOffset));
+      const dur         = player.duration;
       const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      console.log(`[precisePlay] firing at utc=${(now/1000).toFixed(3)} seekTo=${clampedSeek}s`);
+      console.log(`[precisePlay] seek to ${clampedSeek}s`);
       player.currentTime = clampedSeek;
-      player.play().catch(async e=>{
-        const confirmed = await resolveUrl(slot.id);
-        if(confirmed && currentIdx===idx){
-          player.src=confirmed; player.load();
-          player.currentTime=clampedSeek;
-          player.play().catch(()=>{});
-        } else if(!confirmed){
-          console.warn('Skipping unplayable slot:', slot.title);
-          doCut((idx+1)%TIMELINE.length);
+
+      // Wait for the decoder to actually land before playing.
+      // Re-anchor to live UTC at that exact moment — compensates for
+      // the 1–3s seek latency on mobile without guessing a fixed offset.
+      function onSeeked(){
+        player.removeEventListener('seeked', onSeeked);
+        if(currentIdx !== idx) return;
+        const nowAfterSeek   = trueUtcMs();
+        const liveAfterSeek  = (nowAfterSeek / 1000) - slot.startSec;
+        const corrected      = Math.max(0, Math.floor(liveAfterSeek));
+        const clampedCorrected = isFinite(dur) ? Math.min(corrected, dur - 2) : corrected;
+        if(Math.abs(clampedCorrected - player.currentTime) > 0.5){
+          console.log(`[precisePlay] re-anchor ${player.currentTime.toFixed(2)}s → ${clampedCorrected}s (seek latency ${(nowAfterSeek - now).toFixed(0)}ms)`);
+          player.currentTime = clampedCorrected;
         }
-      });
-      startDriftCorrection(idx);
+        player.play().catch(async e=>{
+          const confirmed = await resolveUrl(slot.id);
+          if(confirmed && currentIdx===idx){
+            player.src=confirmed; player.load();
+            player.currentTime=clampedCorrected;
+            player.play().catch(()=>{});
+          } else if(!confirmed){
+            console.warn('Skipping unplayable slot:', slot.title);
+            doCut((idx+1)%TIMELINE.length);
+          }
+        });
+        startDriftCorrection(idx);
+      }
+      player.addEventListener('seeked', onSeeked);
     } else {
       requestAnimationFrame(loop);
     }
