@@ -595,7 +595,7 @@ function startGear2(slot, idx, onComplete){
 
     // Read UTC at the exact millisecond the decoder landed
     const nowMs        = trueUtcMs();
-    const livePos      = (nowMs / 1000) - slot.startSec;
+    const livePos      = utcSec() - slot.startSec;
     const dur          = player.duration;
     const anchorPos    = Math.max(0, livePos);
     const clamped      = isFinite(dur) ? Math.min(anchorPos, dur - 2) : anchorPos;
@@ -628,11 +628,11 @@ function precisePlay(slot, targetUtcMs, idx){
     if(currentIdx !== idx) return;
     const now = trueUtcMs();
     if(now >= targetUtcMs){
-      const liveOffset  = (now / 1000) - slot.startSec;
+      const liveOffset  = utcSec() - slot.startSec;
       const seekTo      = Math.max(0, Math.floor(liveOffset));
       const dur         = player.duration;
       const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      console.log(`[gear1] seek to ${clampedSeek}s at utc=${(now/1000).toFixed(3)}s`);
+      console.log(`[gear1] seek to ${clampedSeek}s at utc=${utcSec().toFixed(3)}s`);
 
       // Arm Gear 2 before issuing the seek so the 'seeked' event is caught
       startGear2(slot, idx, ()=>{
@@ -642,7 +642,7 @@ function precisePlay(slot, targetUtcMs, idx){
           const confirmed = await resolveUrl(slot.id);
           if(confirmed && currentIdx === idx){
             player.src = confirmed; player.load();
-            player.currentTime = Math.max(0, (trueUtcMs()/1000) - slot.startSec);
+            player.currentTime = Math.max(0, utcSec() - slot.startSec);
             player.play().catch(()=>{});
           } else if(!confirmed){
             console.warn('Skipping unplayable slot:', slot.title);
@@ -660,12 +660,10 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: stub — sync handled by three-gear engine above
-function startDriftCorrection(idx){
-  // Gear 3 handles ongoing correction — this stub keeps call sites intact
-  const slot = TIMELINE[idx];
-  if(slot) startGear3(slot, idx);
-}
+// startDriftCorrection: stub — three-gear engine handles all sync.
+// Gear 3 is started exclusively by precisePlay → Gear 2 → Gear 3 chain.
+// This stub exists only to satisfy call sites in the short-offset path.
+function startDriftCorrection(idx){ /* no-op — see precisePlay chain */ }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
 async function playSlot(idx,seekLive){
@@ -714,9 +712,8 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
-    // Always start drift correction — not conditional on seekLive.
-    // doCut passes seekLive=false but still needs the sync loop running.
-    startDriftCorrection(idx);
+    // Short-offset path: Gear 1 seek not needed — engage Gear 3 directly
+    startGear3(slot, idx);
   };
   if(player.readyState>=1)doPlay();
   else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
