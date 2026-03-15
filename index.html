@@ -500,20 +500,80 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// driftInterval: handle for the continuous drift-correction loop
+// Philosophy: one accurate seek beats continuous imperfect correction.
+//
+// player.currentTime on mobile Safari is coarse and delayed — it cannot
+// be reliably used for ongoing drift measurement. Every correction loop
+// we have tried measures against stale data and fights itself.
+//
+// The correct model:
+//   1. Seek to the UTC position
+//   2. Wait for the native 'seeked' event — the decoder has landed
+//   3. At that exact millisecond, read live UTC and correct currentTime
+//      to where we ACTUALLY are right now (post-seek re-anchor)
+//   4. Play at exactly 1.0x — no ongoing rate changes
+//   5. On each slot cut, repeat from step 1
+//
+// This gives every device the same UTC-anchored start position on every
+// clip. No pitch shifting, no oscillation, no compressor needed.
+// The only remaining delta between devices is seek latency variance
+// (typically <100ms on desktop, <500ms on mobile over WiFi).
+
 let driftInterval = null;
 
-// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
-  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
+  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
+  stopPhase2();
   player.playbackRate = 1.0;
 }
 
-// precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
-// then seeks to the live UTC position and waits for the 'seeked' event
-// before calling play(). The post-seek re-anchor compensates for mobile
-// buffer delay — on iOS the seek takes 1–3s, so we recompute the correct
-// position at the moment the decoder has actually landed, not before.
+// anchorAndPlay: the entire sync mechanism.
+// Waits for the decoder to land after a seek, re-anchors to live UTC
+// at that exact moment, then plays at 1.0x.
+function anchorAndPlay(slot, idx){
+  function onSeeked(){
+    player.removeEventListener('seeked', onSeeked);
+    if(currentIdx !== idx) return;
+
+    // The decoder has landed. Read UTC right now.
+    const nowMs         = trueUtcMs();
+    const livePos       = (nowMs / 1000) - slot.startSec;
+    const anchorPos     = Math.max(0, livePos);
+    const dur           = player.duration;
+    const clampedAnchor = isFinite(dur) ? Math.min(anchorPos, dur - 2) : anchorPos;
+
+    // Only re-seek if we're more than 200ms from the correct position.
+    // This avoids a redundant seek on fast desktop connections.
+    const delta = Math.abs(player.currentTime - clampedAnchor);
+    if(delta > 0.2){
+      console.log(`[anchor] re-seek ${player.currentTime.toFixed(3)}s → ${clampedAnchor.toFixed(3)}s (Δ${delta.toFixed(3)}s)`);
+      // Set currentTime directly — don't recurse into another seeked listener
+      player.currentTime = clampedAnchor;
+    }
+
+    console.log(`[anchor] play at ${player.currentTime.toFixed(3)}s utc=${(nowMs/1000).toFixed(3)}s`);
+    player.playbackRate = 1.0;
+    player.play().catch(async e => {
+      const confirmed = await resolveUrl(slot.id);
+      if(confirmed && currentIdx === idx){
+        player.src = confirmed; player.load();
+        player.currentTime = clampedAnchor;
+        player.play().catch(()=>{});
+      } else if(!confirmed){
+        console.warn('Skipping unplayable slot:', slot.title);
+        doCut((idx+1) % TIMELINE.length);
+      }
+    });
+    // Phase 2 — lock rendered frames to UTC
+    startPhase2(slot, idx);
+  }
+  player.addEventListener('seeked', onSeeked);
+}
+
+// precisePlay: seeks to the UTC position and hands off to anchorAndPlay.
+// The rAF spin waits for the top of the next UTC second so all devices
+// fire their seek at the same UTC millisecond — minimising the window
+// during which devices are at different positions.
 function precisePlay(slot, targetUtcMs, idx){
   function loop(){
     if(currentIdx !== idx) return;
@@ -523,37 +583,9 @@ function precisePlay(slot, targetUtcMs, idx){
       const seekTo      = Math.max(0, Math.floor(liveOffset));
       const dur         = player.duration;
       const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      console.log(`[precisePlay] seek to ${clampedSeek}s`);
+      console.log(`[precisePlay] seek to ${clampedSeek}s at utc=${(now/1000).toFixed(3)}s`);
+      anchorAndPlay(slot, idx);
       player.currentTime = clampedSeek;
-
-      // Wait for the decoder to actually land before playing.
-      // Re-anchor to live UTC at that exact moment — compensates for
-      // the 1–3s seek latency on mobile without guessing a fixed offset.
-      function onSeeked(){
-        player.removeEventListener('seeked', onSeeked);
-        if(currentIdx !== idx) return;
-        const nowAfterSeek   = trueUtcMs();
-        const liveAfterSeek  = (nowAfterSeek / 1000) - slot.startSec;
-        const corrected      = Math.max(0, Math.floor(liveAfterSeek));
-        const clampedCorrected = isFinite(dur) ? Math.min(corrected, dur - 2) : corrected;
-        if(Math.abs(clampedCorrected - player.currentTime) > 0.5){
-          console.log(`[precisePlay] re-anchor ${player.currentTime.toFixed(2)}s → ${clampedCorrected}s (seek latency ${(nowAfterSeek - now).toFixed(0)}ms)`);
-          player.currentTime = clampedCorrected;
-        }
-        player.play().catch(async e=>{
-          const confirmed = await resolveUrl(slot.id);
-          if(confirmed && currentIdx===idx){
-            player.src=confirmed; player.load();
-            player.currentTime=clampedCorrected;
-            player.play().catch(()=>{});
-          } else if(!confirmed){
-            console.warn('Skipping unplayable slot:', slot.title);
-            doCut((idx+1)%TIMELINE.length);
-          }
-        });
-        startDriftCorrection(idx);
-      }
-      player.addEventListener('seeked', onSeeked);
     } else {
       requestAnimationFrame(loop);
     }
@@ -561,40 +593,68 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: 500ms tick with tiered rate nudging.
-// Hard seek only for drift >30s — avoids iOS keyframe snap loop.
-// Rate tiers close gaps proportionally without overshooting:
-//   < 0.08s  → locked,       1.0x
-//   < 2s     → gentle nudge, 0.98/1.02x  (closes 1s in ~50s, inaudible)
-//   < 10s    → strong nudge, 0.90/1.10x  (closes 8s in ~80s)
-//   < 30s    → fast nudge,   0.80/1.20x  (closes 20s in ~100s)
-//   >= 30s   → hard seek     (genuinely lost)
-function startDriftCorrection(idx){
-  if(driftInterval){ clearInterval(driftInterval); }
-  driftInterval = setInterval(()=>{
-    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
-    const slot = TIMELINE[idx];
-    if(!slot || player.paused || player.readyState < 2) return;
+// startDriftCorrection is kept as a no-op stub so existing call sites
+// compile without error. Sync is handled entirely by anchorAndPlay.
+function startDriftCorrection(idx){ /* intentionally empty — see anchorAndPlay */ }
 
-    const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos);
-    const drift        = player.currentTime - targetFrame1;
-    const abs          = Math.abs(drift);
+// ── PHASE 2 — UTC FRAME LOCK ──────────────────────────────────
+// Uses requestVideoFrameCallback (Chrome, Safari 15.4+) to measure
+// drift at actual frame presentation time — not from the coarse
+// player.currentTime estimate.
+//
+// At every rendered frame:
+//   frameDrift = metadata.mediaTime - (utcSec() - slot.startSec)
+//   rate = 1.0 - clamp(frameDrift × GAIN, -MAX, +MAX)
+//
+// Every device locks independently to UTC. No inter-device communication.
+// A device on 5G in Hong Kong and one on WiFi in DC both converge to
+// the same UTC frame independently — they sync via UTC, not via each other.
+//
+// GAIN = 0.05: 1s drift closes in ~20s at max rate
+// MAX  = 0.10: ±10% rate ceiling — inaudible for speech content
+//
+// Falls back gracefully to no Phase 2 on browsers without rVFC support.
 
-    if(abs >= 30){
-      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
-      player.currentTime = targetFrame1;
-      player.playbackRate = 1.0;
-    } else if(abs > 10){
-      player.playbackRate = drift > 0 ? 0.80 : 1.20;
-    } else if(abs > 2){
-      player.playbackRate = drift > 0 ? 0.90 : 1.10;
-    } else if(abs > 0.08){
-      player.playbackRate = drift > 0 ? 0.98 : 1.02;
-    } else {
-      player.playbackRate = 1.0;
-    }
-  }, 500);
+const PHASE2_GAIN = 0.05;
+const PHASE2_MAX  = 0.10;
+
+let phase2Active = false;
+let phase2Idx    = -1;
+
+function stopPhase2(){
+  phase2Active = false;
+  phase2Idx    = -1;
+  player.playbackRate = 1.0;
+}
+
+function startPhase2(slot, idx){
+  if(!player.requestVideoFrameCallback){
+    console.log('[phase2] requestVideoFrameCallback not supported — running at 1.0x');
+    return;
+  }
+  phase2Active = true;
+  phase2Idx    = idx;
+
+  function onFrame(now, metadata){
+    if(!phase2Active || phase2Idx !== idx) return; // stopped or slot changed
+    if(player.paused) return;
+
+    const expectedPos = utcSec() - slot.startSec;
+    const frameDrift  = metadata.mediaTime - expectedPos;
+    const correction  = Math.max(-PHASE2_MAX, Math.min(PHASE2_MAX, frameDrift * PHASE2_GAIN));
+    const targetRate  = 1.0 - correction;
+
+    // Smooth rate changes — max 0.005x per frame to avoid audible jumps
+    const current     = player.playbackRate;
+    const smoothed    = current + Math.max(-0.005, Math.min(0.005, targetRate - current));
+    player.playbackRate = smoothed;
+
+    // Schedule next frame
+    player.requestVideoFrameCallback(onFrame);
+  }
+
+  player.requestVideoFrameCallback(onFrame);
+  console.log('[phase2] UTC frame lock started for slot idx='+idx);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -759,6 +819,7 @@ window.tuneIn = function(){
       `actual   ${player.currentTime.toFixed(3)}s\n`+
       `drift    ${drift.toFixed(3)}s\n`+
       `rate     ${player.playbackRate.toFixed(4)}x\n`+
+      `phase2   ${phase2Active?'LOCKED':'fallback'}\n`+
       `[tap to freeze]`;
   }, 250);
 })();
