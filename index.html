@@ -525,13 +525,11 @@ async function fetchPublishDate(id){
 // ══════════════════════════════════════════════════════════════
 
 // Gear 3 constants
-const G3_GAIN       = 0.04;   // proportional gain — scales rate with drift
-const G3_MAX        = 0.02;   // ±2% rate ceiling
-const G3_SMOOTH     = 0.0005; // max rate change per frame — very smooth
-const G3_STABLE_MS  = 800;    // ms after play() before engaging corrections
-const G3_MIN_FRAMES = 10;     // minimum frames before correction starts
+const G3_GAIN    = 0.04;    // proportional — scales rate continuously with drift
+const G3_MAX     = 0.02;    // ±2% ceiling
+const G3_SMOOTH  = 0.0002;  // max rate change per frame — artifact-free
 
-let driftInterval = null;
+let driftInterval = null;  // unused but kept for compatibility
 let g3Active      = false;
 let g3Idx         = -1;
 
@@ -543,66 +541,41 @@ function cancelSync(){
 }
 
 // ── GEAR 3: Frame lock ────────────────────────────────────────
-// Proportional rate controller — rate scales continuously with drift.
-// At zero drift, correction is zero and rate returns exactly to 1.0.
-// Mobile buffer guard prevents false corrections from early frames
-// where mediaTime=0 before buffering has stabilised.
 function startGear3(slot, idx){
-  // Cancel any existing Gear 3 before starting a new one
-  g3Active = false;
-  g3Idx    = -1;
-  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
-
-  const startMs    = Date.now();
-  let   frameCount = 0;
-
-  if(!player.requestVideoFrameCallback){
-    // Fallback for browsers without rVFC — setInterval after stable wait
-    setTimeout(()=>{
-      if(currentIdx !== idx) return;
-      g3Active = true;
-      g3Idx    = idx;
-      driftInterval = setInterval(()=>{
-        if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
-        if(player.paused || player.readyState < 2) return;
-        const drift      = player.currentTime - (utcSec() - slot.startSec);
-        const correction = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
-        const target     = 1.0 - correction;
-        const current    = player.playbackRate;
-        player.playbackRate = current + Math.max(-0.005, Math.min(0.005, target - current));
-      }, 500);
-      console.log('[gear3] fallback started for idx='+idx);
-    }, G3_STABLE_MS);
-    return;
-  }
-
   g3Active = true;
   g3Idx    = idx;
 
+  if(!player.requestVideoFrameCallback){
+    // Fallback: setInterval at 500ms using currentTime
+    // Less precise than rVFC but still applies micro corrections
+    driftInterval = setInterval(()=>{
+      if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
+      if(player.paused || player.readyState < 2) return;
+      const expectedPos = utcSec() - slot.startSec;
+      const drift       = player.currentTime - expectedPos;
+      const correction  = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
+      const target      = 1.0 - correction;
+      const current     = player.playbackRate;
+      player.playbackRate = current + Math.max(-0.01, Math.min(0.01, target - current));
+    }, 500);
+    console.log('[gear3] fallback mode — rVFC not supported');
+    return;
+  }
+
   function onFrame(nowMs, metadata){
-    if(!g3Active || g3Idx !== idx){
-      player.playbackRate = 1.0;
-      return;
-    }
+    if(!g3Active || g3Idx !== idx) return; // disengaged
     if(player.paused) return;
 
-    frameCount++;
-    const ageMs = Date.now() - startMs;
-
-    // Buffer guard: ignore early frames before playback stabilises.
-    // metadata.mediaTime reports 0 on first frames — looks like huge drift.
-    if(ageMs < G3_STABLE_MS || frameCount < G3_MIN_FRAMES || metadata.mediaTime < 0.5){
-      player.requestVideoFrameCallback(onFrame);
-      return;
-    }
-
-    // Proportional correction — continuously scales toward 1.0 as drift → 0
+    // metadata.mediaTime is the actual decoded frame position in seconds —
+    // not the coarse currentTime estimate. This is the key measurement.
     const expectedPos = utcSec() - slot.startSec;
     const frameDrift  = metadata.mediaTime - expectedPos;
+
+    // Proportional correction capped at G3_MAX
     const correction  = Math.max(-G3_MAX, Math.min(G3_MAX, frameDrift * G3_GAIN));
     const target      = 1.0 - correction;
 
-    // Smooth — rate eases toward target, never jumps
+    // Smooth rate change — max G3_SMOOTH per frame, inaudible
     const current     = player.playbackRate;
     const smoothed    = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
     player.playbackRate = smoothed;
@@ -611,22 +584,23 @@ function startGear3(slot, idx){
   }
 
   player.requestVideoFrameCallback(onFrame);
-  console.log('[gear3] frame lock armed for idx='+idx+' engaging in '+G3_STABLE_MS+'ms');
+  console.log('[gear3] frame lock engaged for idx='+idx);
 }
 
 // ── GEAR 2: Iterative re-anchor ───────────────────────────────
-// Loops until the device is within G2_THRESHOLD of UTC before
-// handing to Gear 3. Each seek lands closer than the last as the
-// browser buffers more of the file. Max G2_MAX_ATTEMPTS seeks to
-// prevent infinite loops on very slow connections.
-const G2_THRESHOLD    = 0.5;   // seconds — hand to Gear 3 when within this
-const G2_MAX_ATTEMPTS = 6;     // maximum re-seek attempts before giving up
+// Loops until within G2_THRESHOLD of UTC before handing to Gear 3.
+// Seek latency compensation adapts per-attempt based on measured seek time.
+// More attempts and tighter threshold ensure mobile lands close enough
+// for Gear 3's micro-corrections to reach zero drift quickly.
+const G2_THRESHOLD    = 0.3;   // seconds — hand to Gear 3 within this margin
+const G2_MAX_ATTEMPTS = 10;    // enough for repeated mobile keyframe snaps
 
 function startGear2(slot, idx, onComplete){
-  let attempts = 0;
+  let attempts    = 0;
+  let lastSeekMs  = null; // track actual seek latency per attempt
 
   function tryAnchor(){
-    if(currentIdx !== idx) return; // slot changed — abort
+    if(currentIdx !== idx) return;
 
     const nowUtc   = utcSec();
     const livePos  = nowUtc - slot.startSec;
@@ -637,41 +611,42 @@ function startGear2(slot, idx, onComplete){
     const absDelta = Math.abs(delta);
 
     attempts++;
-    console.log(`[gear2] attempt ${attempts} currentTime=${player.currentTime.toFixed(3)}s target=${clamped.toFixed(3)}s Δ${delta.toFixed(3)}s`);
+    console.log(`[gear2] attempt ${attempts} pos=${player.currentTime.toFixed(2)}s target=${clamped.toFixed(2)}s Δ${delta.toFixed(3)}s`);
 
     if(absDelta <= G2_THRESHOLD || attempts >= G2_MAX_ATTEMPTS){
-      // Close enough — or out of attempts — hand to Gear 3
-      console.log(`[gear2] complete after ${attempts} attempt(s) Δ${delta.toFixed(3)}s — engaging gear3`);
+      console.log(`[gear2] done after ${attempts} attempt(s) Δ${delta.toFixed(3)}s → gear3`);
       onComplete();
       return;
     }
 
-    // Still too far off — re-seek to the live UTC position
-    // Add a small look-ahead to compensate for the seek latency itself:
-    // on mobile a seek takes ~1s, so seek to where we'll be in 1s
-    const seekLatencyCompensation = 1.0; // seconds — tunable
+    // Adaptive latency compensation: use measured seek time from last attempt,
+    // defaulting to 1.5s for first attempt (conservative mobile estimate).
+    const seekLatency = lastSeekMs !== null ? (lastSeekMs / 1000) : 1.5;
     const compensated = Math.max(0, Math.min(
       isFinite(dur) ? dur - 2 : Infinity,
-      clamped + seekLatencyCompensation
+      clamped + seekLatency
     ));
 
-    console.log(`[gear2] re-seek to ${compensated.toFixed(3)}s (with ${seekLatencyCompensation}s latency compensation)`);
+    console.log(`[gear2] re-seek → ${compensated.toFixed(2)}s (latency compensation ${seekLatency.toFixed(2)}s)`);
 
+    const seekStartMs = Date.now();
     function onSeeked(){
       player.removeEventListener('seeked', onSeeked);
       if(currentIdx !== idx) return;
-      // Small delay to let the decoder stabilise before measuring again
-      setTimeout(tryAnchor, 100);
+      lastSeekMs = Date.now() - seekStartMs; // measure actual seek latency
+      setTimeout(tryAnchor, 80);
     }
     player.addEventListener('seeked', onSeeked);
     player.currentTime = compensated;
   }
 
-  // First measurement fires on the initial seeked event from Gear 1
+  // First measurement: fires on the seeked event issued by Gear 1
+  const seekStartMs = Date.now();
   function onFirstSeeked(){
     player.removeEventListener('seeked', onFirstSeeked);
     if(currentIdx !== idx) return;
-    setTimeout(tryAnchor, 100);
+    lastSeekMs = Date.now() - seekStartMs;
+    setTimeout(tryAnchor, 80);
   }
   player.addEventListener('seeked', onFirstSeeked);
 }
