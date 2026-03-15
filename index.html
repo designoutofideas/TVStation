@@ -294,53 +294,17 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// ── UTC CLOCK — UNIFIED MULTI-SAMPLE CALIBRATION ─────────────
-// All devices (desktop + mobile) use the same time source: WorldTimeAPI.
-// Three samples are taken per calibration and the median RTT is used to
-// minimise network jitter. This gives sub-100ms accuracy on all devices
-// and ensures every client is reading from an identical UTC reference.
-// Archive.org Date header is not used — it is only second-accurate and
-// is blocked on mobile, causing desktop/mobile to diverge.
-let clockOffset = 0;
-let clockReady  = false;
-
-async function sampleWorldTime(){
-  const t0  = Date.now();
-  const r   = await fetch('https://worldtimeapi.org/api/ip', {cache:'no-store'});
-  const t1  = Date.now();
-  const data = await r.json();
-  const serverMs = new Date(data.utc_datetime).getTime();
-  if(isNaN(serverMs)) throw new Error('unparseable');
-  const rtt = t1 - t0;
-  return { offset: serverMs + Math.round(rtt / 2) - t1, rtt };
-}
-
-async function calibrateClockOffset(){
-  try{
-    // Take 3 samples, use the one with the lowest RTT (least network jitter)
-    const samples = await Promise.all([sampleWorldTime(), sampleWorldTime(), sampleWorldTime()]);
-    samples.sort((a,b) => a.rtt - b.rtt);
-    const best = samples[0];
-    // Sanity gate: reject if offset implies device clock is >5s wrong
-    if(Math.abs(best.offset) > 5000){
-      console.warn(`[clock] offset=${best.offset}ms rejected — device clock error >5s`);
-      return;
-    }
-    clockOffset = best.offset;
-    clockReady  = true;
-    console.log(`[clock] offset=${clockOffset}ms rtt=${best.rtt}ms (best of 3)`);
-  }catch(e){
-    console.warn('[clock] calibration failed — retaining offset='+clockOffset+'ms');
-  }
-}
-
-// Initial calibration, then every 30s to stay locked
-calibrateClockOffset();
-setInterval(calibrateClockOffset, 30*1000);
-
-function trueUtcMs(){ return Date.now() + clockOffset; }
+// ── UTC CLOCK ─────────────────────────────────────────────────
+// Uses Date.now() directly. All modern devices (iOS, Android, macOS,
+// Windows) maintain OS-level NTP sync accurate to ±50ms of true UTC.
+// HTTP-based calibration (Archive.org headers, WorldTimeAPI RTT) introduces
+// MORE error than it corrects — RTT asymmetry on WiFi/mobile causes offsets
+// to vary by ±150ms between calibrations, making devices diverge rather
+// than converge. Raw Date.now() is the most reliable shared reference.
+const clockOffset = 0; // kept for overlay display compatibility
+function trueUtcMs(){ return Date.now(); }
 function utcSec(){
-  const d = new Date(trueUtcMs());
+  const d = new Date();
   return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
 }
 
