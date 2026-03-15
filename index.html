@@ -506,9 +506,6 @@ let driftInterval = null;
 // cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
-  if(driftTimeout){ clearTimeout(driftTimeout); driftTimeout=null; }
-  seekInProgress = false;
-  seekCooldownUntil = 0;
   player.playbackRate = 1.0;
 }
 
@@ -564,78 +561,40 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: self-rescheduling setTimeout.
-// Unlike setInterval, this never fires while a seek is in progress —
-// it only reschedules AFTER the current tick fully completes, including
-// waiting for the seeked event. This eliminates the seek loop entirely.
-let driftTimeout = null;
-
-function scheduleDriftCheck(idx, delayMs){
-  if(driftTimeout){ clearTimeout(driftTimeout); driftTimeout=null; }
-  driftTimeout = setTimeout(()=>driftCheck(idx), delayMs||500);
-}
-
-function driftCheck(idx){
-  driftTimeout = null;
-  if(currentIdx !== idx) return;
-  const slot = TIMELINE[idx];
-  if(!slot || player.paused || player.readyState < 2){
-    scheduleDriftCheck(idx, 500);
-    return;
-  }
-
-  const expectedPos = utcSec() - slot.startSec;
-  const targetFrame = Math.floor(expectedPos);
-  const drift       = player.currentTime - targetFrame;
-  const abs         = Math.abs(drift);
-
-  if(abs > 2){
-    // Rubber band — hard seek. Do NOT reschedule until seeked fires.
-    console.log(`[sync] rubber-band drift=${drift.toFixed(3)}s → ${targetFrame}s`);
-    const seekStartMs = trueUtcMs();
-    player.currentTime = targetFrame;
-    player.playbackRate = 1.0;
-
-    function onSeeked(){
-      player.removeEventListener('seeked', onSeeked);
-      if(currentIdx !== idx) return;
-      // Re-anchor to live UTC at moment seek completed
-      const nowMs    = trueUtcMs();
-      const livePos  = (nowMs / 1000) - slot.startSec;
-      const corrected= Math.floor(livePos);
-      const dur      = player.duration;
-      const clamped  = isFinite(dur) ? Math.min(corrected, dur-2) : corrected;
-      if(Math.abs(clamped - player.currentTime) > 0.5){
-        console.log(`[sync] re-anchor latency=${(nowMs-seekStartMs).toFixed(0)}ms → ${clamped}s`);
-        // Set currentTime once more — but do NOT listen for another seeked.
-        // Just set it and schedule the next check after a 2s settle window.
-        player.currentTime = clamped;
-      }
-      // Only reschedule after everything is done — 2s settle window
-      scheduleDriftCheck(idx, 2000);
-    }
-    player.addEventListener('seeked', onSeeked);
-    // Safety: if seeked never fires (stalled network), reschedule after 5s
-    setTimeout(()=>{
-      player.removeEventListener('seeked', onSeeked);
-      if(currentIdx===idx) scheduleDriftCheck(idx, 500);
-    }, 5000);
-
-  } else if(abs > 0.08){
-    player.playbackRate = drift > 0 ? 0.98 : 1.02;
-    scheduleDriftCheck(idx, 500);
-  } else {
-    player.playbackRate = 1.0;
-    scheduleDriftCheck(idx, 500);
-  }
-}
-
+// startDriftCorrection: 500ms tick with tiered rate nudging.
+// Hard seek only for drift >30s — avoids iOS keyframe snap loop.
+// Rate tiers close gaps proportionally without overshooting:
+//   < 0.08s  → locked,       1.0x
+//   < 2s     → gentle nudge, 0.98/1.02x  (closes 1s in ~50s, inaudible)
+//   < 10s    → strong nudge, 0.90/1.10x  (closes 8s in ~80s)
+//   < 30s    → fast nudge,   0.80/1.20x  (closes 20s in ~100s)
+//   >= 30s   → hard seek     (genuinely lost)
 function startDriftCorrection(idx){
-  if(driftTimeout){ clearTimeout(driftTimeout); driftTimeout=null; }
-  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
-  seekInProgress = false;
-  seekCooldownUntil = 0;
-  scheduleDriftCheck(idx, 500);
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+    const slot = TIMELINE[idx];
+    if(!slot || player.paused || player.readyState < 2) return;
+
+    const expectedPos  = utcSec() - slot.startSec;
+    const targetFrame1 = Math.floor(expectedPos);
+    const drift        = player.currentTime - targetFrame1;
+    const abs          = Math.abs(drift);
+
+    if(abs >= 30){
+      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+      player.currentTime = targetFrame1;
+      player.playbackRate = 1.0;
+    } else if(abs > 10){
+      player.playbackRate = drift > 0 ? 0.80 : 1.20;
+    } else if(abs > 2){
+      player.playbackRate = drift > 0 ? 0.90 : 1.10;
+    } else if(abs > 0.08){
+      player.playbackRate = drift > 0 ? 0.98 : 1.02;
+    } else {
+      player.playbackRate = 1.0;
+    }
+  }, 500);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
