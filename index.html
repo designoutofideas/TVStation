@@ -587,37 +587,66 @@ function startGear3(slot, idx){
   console.log('[gear3] frame lock engaged for idx='+idx);
 }
 
-// ── GEAR 2: Fine re-anchor ────────────────────────────────────
+// ── GEAR 2: Iterative re-anchor ───────────────────────────────
+// Loops until the device is within G2_THRESHOLD of UTC before
+// handing to Gear 3. Each seek lands closer than the last as the
+// browser buffers more of the file. Max G2_MAX_ATTEMPTS seeks to
+// prevent infinite loops on very slow connections.
+const G2_THRESHOLD    = 0.5;   // seconds — hand to Gear 3 when within this
+const G2_MAX_ATTEMPTS = 6;     // maximum re-seek attempts before giving up
+
 function startGear2(slot, idx, onComplete){
-  function onSeeked(){
-    player.removeEventListener('seeked', onSeeked);
-    if(currentIdx !== idx) return;
+  let attempts = 0;
 
-    // Read UTC at the exact millisecond the decoder landed
-    const nowMs        = trueUtcMs();
-    const livePos      = utcSec() - slot.startSec;
-    const dur          = player.duration;
-    const anchorPos    = Math.max(0, livePos);
-    const clamped      = isFinite(dur) ? Math.min(anchorPos, dur - 2) : anchorPos;
-    const delta        = Math.abs(player.currentTime - clamped);
+  function tryAnchor(){
+    if(currentIdx !== idx) return; // slot changed — abort
 
-    if(delta > 0.2){
-      // Re-anchor: correct residual keyframe snap error
-      console.log(`[gear2] re-anchor Δ${delta.toFixed(3)}s → ${clamped.toFixed(3)}s`);
-      player.currentTime = clamped;
-      // Wait for this second seek to settle before handing to Gear 3
-      function onSeeked2(){
-        player.removeEventListener('seeked', onSeeked2);
-        if(currentIdx !== idx) return;
-        onComplete();
-      }
-      player.addEventListener('seeked', onSeeked2);
-    } else {
-      console.log(`[gear2] anchor ok Δ${delta.toFixed(3)}s — handing to gear3`);
+    const nowUtc   = utcSec();
+    const livePos  = nowUtc - slot.startSec;
+    const dur      = player.duration;
+    const target   = Math.max(0, livePos);
+    const clamped  = isFinite(dur) ? Math.min(target, dur - 2) : target;
+    const delta    = player.currentTime - clamped;
+    const absDelta = Math.abs(delta);
+
+    attempts++;
+    console.log(`[gear2] attempt ${attempts} currentTime=${player.currentTime.toFixed(3)}s target=${clamped.toFixed(3)}s Δ${delta.toFixed(3)}s`);
+
+    if(absDelta <= G2_THRESHOLD || attempts >= G2_MAX_ATTEMPTS){
+      // Close enough — or out of attempts — hand to Gear 3
+      console.log(`[gear2] complete after ${attempts} attempt(s) Δ${delta.toFixed(3)}s — engaging gear3`);
       onComplete();
+      return;
     }
+
+    // Still too far off — re-seek to the live UTC position
+    // Add a small look-ahead to compensate for the seek latency itself:
+    // on mobile a seek takes ~1s, so seek to where we'll be in 1s
+    const seekLatencyCompensation = 1.0; // seconds — tunable
+    const compensated = Math.max(0, Math.min(
+      isFinite(dur) ? dur - 2 : Infinity,
+      clamped + seekLatencyCompensation
+    ));
+
+    console.log(`[gear2] re-seek to ${compensated.toFixed(3)}s (with ${seekLatencyCompensation}s latency compensation)`);
+
+    function onSeeked(){
+      player.removeEventListener('seeked', onSeeked);
+      if(currentIdx !== idx) return;
+      // Small delay to let the decoder stabilise before measuring again
+      setTimeout(tryAnchor, 100);
+    }
+    player.addEventListener('seeked', onSeeked);
+    player.currentTime = compensated;
   }
-  player.addEventListener('seeked', onSeeked);
+
+  // First measurement fires on the initial seeked event from Gear 1
+  function onFirstSeeked(){
+    player.removeEventListener('seeked', onFirstSeeked);
+    if(currentIdx !== idx) return;
+    setTimeout(tryAnchor, 100);
+  }
+  player.addEventListener('seeked', onFirstSeeked);
 }
 
 // ── GEAR 1: Coarse seek ───────────────────────────────────────
