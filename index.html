@@ -187,6 +187,7 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 
 #flash{position:fixed;inset:0;z-index:95;background:#fff;opacity:0;pointer-events:none;transition:opacity .04s}
 #flash.on{opacity:.35}
+#dbg{position:fixed;top:0;left:0;right:0;z-index:999;background:rgba(0,0,0,0.85);color:#0f0;font-family:'IBM Plex Mono',monospace;font-size:11px;line-height:1.9;padding:8px 12px;pointer-events:none;white-space:pre;}
 </style>
 </head>
 <body>
@@ -194,6 +195,8 @@ html,body{width:100%;height:100%;background:#000;overflow:hidden;font-family:'Sh
 <div id="screen">
   <video id="player" playsinline preload="auto"></video>
 </div>
+
+<div id="dbg">waiting...</div>
 
 <div id="hud">
   <div class="hud-top">
@@ -294,54 +297,23 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// ── UTC CLOCK — UNIFIED MULTI-SAMPLE CALIBRATION ─────────────
-// All devices (desktop + mobile) use the same time source: WorldTimeAPI.
-// Three samples are taken per calibration and the median RTT is used to
-// minimise network jitter. This gives sub-100ms accuracy on all devices
-// and ensures every client is reading from an identical UTC reference.
-// Archive.org Date header is not used — it is only second-accurate and
-// is blocked on mobile, causing desktop/mobile to diverge.
+// NTP-calibrated UTC clock — corrects local clock against Archive.org server time
 let clockOffset = 0;
-let clockReady  = false;
-
-async function sampleWorldTime(){
-  const t0  = Date.now();
-  const r   = await fetch('https://worldtimeapi.org/api/ip', {cache:'no-store'});
-  const t1  = Date.now();
-  const data = await r.json();
-  const serverMs = new Date(data.utc_datetime).getTime();
-  if(isNaN(serverMs)) throw new Error('unparseable');
-  const rtt = t1 - t0;
-  return { offset: serverMs + Math.round(rtt / 2) - t1, rtt };
-}
-
 async function calibrateClockOffset(){
   try{
-    // Take 3 samples, use the one with the lowest RTT (least network jitter)
-    const samples = await Promise.all([sampleWorldTime(), sampleWorldTime(), sampleWorldTime()]);
-    samples.sort((a,b) => a.rtt - b.rtt);
-    const best = samples[0];
-    // Sanity gate: reject if offset implies device clock is >5s wrong
-    if(Math.abs(best.offset) > 5000){
-      console.warn(`[clock] offset=${best.offset}ms rejected — device clock error >5s`);
-      return;
-    }
-    clockOffset = best.offset;
-    clockReady  = true;
-    console.log(`[clock] offset=${clockOffset}ms rtt=${best.rtt}ms (best of 3)`);
-  }catch(e){
-    console.warn('[clock] calibration failed — retaining offset='+clockOffset+'ms');
-  }
+    const t0=Date.now();
+    const r=await fetch('https://archive.org/',{method:'HEAD',cache:'no-store'});
+    const t1=Date.now();
+    const serverMs=new Date(r.headers.get('Date')).getTime();
+    if(!isNaN(serverMs)) clockOffset=serverMs+Math.round((t1-t0)/2)-t1;
+  }catch(e){ clockOffset=0; }
 }
-
-// Initial calibration, then every 30s to stay locked
 calibrateClockOffset();
-setInterval(calibrateClockOffset, 30*1000);
-
-function trueUtcMs(){ return Date.now() + clockOffset; }
+setInterval(calibrateClockOffset,5*60*1000);
+function trueUtcMs(){ return Date.now()+clockOffset; }
 function utcSec(){
-  const d = new Date(trueUtcMs());
-  return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
+  const d=new Date(trueUtcMs());
+  return d.getUTCHours()*3600+d.getUTCMinutes()*60+d.getUTCSeconds()+d.getUTCMilliseconds()/1000;
 }
 
 function buildTimeline(blocks){
@@ -443,29 +415,9 @@ function hideHUD(){
 }
 
 document.addEventListener('mousemove', showHUD);
+document.addEventListener('touchstart', showHUD);
 hudEl.addEventListener('mouseenter',()=>{if(hudTimer)clearTimeout(hudTimer)});
 hudEl.addEventListener('mouseleave',()=>{hudTimer=setTimeout(hideHUD,HUD_TIMEOUT)});
-
-// Tap / click on the screen area toggles the HUD.
-// Tapping the HUD itself (controls) does not toggle — it keeps HUD visible.
-// This works identically in the live player and the admin preview iframe.
-const screenEl = document.getElementById('screen');
-screenEl.addEventListener('click', ()=>{
-  const isHidden = hudEl.classList.contains('hud-hidden');
-  if(isHidden){
-    showHUD();
-  } else {
-    if(hudTimer) clearTimeout(hudTimer);
-    hideHUD();
-  }
-});
-// Prevent touch from both toggling AND triggering mousemove on mobile
-screenEl.addEventListener('touchstart', (e)=>{
-  e.preventDefault();
-  const isHidden = hudEl.classList.contains('hud-hidden');
-  if(isHidden){ showHUD(); } else { if(hudTimer) clearTimeout(hudTimer); hideHUD(); }
-}, {passive:false});
-
 showHUD();
 
 // ── VOLUME ───────────────────────────────────────────────────
@@ -582,14 +534,9 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: 500ms tick with tiered rate nudging.
-// Hard seek only for drift >30s — avoids iOS keyframe snap loop.
-// Rate tiers close gaps proportionally without overshooting:
-//   < 0.08s  → locked,       1.0x
-//   < 2s     → gentle nudge, 0.98/1.02x  (closes 1s in ~50s, inaudible)
-//   < 10s    → strong nudge, 0.90/1.10x  (closes 8s in ~80s)
-//   < 30s    → fast nudge,   0.80/1.20x  (closes 20s in ~100s)
-//   >= 30s   → hard seek     (genuinely lost)
+// startDriftCorrection: every 2s, compare player.currentTime against
+// where UTC says we should be. Nudge playbackRate for small drift,
+// hard-seek for large drift.
 function startDriftCorrection(idx){
   if(driftInterval){ clearInterval(driftInterval); }
   driftInterval = setInterval(()=>{
@@ -597,25 +544,27 @@ function startDriftCorrection(idx){
     const slot = TIMELINE[idx];
     if(!slot || player.paused || player.readyState < 2) return;
 
+    // targetFrame1: Frame 1 of the UTC-correct second.
+    // Every whole UTC second is HH:MM:SS.000 — the millisecond boundary
+    // that is identical on every client on Earth. Snapping here means
+    // every drift correction lands all clients on the same frame.
     const expectedPos  = utcSec() - slot.startSec;
-    const targetFrame1 = Math.floor(expectedPos);
+    const targetFrame1 = Math.floor(expectedPos); // *.000ms = Frame 1
     const drift        = player.currentTime - targetFrame1;
-    const abs          = Math.abs(drift);
 
-    if(abs >= 30){
+    if(Math.abs(drift) > 2){
+      // More than 2s off — hard resync to Frame 1 of the correct second
       console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
       player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
-    } else if(abs > 10){
-      player.playbackRate = drift > 0 ? 0.80 : 1.20;
-    } else if(abs > 2){
-      player.playbackRate = drift > 0 ? 0.90 : 1.10;
-    } else if(abs > 0.08){
+    } else if(Math.abs(drift) > 0.08){
+      // 80ms–2s — nudge playbackRate to drift silently back to Frame 1
       player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
+      // Locked on Frame 1 — restore normal rate
       player.playbackRate = 1.0;
     }
-  }, 500);
+  }, 2000);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -743,6 +692,22 @@ window.tuneIn = function(){
   if(tickInterval)clearInterval(tickInterval);
   tickInterval=setInterval(tick,500);
 };
+
+// ── DEBUG OVERLAY ─────────────────────────────────────────────
+const dbgEl = document.getElementById('dbg');
+setInterval(()=>{
+  const slot = TIMELINE[currentIdx];
+  const utc  = utcSec();
+  const exp  = slot ? (utc - slot.startSec) : 0;
+  const drift= slot ? (player.currentTime - Math.floor(exp)) : 0;
+  dbgEl.textContent =
+    `UTC      ${utc.toFixed(3)}s\n`+
+    `offset   ${clockOffset}ms\n`+
+    `expected ${exp.toFixed(3)}s\n`+
+    `actual   ${player.currentTime.toFixed(3)}s\n`+
+    `drift    ${drift.toFixed(3)}s\n`+
+    `rate     ${player.playbackRate.toFixed(4)}x`;
+}, 250);
 </script>
 </body>
 </html>
