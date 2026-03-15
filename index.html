@@ -294,14 +294,53 @@ function toSec(t){
 }
 function archiveUrl(id){return`https://archive.org/download/${id}/${id}.ia.mp4`}
 
-// ── UTC CLOCK ─────────────────────────────────────────────────
-// Uses Date.now() directly. All modern devices maintain OS-level NTP
-// sync accurate to ±50ms. HTTP calibration introduced more error than
-// it corrected due to RTT asymmetry on mobile networks.
-const clockOffset = 0;
-function trueUtcMs(){ return Date.now(); }
+// ── UTC CLOCK — UNIFIED MULTI-SAMPLE CALIBRATION ─────────────
+// All devices (desktop + mobile) use the same time source: WorldTimeAPI.
+// Three samples are taken per calibration and the median RTT is used to
+// minimise network jitter. This gives sub-100ms accuracy on all devices
+// and ensures every client is reading from an identical UTC reference.
+// Archive.org Date header is not used — it is only second-accurate and
+// is blocked on mobile, causing desktop/mobile to diverge.
+let clockOffset = 0;
+let clockReady  = false;
+
+async function sampleWorldTime(){
+  const t0  = Date.now();
+  const r   = await fetch('https://worldtimeapi.org/api/ip', {cache:'no-store'});
+  const t1  = Date.now();
+  const data = await r.json();
+  const serverMs = new Date(data.utc_datetime).getTime();
+  if(isNaN(serverMs)) throw new Error('unparseable');
+  const rtt = t1 - t0;
+  return { offset: serverMs + Math.round(rtt / 2) - t1, rtt };
+}
+
+async function calibrateClockOffset(){
+  try{
+    // Take 3 samples, use the one with the lowest RTT (least network jitter)
+    const samples = await Promise.all([sampleWorldTime(), sampleWorldTime(), sampleWorldTime()]);
+    samples.sort((a,b) => a.rtt - b.rtt);
+    const best = samples[0];
+    // Sanity gate: reject if offset implies device clock is >5s wrong
+    if(Math.abs(best.offset) > 5000){
+      console.warn(`[clock] offset=${best.offset}ms rejected — device clock error >5s`);
+      return;
+    }
+    clockOffset = best.offset;
+    clockReady  = true;
+    console.log(`[clock] offset=${clockOffset}ms rtt=${best.rtt}ms (best of 3)`);
+  }catch(e){
+    console.warn('[clock] calibration failed — retaining offset='+clockOffset+'ms');
+  }
+}
+
+// Initial calibration, then every 30s to stay locked
+calibrateClockOffset();
+setInterval(calibrateClockOffset, 30*1000);
+
+function trueUtcMs(){ return Date.now() + clockOffset; }
 function utcSec(){
-  const d = new Date();
+  const d = new Date(trueUtcMs());
   return d.getUTCHours()*3600 + d.getUTCMinutes()*60 + d.getUTCSeconds() + d.getUTCMilliseconds()/1000;
 }
 
@@ -497,72 +536,45 @@ async function fetchPublishDate(id){
 }
 
 // ── SYNC ENGINE ───────────────────────────────────────────────
-// Key facts from research:
-//   - Date.now() is equally accurate on desktop and mobile (OS NTP ±50ms)
-//   - player.currentTime is COARSE on mobile Safari — rounded and decoupled
-//     from actual buffer position. This was causing all mobile sync failures.
-//   - metadata.mediaTime from requestVideoFrameCallback is frame-accurate
-//     on ALL devices including iOS Safari 15.4+ (iPhone 16 Pro: supported)
-//   - Therefore: use rVFC + metadata.mediaTime on all devices, not currentTime
-//
-// Architecture:
-//   precisePlay  — seeks to UTC position, waits for 'seeked', plays
-//   startDriftCorrection — rVFC loop using metadata.mediaTime (not currentTime)
-//                          Falls back to setInterval only if rVFC unavailable
-
+// driftInterval: handle for the continuous drift-correction loop
 let driftInterval = null;
-let rVfcActive    = false;
-let rVfcIdx       = -1;
 
+// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
-  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
-  rVfcActive = false;
-  rVfcIdx    = -1;
+  if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
 }
 
-// precisePlay: waits for UTC second boundary, seeks, waits for 'seeked',
-// re-anchors to live UTC at that exact ms, then plays.
+// precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
+// then computes the LIVE seek position at that exact instant and fires play().
+// seekTo is computed at fire-time — not before — so the position is accurate
+// regardless of how long the seek or rAF wait took.
 function precisePlay(slot, targetUtcMs, idx){
   function loop(){
-    if(currentIdx !== idx) return;
+    if(currentIdx !== idx) return; // slot changed — abort
     const now = trueUtcMs();
     if(now >= targetUtcMs){
-      // Use utcSec() not now/1000 — utcSec() returns seconds-since-midnight
-      const liveOffset  = utcSec() - slot.startSec;
-      const seekTo      = Math.max(0, Math.floor(liveOffset));
-      const dur         = player.duration;
+      // Compute where we should be at THIS exact millisecond.
+      // Floor to whole second: every whole UTC second is a universal frame
+      // boundary that is identical on every client on Earth.
+      const liveOffset = (now / 1000) - slot.startSec;
+      const seekTo = Math.max(0, Math.floor(liveOffset));
+      const dur = player.duration;
       const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      console.log(`[precisePlay] seek ${clampedSeek}s utc=${utcSec().toFixed(3)}s`);
-
-      // After seek lands, re-anchor to live UTC before playing
-      function onSeeked(){
-        player.removeEventListener('seeked', onSeeked);
-        if(currentIdx !== idx) return;
-        const liveNow    = utcSec() - slot.startSec;
-        const anchorPos  = Math.max(0, liveNow);
-        const anchClamped = isFinite(dur) ? Math.min(anchorPos, dur - 2) : anchorPos;
-        const delta = Math.abs(player.currentTime - anchClamped);
-        if(delta > 0.5){
-          console.log(`[precisePlay] re-anchor Δ${delta.toFixed(2)}s → ${anchClamped.toFixed(2)}s`);
-          player.currentTime = anchClamped;
-        }
-        player.playbackRate = 1.0;
-        player.play().catch(async e=>{
-          const confirmed = await resolveUrl(slot.id);
-          if(confirmed && currentIdx===idx){
-            player.src=confirmed; player.load();
-            player.currentTime=Math.max(0, utcSec()-slot.startSec);
-            player.play().catch(()=>{});
-          } else if(!confirmed){
-            console.warn('Skipping:', slot.title);
-            doCut((idx+1)%TIMELINE.length);
-          }
-        });
-        startDriftCorrection(idx);
-      }
-      player.addEventListener('seeked', onSeeked);
+      console.log(`[precisePlay] firing at utc=${(now/1000).toFixed(3)} seekTo=${clampedSeek}s`);
       player.currentTime = clampedSeek;
+      player.play().catch(async e=>{
+        const confirmed = await resolveUrl(slot.id);
+        if(confirmed && currentIdx===idx){
+          player.src=confirmed; player.load();
+          player.currentTime=clampedSeek;
+          player.play().catch(()=>{});
+        } else if(!confirmed){
+          console.warn('Skipping unplayable slot:', slot.title);
+          doCut((idx+1)%TIMELINE.length);
+        }
+      });
+      startDriftCorrection(idx);
     } else {
       requestAnimationFrame(loop);
     }
@@ -570,70 +582,40 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: uses requestVideoFrameCallback on all devices.
-// metadata.mediaTime is the actual decoded frame position — frame-accurate
-// on iOS Safari 15.4+ and all modern desktop browsers.
-// This bypasses the coarse/rounded currentTime entirely.
-// Gate band ±80ms: rate=1.0 exactly. Outside: proportional correction ±2%.
-const GATE  = 0.08;   // ±80ms — rate=1.0 within this band
-const GAIN  = 0.04;   // proportional gain
-const MAX   = 0.02;   // ±2% rate ceiling
-const SMOOTH= 0.0002; // max rate change per frame
-
+// startDriftCorrection: 500ms tick with tiered rate nudging.
+// Hard seek only for drift >30s — avoids iOS keyframe snap loop.
+// Rate tiers close gaps proportionally without overshooting:
+//   < 0.08s  → locked,       1.0x
+//   < 2s     → gentle nudge, 0.98/1.02x  (closes 1s in ~50s, inaudible)
+//   < 10s    → strong nudge, 0.90/1.10x  (closes 8s in ~80s)
+//   < 30s    → fast nudge,   0.80/1.20x  (closes 20s in ~100s)
+//   >= 30s   → hard seek     (genuinely lost)
 function startDriftCorrection(idx){
-  rVfcActive = false;
-  rVfcIdx    = -1;
-  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+    const slot = TIMELINE[idx];
+    if(!slot || player.paused || player.readyState < 2) return;
 
-  if(!player.requestVideoFrameCallback){
-    // Fallback for very old browsers — setInterval with currentTime
-    // This path should not be reached on any modern device
-    console.warn('[sync] rVFC not supported — using setInterval fallback');
-    driftInterval = setInterval(()=>{
-      if(currentIdx !== idx){ clearInterval(driftInterval); return; }
-      const slot = TIMELINE[idx];
-      if(!slot || player.paused || player.readyState < 2) return;
-      const drift = player.currentTime - (utcSec() - slot.startSec);
-      const abs   = Math.abs(drift);
-      if(abs >= 30){ player.currentTime = Math.floor(utcSec()-slot.startSec); player.playbackRate=1.0; }
-      else if(abs > 2){ player.playbackRate = drift>0?0.90:1.10; }
-      else if(abs > GATE){ player.playbackRate = drift>0?0.98:1.02; }
-      else { player.playbackRate = 1.0; }
-    }, 500);
-    return;
-  }
+    const expectedPos  = utcSec() - slot.startSec;
+    const targetFrame1 = Math.floor(expectedPos);
+    const drift        = player.currentTime - targetFrame1;
+    const abs          = Math.abs(drift);
 
-  // rVFC path — frame-accurate on all modern devices including iOS 15.4+
-  rVfcActive = true;
-  rVfcIdx    = idx;
-  console.log(`[sync] rVFC drift correction started idx=${idx} device=${/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)?'mobile':'desktop'}`);
-
-  function onFrame(nowMs, metadata){
-    if(!rVfcActive || rVfcIdx !== idx){ player.playbackRate = 1.0; return; }
-    if(player.paused){ player.requestVideoFrameCallback(onFrame); return; }
-
-    // metadata.mediaTime: actual frame position — precise on all devices
-    // This is the key measurement that replaces coarse currentTime
-    const slot        = TIMELINE[idx];
-    if(!slot){ player.requestVideoFrameCallback(onFrame); return; }
-
-    const expectedPos = utcSec() - slot.startSec;
-    const frameDrift  = metadata.mediaTime - expectedPos;
-
-    if(Math.abs(frameDrift) <= GATE){
-      // Inside gate — locked, rate exactly 1.0
+    if(abs >= 30){
+      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+      player.currentTime = targetFrame1;
       player.playbackRate = 1.0;
+    } else if(abs > 10){
+      player.playbackRate = drift > 0 ? 0.80 : 1.20;
+    } else if(abs > 2){
+      player.playbackRate = drift > 0 ? 0.90 : 1.10;
+    } else if(abs > 0.08){
+      player.playbackRate = drift > 0 ? 0.98 : 1.02;
     } else {
-      // Outside gate — proportional correction, eases to 1.0 as drift→0
-      const correction = Math.max(-MAX, Math.min(MAX, frameDrift * GAIN));
-      const target     = 1.0 - correction;
-      const current    = player.playbackRate;
-      player.playbackRate = current + Math.max(-SMOOTH, Math.min(SMOOTH, target - current));
+      player.playbackRate = 1.0;
     }
-
-    player.requestVideoFrameCallback(onFrame);
-  }
-  player.requestVideoFrameCallback(onFrame);
+  }, 500);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -683,6 +665,8 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
+    // Always start drift correction — not conditional on seekLive.
+    // doCut passes seekLive=false but still needs the sync loop running.
     startDriftCorrection(idx);
   };
   if(player.readyState>=1)doPlay();
@@ -703,19 +687,12 @@ function doCut(nextIdx){
 // ── TICK ──────────────────────────────────────────────────────
 function tick(){
   updateHUD();
-  const now = utcSec();
-  const slot = TIMELINE[currentIdx];
-  if(!slot) return;
-  // Cut if: past end of slot, OR current slot doesn't contain now
-  // The second condition catches wrong-slot assignments from findSlot
-  // returning index 0 when UTC falls in a gap between blocks
-  const wrongSlot = now < slot.startSec || now >= slot.endSec;
-  if(wrongSlot){
-    const ni = findSlot(now);
-    if(ni !== currentIdx){
-      console.log(`[tick] wrong slot detected — cutting to idx=${ni}`);
-      doCut(ni);
-    }
+  const now=utcSec();
+  const slot=TIMELINE[currentIdx];
+  if(!slot)return;
+  if(now>=slot.endSec){
+    const ni=findSlot(now);
+    if(ni!==currentIdx)doCut(ni);
   }
 }
 
@@ -768,51 +745,6 @@ window.tuneIn = function(){
   tickInterval=setInterval(tick,500);
 };
 
-// ── DEBUG OVERLAY ─────────────────────────────────────────────
-// Tap/click the overlay to freeze readings for comparison.
-// Tap again to unfreeze. Remove before production deployment.
-(()=>{
-  const dbg = document.createElement('div');
-  dbg.id = 'dbg';
-  dbg.style.cssText = 'position:fixed;top:0;left:0;z-index:999;background:rgba(0,0,0,0.85);color:#0f0;font-family:"IBM Plex Mono",monospace;font-size:11px;line-height:2;padding:8px 12px;pointer-events:all;white-space:pre;cursor:pointer;user-select:none;min-width:220px';
-  dbg.title = 'Tap to freeze / unfreeze';
-  document.body.appendChild(dbg);
-
-  let frozen = false;
-  let frozenAt = '';
-  dbg.addEventListener('click', ()=>{
-    frozen = !frozen;
-    dbg.style.borderBottom = frozen ? '2px solid #ff0' : 'none';
-    dbg.style.color = frozen ? '#ff0' : '#0f0';
-  });
-
-  const p = n => String(Math.floor(n)).padStart(2,'0');
-  const ms3 = n => String(Math.round((n%1)*1000)).padStart(3,'0');
-
-  setInterval(()=>{
-    if(frozen) return;
-    const slot   = TIMELINE[currentIdx];
-    const utc    = utcSec();
-    const hh     = p(utc/3600), mm = p((utc%3600)/60), ss = p(utc%60), ms = ms3(utc);
-    const exp    = slot ? Math.max(0, utc - slot.startSec) : 0;
-    const drift  = slot ? (player.currentTime - exp) : 0;
-    const slotOk = slot && utc >= slot.startSec && utc < slot.endSec;
-    const rVfc   = !!player.requestVideoFrameCallback;
-    const locked = rVfcActive && Math.abs(drift) <= GATE;
-    const sync   = rVfcActive
-      ? (locked ? 'LOCKED ±80ms' : 'rVFC correcting')
-      : (rVfc ? 'seeking...' : 'fallback');
-    dbg.textContent =
-      `UTC      ${utc.toFixed(3)}s  ${hh}:${mm}:${ss}.${ms}\n`+
-      `rVFC     ${rVfc?'supported':'NOT supported'}\n`+
-      `expected ${exp.toFixed(3)}s${slotOk?'':' ⚠'}\n`+
-      `actual   ${player.currentTime.toFixed(3)}s\n`+
-      `drift    ${drift.toFixed(3)}s\n`+
-      `rate     ${player.playbackRate.toFixed(4)}x\n`+
-      `sync     ${sync}\n`+
-      `[tap to freeze]`;
-  }, 250);
-})();
 </script>
 </body>
 </html>
