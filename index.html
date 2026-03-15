@@ -524,12 +524,14 @@ async function fetchPublishDate(id){
 //  frame-accurate. They engage in sequence like gears in a gearbox.
 // ══════════════════════════════════════════════════════════════
 
-// Gear 3 constants — conservative to stay inaudible
-const G3_GAIN    = 0.10;   // rate units per second of frame drift
-const G3_MAX     = 0.02;   // ±2% maximum rate correction
-const G3_SMOOTH  = 0.002;  // max rate change per frame (~0.2% per frame)
+// Gear 3 constants
+const G3_GAIN       = 0.04;   // proportional gain — scales rate with drift
+const G3_MAX        = 0.02;   // ±2% rate ceiling
+const G3_SMOOTH     = 0.0005; // max rate change per frame — very smooth
+const G3_STABLE_MS  = 800;    // ms after play() before engaging corrections
+const G3_MIN_FRAMES = 10;     // minimum frames before correction starts
 
-let driftInterval = null;  // unused but kept for compatibility
+let driftInterval = null;
 let g3Active      = false;
 let g3Idx         = -1;
 
@@ -541,41 +543,66 @@ function cancelSync(){
 }
 
 // ── GEAR 3: Frame lock ────────────────────────────────────────
+// Proportional rate controller — rate scales continuously with drift.
+// At zero drift, correction is zero and rate returns exactly to 1.0.
+// Mobile buffer guard prevents false corrections from early frames
+// where mediaTime=0 before buffering has stabilised.
 function startGear3(slot, idx){
-  g3Active = true;
-  g3Idx    = idx;
+  // Cancel any existing Gear 3 before starting a new one
+  g3Active = false;
+  g3Idx    = -1;
+  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
+
+  const startMs    = Date.now();
+  let   frameCount = 0;
 
   if(!player.requestVideoFrameCallback){
-    // Fallback: setInterval at 500ms using currentTime
-    // Less precise than rVFC but still applies micro corrections
-    driftInterval = setInterval(()=>{
-      if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
-      if(player.paused || player.readyState < 2) return;
-      const expectedPos = utcSec() - slot.startSec;
-      const drift       = player.currentTime - expectedPos;
-      const correction  = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
-      const target      = 1.0 - correction;
-      const current     = player.playbackRate;
-      player.playbackRate = current + Math.max(-0.01, Math.min(0.01, target - current));
-    }, 500);
-    console.log('[gear3] fallback mode — rVFC not supported');
+    // Fallback for browsers without rVFC — setInterval after stable wait
+    setTimeout(()=>{
+      if(currentIdx !== idx) return;
+      g3Active = true;
+      g3Idx    = idx;
+      driftInterval = setInterval(()=>{
+        if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
+        if(player.paused || player.readyState < 2) return;
+        const drift      = player.currentTime - (utcSec() - slot.startSec);
+        const correction = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
+        const target     = 1.0 - correction;
+        const current    = player.playbackRate;
+        player.playbackRate = current + Math.max(-0.005, Math.min(0.005, target - current));
+      }, 500);
+      console.log('[gear3] fallback started for idx='+idx);
+    }, G3_STABLE_MS);
     return;
   }
 
+  g3Active = true;
+  g3Idx    = idx;
+
   function onFrame(nowMs, metadata){
-    if(!g3Active || g3Idx !== idx) return; // disengaged
+    if(!g3Active || g3Idx !== idx){
+      player.playbackRate = 1.0;
+      return;
+    }
     if(player.paused) return;
 
-    // metadata.mediaTime is the actual decoded frame position in seconds —
-    // not the coarse currentTime estimate. This is the key measurement.
+    frameCount++;
+    const ageMs = Date.now() - startMs;
+
+    // Buffer guard: ignore early frames before playback stabilises.
+    // metadata.mediaTime reports 0 on first frames — looks like huge drift.
+    if(ageMs < G3_STABLE_MS || frameCount < G3_MIN_FRAMES || metadata.mediaTime < 0.5){
+      player.requestVideoFrameCallback(onFrame);
+      return;
+    }
+
+    // Proportional correction — continuously scales toward 1.0 as drift → 0
     const expectedPos = utcSec() - slot.startSec;
     const frameDrift  = metadata.mediaTime - expectedPos;
-
-    // Proportional correction capped at G3_MAX
     const correction  = Math.max(-G3_MAX, Math.min(G3_MAX, frameDrift * G3_GAIN));
     const target      = 1.0 - correction;
 
-    // Smooth rate change — max G3_SMOOTH per frame, inaudible
+    // Smooth — rate eases toward target, never jumps
     const current     = player.playbackRate;
     const smoothed    = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
     player.playbackRate = smoothed;
@@ -584,7 +611,7 @@ function startGear3(slot, idx){
   }
 
   player.requestVideoFrameCallback(onFrame);
-  console.log('[gear3] frame lock engaged for idx='+idx);
+  console.log('[gear3] frame lock armed for idx='+idx+' engaging in '+G3_STABLE_MS+'ms');
 }
 
 // ── GEAR 2: Iterative re-anchor ───────────────────────────────
