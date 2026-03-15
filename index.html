@@ -499,58 +499,14 @@ async function fetchPublishDate(id){
   return dateCache[id];
 }
 
-// ── SYNC ENGINE — PROPORTIONAL RATE CONTROLLER ───────────────
-// Modelled on an audio compressor: correction is always proportional
-// to drift, always continuous, never a sudden seek or jump.
-//
-// playbackRate = 1.0 - clamp(drift × GAIN, -MAX_RATE, +MAX_RATE)
-//
-// GAIN controls responsiveness — how many rate units per second of drift.
-// At GAIN=0.05: 1s drift → 0.05x correction → closes in ~20s
-//               2s drift → 0.10x correction → closes in ~20s
-//              10s drift → MAX_RATE (0.10x) → closes in ~100s
-//
-// MAX_RATE caps the correction at ±10% — 1.10x/0.90x maximum.
-// This is the compressor ratio ceiling: beyond this the audio pitch
-// shift becomes noticeable. Below it, correction is imperceptible.
-//
-// No hard seeks. Ever. Every device smoothly converges from wherever
-// it lands to the correct UTC position at a rate proportional to
-// how far it is from the target — exactly like a compressor attack curve.
-
-const SYNC_GAIN     = 0.05;  // rate units per second of drift
-const SYNC_MAX_RATE = 0.10;  // maximum ±correction (10%)
-const SYNC_INTERVAL = 500;   // ms between corrections
-
+// ── SYNC ENGINE ───────────────────────────────────────────────
+// driftInterval: handle for the continuous drift-correction loop
 let driftInterval = null;
 
+// cancelSync: stops any in-flight rAF trigger and drift loop
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval=null; }
   player.playbackRate = 1.0;
-}
-
-function startDriftCorrection(idx){
-  if(driftInterval){ clearInterval(driftInterval); }
-  driftInterval = setInterval(()=>{
-    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
-    const slot = TIMELINE[idx];
-    if(!slot || player.paused || player.readyState < 2) return;
-
-    const expectedPos = utcSec() - slot.startSec;
-    const drift       = player.currentTime - Math.floor(expectedPos);
-
-    // Proportional correction — compressor curve
-    // drift > 0: playing ahead → slow down
-    // drift < 0: playing behind → speed up
-    const correction     = Math.max(-SYNC_MAX_RATE, Math.min(SYNC_MAX_RATE, drift * SYNC_GAIN));
-    const targetRate     = 1.0 - correction;
-    // Smooth the rate change itself — don't jump the rate, ease into it
-    // This is the compressor "attack" — rate changes at most 0.01x per tick
-    const currentRate    = player.playbackRate;
-    const smoothedRate   = currentRate + Math.max(-0.01, Math.min(0.01, targetRate - currentRate));
-    player.playbackRate  = smoothedRate;
-
-  }, SYNC_INTERVAL);
 }
 
 // precisePlay: spins a rAF loop until trueUtcMs() reaches targetUtcMs,
@@ -603,6 +559,42 @@ function precisePlay(slot, targetUtcMs, idx){
     }
   }
   requestAnimationFrame(loop);
+}
+
+// startDriftCorrection: 500ms tick with tiered rate nudging.
+// Hard seek only for drift >30s — avoids iOS keyframe snap loop.
+// Rate tiers close gaps proportionally without overshooting:
+//   < 0.08s  → locked,       1.0x
+//   < 2s     → gentle nudge, 0.98/1.02x  (closes 1s in ~50s, inaudible)
+//   < 10s    → strong nudge, 0.90/1.10x  (closes 8s in ~80s)
+//   < 30s    → fast nudge,   0.80/1.20x  (closes 20s in ~100s)
+//   >= 30s   → hard seek     (genuinely lost)
+function startDriftCorrection(idx){
+  if(driftInterval){ clearInterval(driftInterval); }
+  driftInterval = setInterval(()=>{
+    if(currentIdx !== idx){ clearInterval(driftInterval); driftInterval=null; return; }
+    const slot = TIMELINE[idx];
+    if(!slot || player.paused || player.readyState < 2) return;
+
+    const expectedPos  = utcSec() - slot.startSec;
+    const targetFrame1 = Math.floor(expectedPos);
+    const drift        = player.currentTime - targetFrame1;
+    const abs          = Math.abs(drift);
+
+    if(abs >= 30){
+      console.log(`[sync] hard resync drift=${drift.toFixed(3)}s → ${targetFrame1}s`);
+      player.currentTime = targetFrame1;
+      player.playbackRate = 1.0;
+    } else if(abs > 10){
+      player.playbackRate = drift > 0 ? 0.80 : 1.20;
+    } else if(abs > 2){
+      player.playbackRate = drift > 0 ? 0.90 : 1.10;
+    } else if(abs > 0.08){
+      player.playbackRate = drift > 0 ? 0.98 : 1.02;
+    } else {
+      player.playbackRate = 1.0;
+    }
+  }, 500);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
