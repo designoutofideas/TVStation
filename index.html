@@ -496,42 +496,38 @@ async function fetchPublishDate(id){
   return dateCache[id];
 }
 
-// ── SYNC ENGINE ───────────────────────────────────────────────
 // ══════════════════════════════════════════════════════════════
 //  THREE-GEAR UTC SYNC ENGINE
 //
-//  GEAR 1 — Coarse seek
-//    Seeks to floor(utcSec - slot.startSec) at the top of the next
-//    UTC second. All devices fire simultaneously. Accepts keyframe
-//    snap. Lands within 0–3s of UTC. Hands off to Gear 2.
+//  IRON RULE: no seeks after play() is called.
+//  Mobile seeking during playback causes rebuffering, choppy audio,
+//  and growing negative drift. All seeks happen before play().
 //
-//  GEAR 2 — Fine re-anchor
-//    Listens for the native 'seeked' event — fires when the decoder
-//    has physically landed. At that exact millisecond, reads live UTC
-//    and corrects currentTime to where we ACTUALLY are right now.
-//    Lands within ~200ms of UTC. Hands off to Gear 3.
+//  GEAR 1 — Coarse pre-play seek
+//    Waits for top of next UTC second (rAF loop). Seeks to floor(utcPos).
+//    Video loads and buffers. Hands to Gear 2 via 'seeked' event.
 //
-//  GEAR 3 — Frame lock (requestVideoFrameCallback)
-//    Fires on every rendered frame. Reads metadata.mediaTime — the
-//    actual decoded frame position, not coarse currentTime. Computes
-//    frameDrift against live UTC and applies a micro rate correction
-//    (max ±2%) to hold every device on the same UTC millisecond
-//    continuously. Rate change is smoothed at 0.002x per frame —
-//    completely inaudible. Falls back gracefully on unsupported browsers.
+//  GEAR 2 — Single corrective pre-play seek
+//    Fires once on 'seeked'. Measures actual landed position vs UTC.
+//    If gap > G2_THRESHOLD: one more seek to UTC + latency estimate.
+//    Waits for that seek's 'seeked' event, then calls play().
+//    Maximum two seeks total before play() — no looping on mobile.
 //
-//  Each gear only handles the residual error left by the previous one.
-//  Gear 3 never closes a 2-second gap. Gear 1 never tries to be
-//  frame-accurate. They engage in sequence like gears in a gearbox.
+//  GEAR 3 — Frame lock (rate-only, no seeks ever)
+//    requestVideoFrameCallback fires on every rendered frame.
+//    Reads metadata.mediaTime (actual frame position, not currentTime).
+//    Applies proportional rate correction: rate → 1.0 as drift → 0.
+//    Completely inaudible. Falls back to setInterval on older browsers.
 // ══════════════════════════════════════════════════════════════
 
-// Gear 3 constants
-const G3_GAIN    = 0.04;    // proportional — scales rate continuously with drift
-const G3_MAX     = 0.02;    // ±2% ceiling
-const G3_SMOOTH  = 0.0002;  // max rate change per frame — artifact-free
-
-let driftInterval = null;  // unused but kept for compatibility
+let driftInterval = null;
 let g3Active      = false;
 let g3Idx         = -1;
+
+// Gear 3 constants
+const G3_GAIN   = 0.04;    // proportional gain
+const G3_MAX    = 0.02;    // ±2% rate ceiling
+const G3_SMOOTH = 0.0002;  // max rate change per frame — artifact-free
 
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
@@ -540,120 +536,99 @@ function cancelSync(){
   player.playbackRate = 1.0;
 }
 
-// ── GEAR 3: Frame lock ────────────────────────────────────────
+// ── GEAR 3 ───────────────────────────────────────────────────
 function startGear3(slot, idx){
+  g3Active = false; // reset first — stops any running instance
+  g3Idx    = -1;
+  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
+
   g3Active = true;
   g3Idx    = idx;
 
   if(!player.requestVideoFrameCallback){
-    // Fallback: setInterval at 500ms using currentTime
-    // Less precise than rVFC but still applies micro corrections
+    // Fallback: setInterval, rate-only
     driftInterval = setInterval(()=>{
       if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
       if(player.paused || player.readyState < 2) return;
-      const expectedPos = utcSec() - slot.startSec;
-      const drift       = player.currentTime - expectedPos;
-      const correction  = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
-      const target      = 1.0 - correction;
-      const current     = player.playbackRate;
-      player.playbackRate = current + Math.max(-0.01, Math.min(0.01, target - current));
+      const drift      = player.currentTime - (utcSec() - slot.startSec);
+      const correction = Math.max(-G3_MAX, Math.min(G3_MAX, drift * G3_GAIN));
+      const target     = 1.0 - correction;
+      const current    = player.playbackRate;
+      player.playbackRate = current + Math.max(-0.002, Math.min(0.002, target - current));
     }, 500);
-    console.log('[gear3] fallback mode — rVFC not supported');
+    console.log('[gear3] fallback started idx='+idx);
     return;
   }
 
   function onFrame(nowMs, metadata){
-    if(!g3Active || g3Idx !== idx) return; // disengaged
-    if(player.paused) return;
-
-    // metadata.mediaTime is the actual decoded frame position in seconds —
-    // not the coarse currentTime estimate. This is the key measurement.
+    if(!g3Active || g3Idx !== idx){ player.playbackRate = 1.0; return; }
+    if(player.paused || metadata.mediaTime < 0.5) {
+      player.requestVideoFrameCallback(onFrame);
+      return;
+    }
     const expectedPos = utcSec() - slot.startSec;
     const frameDrift  = metadata.mediaTime - expectedPos;
-
-    // Proportional correction capped at G3_MAX
     const correction  = Math.max(-G3_MAX, Math.min(G3_MAX, frameDrift * G3_GAIN));
     const target      = 1.0 - correction;
-
-    // Smooth rate change — max G3_SMOOTH per frame, inaudible
     const current     = player.playbackRate;
-    const smoothed    = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
-    player.playbackRate = smoothed;
-
+    player.playbackRate = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
     player.requestVideoFrameCallback(onFrame);
   }
-
   player.requestVideoFrameCallback(onFrame);
-  console.log('[gear3] frame lock engaged for idx='+idx);
+  console.log('[gear3] frame lock engaged idx='+idx);
 }
 
-// ── GEAR 2: Iterative re-anchor ───────────────────────────────
-// Loops until within G2_THRESHOLD of UTC before handing to Gear 3.
-// Seek latency compensation adapts per-attempt based on measured seek time.
-// More attempts and tighter threshold ensure mobile lands close enough
-// for Gear 3's micro-corrections to reach zero drift quickly.
-const G2_THRESHOLD    = 0.3;   // seconds — hand to Gear 3 within this margin
-const G2_MAX_ATTEMPTS = 10;    // enough for repeated mobile keyframe snaps
+// ── GEAR 2 ───────────────────────────────────────────────────
+// One measurement, at most one corrective seek, then play().
+// Never seeks during playback.
+const G2_THRESHOLD = 1.0; // seconds — acceptable pre-play gap for Gear 3
 
 function startGear2(slot, idx, onComplete){
-  let attempts    = 0;
-  let lastSeekMs  = null; // track actual seek latency per attempt
+  const seekStartMs = Date.now();
 
-  function tryAnchor(){
+  function onSeeked(){
+    player.removeEventListener('seeked', onSeeked);
     if(currentIdx !== idx) return;
 
-    const nowUtc   = utcSec();
-    const livePos  = nowUtc - slot.startSec;
-    const dur      = player.duration;
-    const target   = Math.max(0, livePos);
-    const clamped  = isFinite(dur) ? Math.min(target, dur - 2) : target;
-    const delta    = player.currentTime - clamped;
-    const absDelta = Math.abs(delta);
+    const seekLatencyMs = Date.now() - seekStartMs;
+    const nowUtc        = utcSec();
+    const livePos       = nowUtc - slot.startSec;
+    const dur           = player.duration;
+    const delta         = player.currentTime - livePos;
 
-    attempts++;
-    console.log(`[gear2] attempt ${attempts} pos=${player.currentTime.toFixed(2)}s target=${clamped.toFixed(2)}s Δ${delta.toFixed(3)}s`);
+    console.log(`[gear2] landed pos=${player.currentTime.toFixed(2)}s target=${livePos.toFixed(2)}s Δ${delta.toFixed(3)}s seekLatency=${seekLatencyMs}ms`);
 
-    if(absDelta <= G2_THRESHOLD || attempts >= G2_MAX_ATTEMPTS){
-      console.log(`[gear2] done after ${attempts} attempt(s) Δ${delta.toFixed(3)}s → gear3`);
+    if(Math.abs(delta) <= G2_THRESHOLD){
+      // Close enough — hand to play + Gear 3
+      console.log('[gear2] within threshold → play');
       onComplete();
       return;
     }
 
-    // Adaptive latency compensation: use measured seek time from last attempt,
-    // defaulting to 1.5s for first attempt (conservative mobile estimate).
-    const seekLatency = lastSeekMs !== null ? (lastSeekMs / 1000) : 1.5;
-    const compensated = Math.max(0, Math.min(
-      isFinite(dur) ? dur - 2 : Infinity,
-      clamped + seekLatency
-    ));
+    // One corrective seek — compensate for seek latency
+    // Seek to where UTC will be when the seek completes
+    const latencyCompSec = Math.min(seekLatencyMs / 1000, 3.0); // cap at 3s
+    const corrTarget     = Math.max(0, livePos + latencyCompSec);
+    const clamped        = isFinite(dur) ? Math.min(corrTarget, dur - 2) : corrTarget;
 
-    console.log(`[gear2] re-seek → ${compensated.toFixed(2)}s (latency compensation ${seekLatency.toFixed(2)}s)`);
+    console.log(`[gear2] corrective seek → ${clamped.toFixed(2)}s (latency comp ${latencyCompSec.toFixed(2)}s)`);
 
-    const seekStartMs = Date.now();
-    function onSeeked(){
-      player.removeEventListener('seeked', onSeeked);
+    function onCorrected(){
+      player.removeEventListener('seeked', onCorrected);
       if(currentIdx !== idx) return;
-      lastSeekMs = Date.now() - seekStartMs; // measure actual seek latency
-      setTimeout(tryAnchor, 80);
+      const finalDelta = player.currentTime - (utcSec() - slot.startSec);
+      console.log(`[gear2] corrected Δ${finalDelta.toFixed(3)}s → play`);
+      onComplete();
     }
-    player.addEventListener('seeked', onSeeked);
-    player.currentTime = compensated;
+    player.addEventListener('seeked', onCorrected);
+    player.currentTime = clamped;
   }
 
-  // First measurement: fires on the seeked event issued by Gear 1
-  const seekStartMs = Date.now();
-  function onFirstSeeked(){
-    player.removeEventListener('seeked', onFirstSeeked);
-    if(currentIdx !== idx) return;
-    lastSeekMs = Date.now() - seekStartMs;
-    setTimeout(tryAnchor, 80);
-  }
-  player.addEventListener('seeked', onFirstSeeked);
+  player.addEventListener('seeked', onSeeked);
 }
 
-// ── GEAR 1: Coarse seek ───────────────────────────────────────
-// Waits for top of next UTC second (all devices fire simultaneously),
-// seeks to floor(utcPos), then chains to Gear 2 → Gear 3.
+// ── GEAR 1 ───────────────────────────────────────────────────
+// Waits for top of next UTC second, seeks, arms Gear 2, then play() + Gear 3.
 function precisePlay(slot, targetUtcMs, idx){
   function loop(){
     if(currentIdx !== idx) return;
@@ -663,11 +638,10 @@ function precisePlay(slot, targetUtcMs, idx){
       const seekTo      = Math.max(0, Math.floor(liveOffset));
       const dur         = player.duration;
       const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      console.log(`[gear1] seek to ${clampedSeek}s at utc=${utcSec().toFixed(3)}s`);
+      console.log(`[gear1] seek to ${clampedSeek}s utc=${utcSec().toFixed(3)}s`);
 
-      // Arm Gear 2 before issuing the seek so the 'seeked' event is caught
+      // Arm Gear 2 before the seek so 'seeked' is captured
       startGear2(slot, idx, ()=>{
-        // Gear 2 complete — start playback then engage Gear 3
         player.playbackRate = 1.0;
         player.play().catch(async e=>{
           const confirmed = await resolveUrl(slot.id);
@@ -691,10 +665,11 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
-// startDriftCorrection: stub — three-gear engine handles all sync.
-// Gear 3 is started exclusively by precisePlay → Gear 2 → Gear 3 chain.
-// This stub exists only to satisfy call sites in the short-offset path.
-function startDriftCorrection(idx){ /* no-op — see precisePlay chain */ }
+function startDriftCorrection(idx){
+  // Stub — Gear 3 handles ongoing correction via startGear3
+  const slot = TIMELINE[idx];
+  if(slot && g3Idx !== idx) startGear3(slot, idx);
+}
 
 // ── PLAYBACK ──────────────────────────────────────────────────
 async function playSlot(idx,seekLive){
@@ -743,7 +718,6 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
-    // Short-offset path: Gear 1 seek not needed — engage Gear 3 directly
     startGear3(slot, idx);
   };
   if(player.readyState>=1)doPlay();
@@ -852,17 +826,19 @@ window.tuneIn = function(){
 
   setInterval(()=>{
     if(frozen) return;
-    const slot = TIMELINE[currentIdx];
-    const utc  = utcSec();
-    const hh   = p(utc/3600), mm = p((utc%3600)/60), ss = p(utc%60), ms = ms3(utc);
-    const exp  = slot ? Math.max(0, utc - slot.startSec) : 0;
-    const drift= slot ? (player.currentTime - exp) : 0;
+    const slot   = TIMELINE[currentIdx];
+    const utc    = utcSec();
+    const hh     = p(utc/3600), mm = p((utc%3600)/60), ss = p(utc%60), ms = ms3(utc);
+    const exp    = slot ? Math.max(0, utc - slot.startSec) : 0;
+    const drift  = slot ? (player.currentTime - exp) : 0;
     const slotOk = slot && utc >= slot.startSec && utc < slot.endSec;
-    const gear = g3Active ? (player.requestVideoFrameCallback ? 'GEAR 3 — frame lock' : 'GEAR 3 — fallback') : 'GEAR 1/2';
+    const gear   = g3Active
+      ? (player.requestVideoFrameCallback ? 'G3 frame lock' : 'G3 fallback')
+      : 'G1/G2 seeking';
     dbg.textContent =
       `UTC      ${utc.toFixed(3)}s  ${hh}:${mm}:${ss}.${ms}\n`+
       `offset   ${clockOffset}ms\n`+
-      `expected ${exp.toFixed(3)}s${slotOk?'':' ⚠ wrong slot'}\n`+
+      `expected ${exp.toFixed(3)}s${slotOk?'':' ⚠'}\n`+
       `actual   ${player.currentTime.toFixed(3)}s\n`+
       `drift    ${drift.toFixed(3)}s\n`+
       `rate     ${player.playbackRate.toFixed(4)}x\n`+
