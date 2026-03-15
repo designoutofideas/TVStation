@@ -496,162 +496,73 @@ async function fetchPublishDate(id){
   return dateCache[id];
 }
 
-// ══════════════════════════════════════════════════════════════
-//  SYNC ENGINE — MOBILE-AWARE
+// ── SYNC ENGINE ───────────────────────────────────────────────
+// Key facts from research:
+//   - Date.now() is equally accurate on desktop and mobile (OS NTP ±50ms)
+//   - player.currentTime is COARSE on mobile Safari — rounded and decoupled
+//     from actual buffer position. This was causing all mobile sync failures.
+//   - metadata.mediaTime from requestVideoFrameCallback is frame-accurate
+//     on ALL devices including iOS Safari 15.4+ (iPhone 16 Pro: supported)
+//   - Therefore: use rVFC + metadata.mediaTime on all devices, not currentTime
 //
-//  IRON RULE: no seeks after play() is called on any device.
-//
-//  DESKTOP path:
-//    Gear 1 → single seek → play() → Gear 3 fine lock (±2%)
-//    Desktop lands within ~500ms of UTC. Gear 3 closes it quietly.
-//
-//  MOBILE path:
-//    Gear 1 → single seek → play() → Gear 3 coarse lock (±15%)
-//    Mobile lands within ~3–5s of UTC. Coarse rate closes it in ~30s.
-//    Once within 0.5s → Gear 3 fine lock (±2%) holds it there.
-//
-//  Gear 3 is rate-only on both paths. No seeks, no rebuffering,
-//  no choppy playback. The rate tiers step down as drift closes —
-//  like a car downshifting as it reaches cruising speed.
-// ══════════════════════════════════════════════════════════════
-
-const isMobile = /iPhone|iPad|iPod|Android/i.test(navigator.userAgent);
+// Architecture:
+//   precisePlay  — seeks to UTC position, waits for 'seeked', plays
+//   startDriftCorrection — rVFC loop using metadata.mediaTime (not currentTime)
+//                          Falls back to setInterval only if rVFC unavailable
 
 let driftInterval = null;
-let g3Active      = false;
-let g3Idx         = -1;
-
-// Fine lock constants (all devices once within threshold)
-const G3_FINE_MAX    = 0.02;   // ±2%
-const G3_FINE_GAIN   = 0.04;
-const G3_FINE_THRESH = 0.5;    // seconds — switch from coarse to fine
-
-// Coarse lock constants (mobile only, large initial gap)
-const G3_COARSE_MAX  = 0.15;   // ±15% — closes 5s gap in ~33s
-const G3_COARSE_GAIN = 0.05;
-
-// Rate smoothing — artifact-free
-const G3_SMOOTH      = 0.0002; // max rate change per frame
+let rVfcActive    = false;
+let rVfcIdx       = -1;
 
 function cancelSync(){
   if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
-  g3Active = false;
-  g3Idx    = -1;
+  rVfcActive = false;
+  rVfcIdx    = -1;
   player.playbackRate = 1.0;
 }
 
-// ── GEAR 3 ───────────────────────────────────────────────────
-function startGear3(slot, idx){
-  g3Active = false;
-  g3Idx    = -1;
-  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
-  g3Active = true;
-  g3Idx    = idx;
-
-  function computeRate(drift){
-    const abs = Math.abs(drift);
-    // Step down through tiers as drift closes
-    const max  = (isMobile && abs > G3_FINE_THRESH) ? G3_COARSE_MAX  : G3_FINE_MAX;
-    const gain = (isMobile && abs > G3_FINE_THRESH) ? G3_COARSE_GAIN : G3_FINE_GAIN;
-    const correction = Math.max(-max, Math.min(max, drift * gain));
-    return 1.0 - correction;
-  }
-
-  if(!player.requestVideoFrameCallback){
-    // Fallback: setInterval rate-only
-    driftInterval = setInterval(()=>{
-      if(!g3Active || g3Idx !== idx){ clearInterval(driftInterval); driftInterval = null; return; }
-      if(player.paused || player.readyState < 2) return;
-      const drift   = player.currentTime - (utcSec() - slot.startSec);
-      const target  = computeRate(drift);
-      const current = player.playbackRate;
-      player.playbackRate = current + Math.max(-0.005, Math.min(0.005, target - current));
-    }, 500);
-    console.log('[gear3] fallback started idx='+idx+' mobile='+isMobile);
-    return;
-  }
-
-  function onFrame(nowMs, metadata){
-    if(!g3Active || g3Idx !== idx){ player.playbackRate = 1.0; return; }
-    if(player.paused || metadata.mediaTime < 0.3){
-      player.requestVideoFrameCallback(onFrame);
-      return;
-    }
-    const expectedPos = utcSec() - slot.startSec;
-    const frameDrift  = metadata.mediaTime - expectedPos;
-    const target      = computeRate(frameDrift);
-    const current     = player.playbackRate;
-    player.playbackRate = current + Math.max(-G3_SMOOTH, Math.min(G3_SMOOTH, target - current));
-    player.requestVideoFrameCallback(onFrame);
-  }
-  player.requestVideoFrameCallback(onFrame);
-  console.log('[gear3] engaged idx='+idx+' mobile='+isMobile);
-}
-
-// ── GEAR 1 + 2 combined ───────────────────────────────────────
-// One seek (Gear 1), one optional corrective seek (Gear 2),
-// both before play(). Then play() + Gear 3. No seeks after.
+// precisePlay: waits for UTC second boundary, seeks, waits for 'seeked',
+// re-anchors to live UTC at that exact ms, then plays.
 function precisePlay(slot, targetUtcMs, idx){
   function loop(){
     if(currentIdx !== idx) return;
     const now = trueUtcMs();
     if(now >= targetUtcMs){
-      const seekTo    = Math.max(0, Math.floor(utcSec() - slot.startSec));
-      const dur       = player.duration;
-      const clamped   = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
-      const seekStart = Date.now();
-      console.log(`[gear1] seek ${clamped}s utc=${utcSec().toFixed(2)}s`);
+      // Use utcSec() not now/1000 — utcSec() returns seconds-since-midnight
+      const liveOffset  = utcSec() - slot.startSec;
+      const seekTo      = Math.max(0, Math.floor(liveOffset));
+      const dur         = player.duration;
+      const clampedSeek = isFinite(dur) ? Math.min(seekTo, dur - 2) : seekTo;
+      console.log(`[precisePlay] seek ${clampedSeek}s utc=${utcSec().toFixed(3)}s`);
 
+      // After seek lands, re-anchor to live UTC before playing
       function onSeeked(){
         player.removeEventListener('seeked', onSeeked);
         if(currentIdx !== idx) return;
-        const seekMs    = Date.now() - seekStart;
-        const livePos   = utcSec() - slot.startSec;
-        const delta     = player.currentTime - livePos;
-        console.log(`[gear2] landed Δ${delta.toFixed(2)}s seekMs=${seekMs}`);
-
-        function doPlay(){
-          player.playbackRate = 1.0;
-          player.play().catch(async e=>{
-            const confirmed = await resolveUrl(slot.id);
-            if(confirmed && currentIdx === idx){
-              player.src = confirmed; player.load();
-              player.currentTime = Math.max(0, utcSec() - slot.startSec);
-              player.play().catch(()=>{});
-            } else if(!confirmed){
-              console.warn('Skipping:', slot.title);
-              doCut((idx+1) % TIMELINE.length);
-            }
-          });
-          startGear3(slot, idx);
+        const liveNow    = utcSec() - slot.startSec;
+        const anchorPos  = Math.max(0, liveNow);
+        const anchClamped = isFinite(dur) ? Math.min(anchorPos, dur - 2) : anchorPos;
+        const delta = Math.abs(player.currentTime - anchClamped);
+        if(delta > 0.5){
+          console.log(`[precisePlay] re-anchor Δ${delta.toFixed(2)}s → ${anchClamped.toFixed(2)}s`);
+          player.currentTime = anchClamped;
         }
-
-        // On desktop: if gap > 1s, one corrective seek before play
-        // On mobile: skip corrective seek entirely — rebuffering is worse
-        //            than letting Gear 3 coarse-close the gap via rate
-        if(!isMobile && Math.abs(delta) > 1.0){
-          const latency   = Math.min(seekMs / 1000, 2.0);
-          const corrected = Math.max(0, Math.min(
-            isFinite(dur) ? dur - 2 : Infinity,
-            livePos + latency
-          ));
-          console.log(`[gear2] desktop corrective seek → ${corrected.toFixed(2)}s`);
-          function onCorrected(){
-            player.removeEventListener('seeked', onCorrected);
-            if(currentIdx !== idx) return;
-            doPlay();
+        player.playbackRate = 1.0;
+        player.play().catch(async e=>{
+          const confirmed = await resolveUrl(slot.id);
+          if(confirmed && currentIdx===idx){
+            player.src=confirmed; player.load();
+            player.currentTime=Math.max(0, utcSec()-slot.startSec);
+            player.play().catch(()=>{});
+          } else if(!confirmed){
+            console.warn('Skipping:', slot.title);
+            doCut((idx+1)%TIMELINE.length);
           }
-          player.addEventListener('seeked', onCorrected);
-          player.currentTime = corrected;
-        } else {
-          // Mobile: play immediately from wherever Gear 1 landed
-          // Gear 3 coarse tier closes the gap via rate — no rebuffering
-          doPlay();
-        }
+        });
+        startDriftCorrection(idx);
       }
-
       player.addEventListener('seeked', onSeeked);
-      player.currentTime = clamped;
+      player.currentTime = clampedSeek;
     } else {
       requestAnimationFrame(loop);
     }
@@ -659,9 +570,70 @@ function precisePlay(slot, targetUtcMs, idx){
   requestAnimationFrame(loop);
 }
 
+// startDriftCorrection: uses requestVideoFrameCallback on all devices.
+// metadata.mediaTime is the actual decoded frame position — frame-accurate
+// on iOS Safari 15.4+ and all modern desktop browsers.
+// This bypasses the coarse/rounded currentTime entirely.
+// Gate band ±80ms: rate=1.0 exactly. Outside: proportional correction ±2%.
+const GATE  = 0.08;   // ±80ms — rate=1.0 within this band
+const GAIN  = 0.04;   // proportional gain
+const MAX   = 0.02;   // ±2% rate ceiling
+const SMOOTH= 0.0002; // max rate change per frame
+
 function startDriftCorrection(idx){
-  const slot = TIMELINE[idx];
-  if(slot && g3Idx !== idx) startGear3(slot, idx);
+  rVfcActive = false;
+  rVfcIdx    = -1;
+  if(driftInterval){ clearInterval(driftInterval); driftInterval = null; }
+
+  if(!player.requestVideoFrameCallback){
+    // Fallback for very old browsers — setInterval with currentTime
+    // This path should not be reached on any modern device
+    console.warn('[sync] rVFC not supported — using setInterval fallback');
+    driftInterval = setInterval(()=>{
+      if(currentIdx !== idx){ clearInterval(driftInterval); return; }
+      const slot = TIMELINE[idx];
+      if(!slot || player.paused || player.readyState < 2) return;
+      const drift = player.currentTime - (utcSec() - slot.startSec);
+      const abs   = Math.abs(drift);
+      if(abs >= 30){ player.currentTime = Math.floor(utcSec()-slot.startSec); player.playbackRate=1.0; }
+      else if(abs > 2){ player.playbackRate = drift>0?0.90:1.10; }
+      else if(abs > GATE){ player.playbackRate = drift>0?0.98:1.02; }
+      else { player.playbackRate = 1.0; }
+    }, 500);
+    return;
+  }
+
+  // rVFC path — frame-accurate on all modern devices including iOS 15.4+
+  rVfcActive = true;
+  rVfcIdx    = idx;
+  console.log(`[sync] rVFC drift correction started idx=${idx} device=${/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)?'mobile':'desktop'}`);
+
+  function onFrame(nowMs, metadata){
+    if(!rVfcActive || rVfcIdx !== idx){ player.playbackRate = 1.0; return; }
+    if(player.paused){ player.requestVideoFrameCallback(onFrame); return; }
+
+    // metadata.mediaTime: actual frame position — precise on all devices
+    // This is the key measurement that replaces coarse currentTime
+    const slot        = TIMELINE[idx];
+    if(!slot){ player.requestVideoFrameCallback(onFrame); return; }
+
+    const expectedPos = utcSec() - slot.startSec;
+    const frameDrift  = metadata.mediaTime - expectedPos;
+
+    if(Math.abs(frameDrift) <= GATE){
+      // Inside gate — locked, rate exactly 1.0
+      player.playbackRate = 1.0;
+    } else {
+      // Outside gate — proportional correction, eases to 1.0 as drift→0
+      const correction = Math.max(-MAX, Math.min(MAX, frameDrift * GAIN));
+      const target     = 1.0 - correction;
+      const current    = player.playbackRate;
+      player.playbackRate = current + Math.max(-SMOOTH, Math.min(SMOOTH, target - current));
+    }
+
+    player.requestVideoFrameCallback(onFrame);
+  }
+  player.requestVideoFrameCallback(onFrame);
 }
 
 // ── PLAYBACK ──────────────────────────────────────────────────
@@ -711,7 +683,7 @@ async function playSlot(idx,seekLive){
         doCut((idx+1)%TIMELINE.length);
       }
     });
-    startGear3(slot, idx);
+    startDriftCorrection(idx);
   };
   if(player.readyState>=1)doPlay();
   else player.addEventListener('loadedmetadata',function h(){player.removeEventListener('loadedmetadata',h);doPlay()});
@@ -825,15 +797,19 @@ window.tuneIn = function(){
     const exp    = slot ? Math.max(0, utc - slot.startSec) : 0;
     const drift  = slot ? (player.currentTime - exp) : 0;
     const slotOk = slot && utc >= slot.startSec && utc < slot.endSec;
-    const tier   = g3Active ? (Math.abs(drift) > 0.5 && isMobile ? 'G3 coarse ±15%' : 'G3 fine ±2%') : 'G1/G2';
+    const rVfc   = !!player.requestVideoFrameCallback;
+    const locked = rVfcActive && Math.abs(drift) <= GATE;
+    const sync   = rVfcActive
+      ? (locked ? 'LOCKED ±80ms' : 'rVFC correcting')
+      : (rVfc ? 'seeking...' : 'fallback');
     dbg.textContent =
       `UTC      ${utc.toFixed(3)}s  ${hh}:${mm}:${ss}.${ms}\n`+
-      `offset   ${clockOffset}ms  ${isMobile?'[mobile]':'[desktop]'}\n`+
+      `rVFC     ${rVfc?'supported':'NOT supported'}\n`+
       `expected ${exp.toFixed(3)}s${slotOk?'':' ⚠'}\n`+
       `actual   ${player.currentTime.toFixed(3)}s\n`+
       `drift    ${drift.toFixed(3)}s\n`+
       `rate     ${player.playbackRate.toFixed(4)}x\n`+
-      `sync     ${tier}\n`+
+      `sync     ${sync}\n`+
       `[tap to freeze]`;
   }, 250);
 })();
